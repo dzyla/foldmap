@@ -242,6 +242,9 @@ def draw_topology(
     written: the note says why and which arguments draw less (focus, chains); the structured result's `floor` lists
     the reasons, each {reason, measured, limit, text} (empty above it). A figure that took longer than the hosted
     app's 90 s is said so in the note, never judged.
+    With domains_from "auto", the note says each inferred domain split with its confidence (1 - its normalized cut
+    / DOMAIN_NCUT: 0 at the limit, 1 with no contact across; said, never judged), and the structured result's
+    `domain_splits` lists them, each {chain, between, ncut, confidence, across, density_ratio, residues, sides}.
     msa_path: alignment for theme 'conservation'. uniprot: "auto" or an accession, to mark UniProt active and binding
     sites (style key uniprot_sites: all, or types like "active,modified"); uniprot_domains: UniProt domain panels.
     layout_file / save_layout: load or write a YAML layout file that re-creates the figure
@@ -263,6 +266,7 @@ def draw_topology(
     in the structured result's `data_problems` [{where, text}]; crosslinks drawn are among `interactions` (kind xl,
     or xl-over when longer than their span)."""
     from . import layoutfile
+    from .domain_confidence import said as splits_said
     from .floor import said as floor_said
     from .provenance import lines
     from .render import save
@@ -333,6 +337,9 @@ def draw_topology(
         below, floor_line = floor_said(drawn, "mcp")  # the readability floor (floor.py): said, never drawn
         if floor_line:  # its reasons, and the time note (never judged)
             note += f"; warning: {floor_line}"
+        splits, splits_line = splits_said(drawn)  # inferred domain splits' confidence (domain_confidence.py)
+        if splits_line:
+            note += f"; {splits_line}"
         return CallToolResult(
             content=[TextContent(type="text", text=note), _preview(drawn.figure).to_image_content()],
             structured_content={
@@ -342,6 +349,7 @@ def draw_topology(
                 "bent_duplex": drawn.layout.bent_duplex,  # na_bend (pieces or curved) is a choice for it
                 "fallbacks": drawn.fallbacks,  # each named fallback taken -> how many times (fallback.FALLBACKS)
                 "floor": below,  # why it is below the readability floor (floor.readability_floor), [] above it
+                "domain_splits": splits,  # inferred domain splits with their confidence (domain_confidence), or []
             },
         )
 

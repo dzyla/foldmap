@@ -406,6 +406,7 @@ def draw_job(path, settings_json: str, eager_after: float | None = None) -> dict
     `eager_after` seconds, its PNG and PDF come with it (a job process cannot hand back the figure itself)."""
     from . import app, render
     from .cli import stale_domains_note
+    from .domain_confidence import said as splits_said
     from .floor import said as floor_said
     from .scope import drawn_scope
 
@@ -441,6 +442,8 @@ def draw_job(path, settings_json: str, eager_after: float | None = None) -> dict
         # below the readability floor (floor.py): why, the controls that draw less and the time note, in the app's
         # words ('' above it); never on a compare or diff page (its page and B's layout are not one figure)
         "floor_note": "" if app.pair_kind(settings) else floor_said(drawn, "app")[1],
+        # inferred domain splits with their confidence (domain_confidence.py), '' without; never on a compare page
+        "splits_note": "" if app.pair_kind(settings) else splits_said(drawn)[1],
         "seconds": seconds,
         "files": files,
     }

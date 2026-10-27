@@ -26,7 +26,9 @@ version, "deep": whether D1-D3 were run, "verdict", "counts": {status: n}, "kind
 "reason", "measures"}, ...]}. A field is added in a later version only with VERSION raised. The floor group (plan 28
 Task 4) holds R1, the readability floor (floor.check), after the criteria: a check id added, the shape unchanged;
 its measures hold no wall time (the time a figure took is said in the text only, ruling Q41), so the report is the
-same on every run."""
+same on every run. S5's entry holds "measures" (plan 28 Task 5, ruling Q42) when the figure's domains are inferred
+and split: {"domain_splits": each split with its confidence, "confidence": what that is} (domain_confidence); its
+status is S5's as before."""
 
 from __future__ import annotations
 
@@ -337,19 +339,29 @@ def _criterion_entry(got: dict) -> dict:
 
 
 def report(
-    structure, found: dict, like: dict | None = None, deep: dict | None = None, floor: dict | None = None
+    structure,
+    found: dict,
+    like: dict | None = None,
+    deep: dict | None = None,
+    floor: dict | None = None,
+    splits: list | None = None,
 ) -> dict:
     """The machine-readable check report (module docstring) of `foldmap check`: `found` criteria.check_figure's,
     `like` the H checks (criteria.like_checks) when drawn like a reference, `deep` D1-D3 (deep_checks) when run,
-    `floor` R1 (floor.check: the readability floor) when judged."""
+    `floor` R1 (floor.check: the readability floor) when judged, `splits` the inferred domain splits with their
+    confidence (domain_confidence.splits_of), S5's measures when there are any (said, never judged: its status is
+    unchanged)."""
     from . import __version__
     from . import floor as floor_mod
     from .criteria import CRITERIA, LIKE_CHECKS
+    from .domain_confidence import measures as split_measures
 
     kinds = {**check_kinds(CRITERIA), **DEEP_KIND}
     checks = []
     for code, title in SCIENCE.items():
         entry = _science_entry(code, found["science"].get(code), found.get("science_judged"))
+        if code == "S5" and splits:  # plan 28 Task 5: an added field, the shape unchanged
+            entry["measures"] = split_measures(splits)
         checks.append({"code": code, "group": "science", "title": title, "kind": kinds[code], **entry})
     for code, title in CRITERIA.items():
         entry = _criterion_entry(found["criteria"].get(code))

@@ -83,10 +83,10 @@ every correction of a rule are by hand.
 | default | 33 | 0 | 0 | 0 | 0 | 3 | 30 |
 | local | 1 | 0 | 0 | 0 | 0 | 0 | 1 |
 | comparison | 299 | 0 | 0 | 0 | 0 | 157 | 142 |
-| argument | 668 | 0 | 1 | 0 | 0 | 187 | 480 |
+| argument | 672 | 0 | 1 | 0 | 0 | 191 | 480 |
 | fallback | 24 | 0 | 0 | 0 | 4 | 1 | 19 |
 | fallback-marker | 29 | 0 | 0 | 0 | 3 | 0 | 26 |
-| all | 1644 | 62 | 26 | 28 | 43 | 450 | 1035 |
+| all | 1648 | 62 | 26 | 28 | 43 | 454 | 1035 |
 
 Of the 43 named-entry rows, 32 rest on the comment at the item and 11 on git (evidence starting `git:`: a commit whose message ties the value to the entries).
 
@@ -172,7 +172,7 @@ Of the 43 named-entry rows, 32 rest on the comment at the item and 11 on git (ev
 
 | id | kind | value | at | origin | evidence | tests naming it | check |
 |---|---|---|---|---|---|---|---|
-| `app:LAYOUT_DEFAULTS` | constant | { "mode": "projected", "rotate": 0.0, "symmetry": "auto", "assembly": "auto", "rename": "", "swap": "", "move": "", "ti… | LAYOUT_DEFAULTS = { | convention | the app's default settings; earliest in this file: 0438931 2026-10-09 Rename to foldmap; add README | app, app_controls, app_edits, floor | - |
+| `app:LAYOUT_DEFAULTS` | constant | { "mode": "projected", "rotate": 0.0, "symmetry": "auto", "assembly": "auto", "rename": "", "swap": "", "move": "", "ti… | LAYOUT_DEFAULTS = { | convention | the app's default settings; earliest in this file: 0438931 2026-10-09 Rename to foldmap; add README | app, app_controls, app_edits, domain_confidence +1 | - |
 | `app:TITLE_MAX` | constant | 200 | TITLE_MAX = 200 # characters of a layout file's title | convention | an input limit; earliest in this file: 81aec46 2026-10-12 User YAML: no anchors or aliases in layout, names and style files; every layout … | - | - |
 | `app:TEXT_MAX` | constant | 2000 | TEXT_MAX = 2000 # characters of any other text a layout file gives (a path, a mark list, a reference) | convention | an input limit; earliest in this file: 81aec46 2026-10-12 User YAML: no anchors or aliases in layout, names and style files; every layout … | - | - |
 | `app:IDS_MAX` | constant | 20_000 | IDS_MAX = 20_000 # characters of a list of chain ids, joined (a capsid has hundreds of chains) | convention | an input limit; earliest in this file: 81aec46 2026-10-12 User YAML: no anchors or aliases in layout, names and style files; every layout … | - | - |
@@ -260,6 +260,7 @@ Of the 43 named-entry rows, 32 rest on the comment at the item and 11 on git (ev
 |---|---|---|---|---|---|---|---|
 | `app_views:figure_card:comparison:3@46537647` | comparison | 3 | elif attrs.get("height") and attrs.get("width", 0) / attrs["height"] > 3: | unknown | - | app, app_uploads | - |
 | `app_views:figure_view:argument:2000@7bd8c347` | argument | 2000 | st.caption(shown(result["like_note"], limit=2000, paths=not local_files())) | unknown | - | - | - |
+| `app_views:figure_view:argument:2000@b96a084a` | argument | 2000 | st.caption(shown(f"{note[0].upper()}{note[1:]}.", limit=2000)) | convention | a display limit: the characters of the inferred domain splits' note shown under the figure (app_edits.shown cuts longer text; plan 28 Task 5) | - | - |
 | `app_views:sequence_options:argument:60@8cac53ab` | argument | 60 | "columns": int(ss.get("seq_columns", 60)), | unknown | - | - | - |
 | `app_views:sequence_view:argument:20@bd227f19` | argument | 20 | st.slider("Columns per row", 20, 150, 60, step=5, key="seq_columns", width=300, persist_state="session") | unknown | - | - | - |
 | `app_views:sequence_view:argument:150@bd227f19` | argument | 150 | st.slider("Columns per row", 20, 150, 60, step=5, key="seq_columns", width=300, persist_state="session") | unknown | - | - | - |
@@ -409,8 +410,8 @@ Of the 43 named-entry rows, 32 rest on the comment at the item and 11 on git (ev
 | `domain_score:TARGETS` | constant | {"overlap": 0.80, "f1": 0.70, "recall": 0.85} | TARGETS = {"overlap": 0.80, "f1": 0.70, "recall": 0.85} # plan 12 ruling R2, means over the CATH set | unknown | cites ruling R2; earliest in this file: 6c6c089 2026-10-16 Domain calibration: the 33-chain CATH reference set, overlap and boundary scores… | domain_score, random100 | - |
 | `domain_score:fixture_arrays:argument:1000@315d04bb` | argument | 1000 | "ca": np.round(np.asarray(inputs.ca) * 1000).astype(np.int32), | convention | rounding digits | - | - |
 | `domain_score:fixture_arrays:argument:3@6eff76dc` | argument | 3 | "contacts": np.array(contacts, dtype=np.int32).reshape(-1, 3), | convention | an array's shape | - | - |
-| `domain_score:load_fixture:argument:3@b62bc6e6` | argument | 3 | zero = np.zeros(3) | convention | an array's shape | domain_score, membrane | - |
-| `domain_score:load_fixture:argument:1000@774c6d43` | argument | 1000 | out[key] = ChainInputs(labels, a["ca"].astype(float) / 1000, sses, contacts, rows) | unknown | - | domain_score, membrane | - |
+| `domain_score:load_fixture:argument:3@b62bc6e6` | argument | 3 | zero = np.zeros(3) | convention | an array's shape | domain_confidence, domain_score, membrane | - |
+| `domain_score:load_fixture:argument:1000@774c6d43` | argument | 1000 | out[key] = ChainInputs(labels, a["ca"].astype(float) / 1000, sses, contacts, rows) | unknown | - | domain_confidence, domain_score, membrane | - |
 | `domain_score:held_out:comparison:3@7fef68c2` | comparison | 3 | if len(held) >= len(entries) // 3: | unknown | - | domain_score | - |
 
 ## dssp
@@ -461,13 +462,16 @@ Of the 43 named-entry rows, 32 rest on the comment at the item and 11 on git (ev
 | `features:DOMAIN_MIN_SSE_RESIDUES` | constant | 30 | DOMAIN_MIN_SSE_RESIDUES = 30 # residues in helices/strands an automatic domain needs | unknown | earliest in this file: 0438931 2026-10-09 Rename to foldmap; add README | domains | - |
 | `features:DOMAIN_CONTACT` | constant | 12.0 | DOMAIN_CONTACT = 12.0 # Å between CA atoms: two residues in contact, counted for the split | measured | "The residue-level split (residue_domains), calibrated on 22 of the 33 CATH chains" (plan 12 Task 3); earliest in this file: c7e1b70 2026-10-16 Auto domains from residue contacts: two-run normalized cuts, strays taken home (… | - | - |
 | `features:DOMAIN_SEPARATION` | constant | 6 | DOMAIN_SEPARATION = 6 # residues apart in sequence at least: nearer pairs are the chain, not the fold | measured | in the block "calibrated on 22 of the 33 CATH chains" (plan 12 Task 3); earliest in this file: c7e1b70 2026-10-16 Auto domains from residue contacts: two-run normalized cuts, strays taken home (… | - | - |
-| `features:DOMAIN_NCUT` | constant | 0.37 | DOMAIN_NCUT = 0.37 # a part splits when its best cut's normalized cut is below this | measured | in the block "calibrated on 22 of the 33 CATH chains" (plan 12 Task 3); earliest in this file: c7e1b70 2026-10-16 Auto domains from residue contacts: two-run normalized cuts, strays taken home (… | - | - |
+| `features:DOMAIN_NCUT` | constant | 0.37 | DOMAIN_NCUT = 0.37 # a part splits when its best cut's normalized cut is below this | measured | in the block "calibrated on 22 of the 33 CATH chains" (plan 12 Task 3); earliest in this file: c7e1b70 2026-10-16 Auto domains from residue contacts: two-run normalized cuts, strays taken home (… | domain_confidence | - |
 | `features:DOMAIN_MIN_RESIDUES` | constant | 40 | DOMAIN_MIN_RESIDUES = 40 # residues a domain needs | measured | in the block "calibrated on 22 of the 33 CATH chains" (plan 12 Task 3); earliest in this file: c7e1b70 2026-10-16 Auto domains from residue contacts: two-run normalized cuts, strays taken home (… | - | - |
 | `features:DOMAIN_MIN_SEGMENT` | constant | 20 | DOMAIN_MIN_SEGMENT = 20 # residues each piece of a cut needs (a domain may be two pieces: 5JDN's alternate) | measured | in the block "calibrated on 22 of the 33 CATH chains" (plan 12 Task 3); "5JDN's alternate"; earliest in this file: c7e1b70 2026-10-16 Auto domains from residue contacts: two-run normalized cuts, strays taken home (… | - | - |
 | `features:DOMAIN_MAX_POINTS` | constant | 800 | DOMAIN_MAX_POINTS = 800 # longer chains are split on blocks of consecutive residues, this many blocks at most | convention | a work bound: "longer chains are split on blocks of consecutive residues, this many blocks at most"; earliest in this file: c7e1b70 2026-10-16 Auto domains from residue contacts: two-run normalized cuts, strays taken home (… | - | - |
 | `features:DOMAIN_STRAY` | constant | 20 | DOMAIN_STRAY = 20 # residues of elements: a run of one domain's elements this small, between two runs of another | unknown | earliest in this file: c7e1b70 2026-10-16 Auto domains from residue contacts: two-run normalized cuts, strays taken home (… | domain_score | - |
 | `features:_segment:default:n` | default | 20 | def _segment(s: SSE, n: int = 20) -> np.ndarray: | unknown | - | - | - |
-| `features:_best_cut.ncut:argument:9@fdc98c6f` | argument | 9 | return np.where(ok & (volume > 0) & (total - volume > 0), np.round(value, 9), np.inf) | convention | rounding digits | - | - |
+| `features:_lowest_cut.ncut:argument:9@fdc98c6f` | argument | 9 | return np.where(ok & (volume > 0) & (total - volume > 0), np.round(value, 9), np.inf) | convention | rounding digits | domain_confidence | - |
+| `features:domain_splits:argument:4@fe44b1cb` | argument | 4 | "ncut": round(cut["ncut"], 4), | convention | rounding digits | domain_confidence | - |
+| `features:domain_splits:argument:4@4fceb185` | argument | 4 | "confidence": split_confidence(round(cut["ncut"], 4)), # of the ncut said | convention | rounding digits | domain_confidence | - |
+| `features:domain_splits:argument:3@e60d44ba` | argument | 3 | "density_ratio": None if cut["density_ratio"] is None else round(cut["density_ratio"], 3), | convention | rounding digits | domain_confidence | - |
 
 ## fetch
 

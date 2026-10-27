@@ -20,6 +20,8 @@ import numpy as np
 
 from . import layoutfile
 from .criteria import LIMITS
+from .domain_confidence import lines as split_lines
+from .domain_confidence import said as splits_said
 from .dssp import assign_dssp
 from .fallback import line as fallback_line
 from .features import helices_on_sheets, sse_contacts
@@ -762,7 +764,8 @@ def make_layout(
     conventions = functools.partial(all_names, path, whole=whole)  # dep: and beta: references (layout.resolve)
     tm = _transmembrane(sses, bb, mem) if mem is not None and mode == "projected" else set()
     in_band = _band_ids(sses, bb, mem, tm) if tm else frozenset()  # auto domains never split these (R17)
-    named = _domains(domains, sses, contacts, rows, copies, partial, bb, conventions, band=in_band)
+    splits: list[dict] = []  # the inferred splits kept, with their confidence (plan 28 Task 5): notes only
+    named = _domains(domains, sses, contacts, rows, copies, partial, bb, conventions, band=in_band, splits=splits)
     absorbed = (  # the band joined every domain contacts found (5JDN's two halves): the note says so (review-3 M1)
         bool(in_band)
         and source == "inferred"
@@ -847,6 +850,7 @@ def make_layout(
         lay.helix_matched_ids = list(matched.get("ids", []))
         lay.membrane_joined_ids = list(matched.get("membrane", []))
         lay.domain_source, lay.domain_note = (source if lay.domains else ""), named_note
+        lay.domain_splits = list(splits) if source == "inferred" and lay.domains else []
         if lay.domains:  # copies of one domain share a tone
             from .features import domain_tones
 
@@ -1653,20 +1657,30 @@ def stale_domains_note(spec, sses) -> str:
 
 
 def _domains(
-    spec, sses, contacts, rows=(), copies=None, lent=frozenset(), bb=None, conventions=None, band=frozenset()
+    spec,
+    sses,
+    contacts,
+    rows=(),
+    copies=None,
+    lent=frozenset(),
+    bb=None,
+    conventions=None,
+    band=frozenset(),
+    splits: list | None = None,
 ) -> list[tuple[str, list[str]]]:
     """[(name, element ids)] from 'auto' (chain by chain, copies of a protein (`copies`) alike, chains that only
     lend elements (`lent`) in their mates' domains, never splitting a βα row of `rows`, nor a membrane view's
     `band`: its domains holding those elements joined, features.auto_domains) or [(name, [refs])]; every
     element in at most one domain. `conventions` (names.all_names, the structure bound): the names a reference may
-    give with dep: or beta: (before layout no βα row is known, so a row helix's β-scheme name is not)."""
+    give with dep: or beta: (before layout no βα row is known, so a row helix's β-scheme name is not). `splits`:
+    auto's splits kept, with their confidence, are added to it (features.domain_splits)."""
     from .features import auto_domains
     from .layout import provisional, with_conventions
 
     if not spec:
         return []
     if spec == "auto":
-        return auto_domains(sses, contacts, rows, copies, lent, bb=bb, band=band)
+        return auto_domains(sses, contacts, rows, copies, lent, bb=bb, band=band, splits=splits)
     typed = [] if isinstance(spec, SavedDomains) else stale_domain_ids(spec, sses)  # typed ids naming no element
     for name, i in typed:  # A:1-60 is read as the range res:A:1-60 (Q-A19); a range that will not parse is an error
         if RES_RANGE.fullmatch(i.split(":", 1)[1]) is None:
@@ -2026,7 +2040,9 @@ def build_parser() -> argparse.ArgumentParser:
         "holds a ring of 5 or more; S6, a strand off a sheet's run of paired strands stands beside its partner, "
         "level with it, or its pairing is named in the notes. S4, a linked residue's star stands at its "
         "residue (linked-residue stars only: not ligand tethers, glycans, disulfide ends or UniProt marks); S5 "
-        "(automatic domains) is not measured here. Then the figure criteria A1-A20 the random-100 campaign judges "
+        "(automatic domains) is not measured here; with --domains auto each inferred split is said under it with its "
+        "confidence, 1 - its normalized cut / 0.37 (said, never judged). Then the figure criteria A1-A20 the "
+        "random-100 campaign judges "
         "every figure by, with the same limits: route fallbacks, loops over labels, overlapping elements, text "
         "collisions, text off the page, repeated labels, chains left out without a note, N->C and sheet order, "
         "copies drawn alike, domains (with --domains), membrane (with --membrane), ligand tethers; a --membrane or "
@@ -2570,6 +2586,8 @@ def _cmd_figure(args: argparse.Namespace) -> int:
         print(provenance_block(drawn.provenance), file=sys.stderr, end="")
         if said := fallback_line(drawn.fallbacks):  # how often each named fallback fired (notes only, never drawn)
             print(f"foldmap: {said}", file=sys.stderr)
+        if said := splits_said(drawn)[1]:  # inferred domain splits' confidence (domain_confidence.py), never drawn
+            print(f"foldmap: {said}", file=sys.stderr)
         below, line = floor_said(drawn)  # the readability floor (floor.py, plan 28 Task 4): said, never drawn
         if line:  # its judged reasons, and the time note (never judged)
             print(f"foldmap: warning: {line}", file=sys.stderr)
@@ -2764,9 +2782,14 @@ def _cmd_check(args: argparse.Namespace) -> int:
     for out in args.output:
         print(f"wrote {save(drawn.figure, out)}", file=sys.stdout if text else sys.stderr)
     found = check_figure(drawn, spec, args.structure)
+    splits, _ = splits_said(drawn)  # inferred domain splits' confidence (domain_confidence.py): said, never judged
     if text:
         print(kind_line())  # what each check is evidence of (science.KIND; plan 28 Task 2)
-        for line in science_lines(found["science"], found["science_judged"]) + criteria_lines(found["criteria"]):
+        science = science_lines(found["science"], found["science_judged"])
+        at = next((k + 1 for k, line in enumerate(science) if line.startswith("S5 ")), len(science))
+        while at < len(science) and science[at].startswith("  "):  # after S5's findings
+            at += 1
+        for line in science[:at] + split_lines(splits) + science[at:] + criteria_lines(found["criteria"]):
             print(line)
     failed = any(c["pass"] is False for c in found["criteria"].values())
     floor = floor_check(drawn)  # R1, the readability floor (floor.py, plan 28 Task 4): readability, as A1-A20
@@ -2792,7 +2815,7 @@ def _cmd_check(args: argparse.Namespace) -> int:
 
         from .deep import report
 
-        doc = json.dumps(report(args.structure, found, like, deep, floor), indent=1, default=str) + "\n"
+        doc = json.dumps(report(args.structure, found, like, deep, floor, splits), indent=1, default=str) + "\n"
         if text:
             Path(to_json).write_text(doc, encoding="utf-8")
             print(f"wrote {to_json}")

@@ -340,7 +340,14 @@ domain (calling each chain one domain matches 54 %) and finds 88 % of CATH's dom
 (boundary F1 0.79). Its parameters were tuned on 22 of those chains, the other 11 held out (drawn chain by chain, so
 some had a homologue among the 22). Eleven more chains, from CATH superfamilies none of the 33 has, were picked
 before foldmap ran on them and never tuned on: on those it matches 86 % of the residues and finds 85 % of the
-boundaries (F1 0.78). The calibration is `tests/test_domain_score.py`. For a
+boundaries (F1 0.78). The calibration is `tests/test_domain_score.py`. Each split comes with its confidence,
+1 - (its normalized cut / 0.37, the limit a cut must be under): 0 at the limit, where the part would have stayed
+whole, 1 with no contact across. The notes, `foldmap check` (under S5, and in S5's measures in `--json`), the MCP
+result (`domain_splits`) and the app say it with the contacts across and the sides' sizes; it is never drawn. It is
+how far a split is from not being made, not a probability that CATH draws it: most splits under 0.25 are boundaries
+CATH does not draw, most at 0.75 or more are ones it draws, not all (`docs/validation/domain-uncertainty`, which also
+says why the third random sample's multi-domain chains fail and shows that keeping weak splits undivided makes the
+calibration worse at every level tried, so foldmap does not). For a
 published assignment, `--domains cath` draws CATH's chopping of a PDB entry (fetched once from the PDBe API, panels named by CATH id such as `1ldmA01`,
 captioned "domains: CATH"); when CATH has none the note says so and the figure is drawn without domains.
 

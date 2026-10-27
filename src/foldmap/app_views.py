@@ -173,6 +173,9 @@ def figure_view(ws: Workspace) -> None:
         if result and result.get("floor_note"):  # below the readability floor (floor.py), as the command line warns
             note = result["floor_note"]
             st.warning(shown(f"{note[0].upper()}{note[1:]}."))
+        if result and result.get("splits_note"):  # inferred domain splits' confidence (domain_confidence.py)
+            note = result["splits_note"]
+            st.caption(shown(f"{note[0].upper()}{note[1:]}.", limit=2000))
         if result and result.get("domains_note"):  # as the command line warns
             note = result["domains_note"]
             st.warning(shown(f"{note[0].upper()}{note[1:]}. {DOMAINS_EDIT}"))

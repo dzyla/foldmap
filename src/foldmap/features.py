@@ -188,7 +188,7 @@ DOMAIN_MIN_SEGMENT = 20  # residues each piece of a cut needs (a domain may be t
 DOMAIN_MAX_POINTS = 800  # longer chains are split on blocks of consecutive residues, this many blocks at most
 
 
-def residue_domains(ca: np.ndarray, keep=()) -> np.ndarray:
+def residue_domains(ca: np.ndarray, keep=(), cuts: list | None = None) -> np.ndarray:
     """One chain's domains, residue by residue (CA coordinates in chain order): the domain number of each residue,
     numbered by first residue. The chain is cut in two again and again, as long as a part splits clearly: each cut
     takes one or two runs of the part's residues (in sequence) as one side and the rest as the other, so a domain
@@ -196,7 +196,11 @@ def residue_domains(ca: np.ndarray, keep=()) -> np.ndarray:
     normalized cut (contacts across / contacts of either side, summed: Shi and Malik 2000) over residue contacts
     (DOMAIN_CONTACT, DOMAIN_SEPARATION); it is made when that is below DOMAIN_NCUT and both sides keep
     DOMAIN_MIN_RESIDUES, each piece DOMAIN_MIN_SEGMENT (_best_cut). No cut parts the residues of a group of
-    `keep` (residue indices: a βα row's elements, drawn as one rigid unit)."""
+    `keep` (residue indices: a βα row's elements, drawn as one rigid unit).
+
+    `cuts` (a list, plan 28 Task 5): each part weighed is recorded in it (_cut_record: its residues, its lowest cut,
+    whether it was made, what the cut has across and within), in the order weighed; the domains are the same with or
+    without it."""
     n = len(ca)
     block = max(1, -(-n // DOMAIN_MAX_POINTS))  # residues per point: a long chain is split on blocks of residues
     m = -(-n // block)
@@ -211,8 +215,15 @@ def residue_domains(ca: np.ndarray, keep=()) -> np.ndarray:
     while parts:
         part = parts.pop()
         whole = [np.isin(part, g) for g in groups]
-        side = _best_cut(graph[np.ix_(part, part)], least, piece, [w for w in whole if w.any()])
-        if side is None:
+        sub = graph[np.ix_(part, part)]
+        side, value = _lowest_cut(sub, least, piece, [w for w in whole if w.any()])
+        made = side is not None and value < DOMAIN_NCUT  # _best_cut's rule
+        if cuts is not None:
+            try:  # a record that fails is said so; it never stops the domains
+                cuts.append(_cut_record(sub, part, side, value, made, block, n))
+            except Exception as err:  # noqa: BLE001
+                cuts.append({"error": type(err).__name__})
+        if not made:
             done.append(part)
         else:
             parts += [part[~side], part[side]]
@@ -222,15 +233,43 @@ def residue_domains(ca: np.ndarray, keep=()) -> np.ndarray:
     return np.repeat(out, block)[:n]
 
 
+def _cut_record(graph: np.ndarray, part: np.ndarray, side, value: float, made: bool, block: int, n: int) -> dict:
+    """What residue_domains' `cuts` holds of one part (its contacts `graph`, its points `part`, residues per point
+    `block`, the chain's residue count `n`): its residues (chain positions), whether its lowest cut was made, that
+    cut's normalized cut (None when no cut keeps the sizes), its sides' residues, the contacts across it and within
+    each side (CA pairs, DOMAIN_CONTACT) and the density of contacts across over that within (per residue pair)."""
+
+    def residues(points) -> np.ndarray:
+        return np.flatnonzero(np.isin(np.arange(n) // block, points))
+
+    out = {"part": residues(part), "made": bool(made), "ncut": None if side is None else float(value)}
+    if side is None:
+        return out
+    a, b = residues(part[side]), residues(part[~side])
+    across = float(graph[np.ix_(side, ~side)].sum())
+    within = (float(graph[np.ix_(side, side)].sum()) / 2, float(graph[np.ix_(~side, ~side)].sum()) / 2)
+    pairs = len(a) * (len(a) - 1) / 2 + len(b) * (len(b) - 1) / 2
+    dense = sum(within) / pairs if pairs else 0.0
+    ratio = (across / (len(a) * len(b))) / dense if dense and len(a) and len(b) else None
+    return {**out, "a": a, "b": b, "across": across, "within": within, "density_ratio": ratio}
+
+
 def _best_cut(graph: np.ndarray, least: int, piece: int, whole=()) -> np.ndarray | None:
     """The side of the part's best cut (residue_domains) as a mask over the part's points, None when the part does
-    not split: the run [a, b) of lowest normalized cut, or that run with one more run of the rest when that cuts
-    lower (5JDN's domains alternate four times along the chain). Each side keeps `least` points and each piece
+    not split: its lowest cut (_lowest_cut), made when its normalized cut is below DOMAIN_NCUT."""
+    side, value = _lowest_cut(graph, least, piece, whole)
+    return side if side is not None and value < DOMAIN_NCUT else None
+
+
+def _lowest_cut(graph: np.ndarray, least: int, piece: int, whole=()) -> tuple[np.ndarray | None, float]:
+    """(the side of the part's lowest cut as a mask over the part's points, its normalized cut); (None, inf) when no
+    cut keeps the sizes: the run [a, b) of lowest normalized cut, or that run with one more run of the rest when that
+    cuts lower (5JDN's domains alternate four times along the chain). Each side keeps `least` points and each piece
     `piece`; no side holds only some of a group of `whole` (masks over the part's points). Every run is weighed at
     once from the cumulative sums of the contact matrix."""
     m = len(graph)
     if m < 2 * least:
-        return None
+        return None, float("inf")
     cum = np.zeros((m + 1, m + 1))
     cum[1:, 1:] = graph.cumsum(0).cumsum(1)
     degree = np.concatenate([[0.0], graph.sum(1).cumsum()])
@@ -256,7 +295,7 @@ def _best_cut(graph: np.ndarray, least: int, piece: int, whole=()) -> np.ndarray
     one = ncut(inner, vol, ok)
     a, b = np.unravel_index(int(np.argmin(one)), one.shape)
     if not np.isfinite(one[a, b]):
-        return None
+        return None, float("inf")
     side = np.zeros(m, dtype=bool)
     side[a:b] = True
     best = one[a, b]
@@ -272,7 +311,7 @@ def _best_cut(graph: np.ndarray, least: int, piece: int, whole=()) -> np.ndarray
     c, d = np.unravel_index(int(np.argmin(two)), two.shape)
     if two[c, d] < best:
         side[c:d], best = True, two[c, d]
-    return side if best < DOMAIN_NCUT else None
+    return side, float(best)
 
 
 def auto_domains(
@@ -284,6 +323,7 @@ def auto_domains(
     *,
     bb: Backbone,
     band: set[str] = frozenset(),
+    splits: list | None = None,
 ) -> list[tuple[str, list[str]]]:
     """Domains, chain by chain: each chain's split (_chain_domains, from its residues in the backbone `bb`), named
     D1, D2... in sequence order (with " · chain" when several chains are split). Copies of one protein (`copies`,
@@ -296,15 +336,20 @@ def auto_domains(
     or held in its slab): every domain of a protein holding any of them, in any copy, is one domain, the membrane
     domain (_join_band; plan 26 Task 3 ruling T3-a: contacts alone never split the band, as 32KS's competence
     domain, its eleven TM helices and its NS helices on the face, came in five); the other domains stay as found.
-    [] when no chain reads as more than one domain."""
+    [] when no chain reads as more than one domain.
+
+    `splits` (a list, plan 28 Task 5): the splits the domains returned keep are added to it (domain_splits: each with
+    its normalized cut and confidence, split_confidence); the domains are the same with or without it."""
     classes = copy_classes(sses, copies or {})
     mine = group_by_chain(sses)
     root = {c: (copies or {}).get(c, (c, 0))[0] for c in mine}
     owner: dict[str, tuple[str, int]] = {}  # element -> (chain, its domain's number there)
+    cuts: dict[str, list[dict]] = {}  # reference chain -> residue_domains' record of its cuts (when `splits` asks)
     for chain, els in mine.items():
         if classes.reference.get(root[chain], chain) == chain:
             index = [k for k, l in enumerate(bb.labels) if l.chain == chain]
-            for d, ids in enumerate(_chain_domains(els, contacts, together, (bb.ca[index], index))):
+            made = cuts.setdefault(chain, []) if splits is not None else None
+            for d, ids in enumerate(_chain_domains(els, contacts, together, (bb.ca[index], index), made)):
                 owner.update({k: (chain, d) for k in ids})
     drawn: dict[str, tuple[str, int]] = {}  # the drawn chains' elements and their domains, once all are known
     for chain, els in sorted(mine.items(), key=lambda kv: kv[0] in lent):  # the lending chains last
@@ -331,7 +376,83 @@ def auto_domains(
     for chain in split:
         for d in sorted(d for c, d in groups if c == chain):  # a copy's domains are numbered as its reference's
             out.append((f"D{d + 1}" if len(split) == 1 else f"D{d + 1} · {chain}", groups[(chain, d)]))
+    if splits is not None:
+        try:  # what the record says never stops the domains (domain_confidence.said says a failure)
+            splits += domain_splits(cuts, out, sses, bb.labels)
+        except Exception as err:  # noqa: BLE001
+            splits.append({"error": type(err).__name__})
     return out
+
+
+def split_confidence(ncut: float) -> float:
+    """The confidence of an inferred domain split (plan 28 Task 5, ruling Q42): 1 - its normalized cut / DOMAIN_NCUT,
+    rounded to 0.01: 0 at the limit, where the part would have stayed whole, 1 for a part with no contact across."""
+    return round(max(0.0, 1.0 - float(ncut) / DOMAIN_NCUT), 2)
+
+
+def domain_splits(cuts: dict[str, list[dict]], domains, sses: list[SSE], labels) -> list[dict]:
+    """The inferred splits the drawn `domains` ([(name, element ids)], auto_domains) keep, from the cuts
+    residue_domains made in each chain (`cuts`: chain -> its record, _cut_record, residues as backbone indices), in
+    the order made. A cut weighs the chain's domains that have more than half of their element residues in its part,
+    each on the side holding more of them; it is kept when both sides hold one, and said once for the domains it
+    parts (a later cut parting the same ones, as a domain the element rules moved can make, is not said again). A cut
+    the element rules undid (a domain too small to keep, a βα row kept whole, a membrane band joined) leaves one side
+    without a domain and is none. Each {chain, between: [the domains on one side, those on the other], ncut,
+    confidence (split_confidence), across: CA contacts across, density_ratio: the density of contacts across over
+    that within, residues: the two sides' sizes, sides: their residues as runs of author numbers}; a record that
+    failed passes on as {chain, error}."""
+    span = {s.id: (s.chain, s.start, s.end) for s in sses}
+    out = []
+    for chain, found in cuts.items():
+        held = {  # each domain's element residues in this chain
+            name: {r for k in ids if span.get(k, (None,))[0] == chain for r in range(span[k][1], span[k][2] + 1)}
+            for name, ids in domains
+        }
+        said: set[tuple] = set()
+        for cut in found:
+            if "error" in cut:
+                out.append({"chain": chain, "error": cut["error"]})
+                continue
+            if not cut["made"]:
+                continue
+            a, b = set(cut["a"].tolist()), set(cut["b"].tolist())
+            between: list[list[str]] = [[], []]
+            for name, mine in held.items():
+                on_a, on_b = len(mine & a), len(mine & b)
+                if mine and 2 * (on_a + on_b) > len(mine):
+                    between[0 if on_a >= on_b else 1].append(name)
+            key = (tuple(between[0]), tuple(between[1]))
+            if not all(between) or key in said:
+                continue
+            said.add(key)
+            out.append(
+                {
+                    "chain": chain,
+                    "between": between,
+                    "ncut": round(cut["ncut"], 4),
+                    "confidence": split_confidence(round(cut["ncut"], 4)),  # of the ncut said
+                    "across": int(cut["across"]),
+                    "density_ratio": None if cut["density_ratio"] is None else round(cut["density_ratio"], 3),
+                    "residues": [len(a), len(b)],
+                    "sides": [_runs(sorted(s), labels) for s in (a, b)],
+                }
+            )
+    return out
+
+
+def _runs(idx: list[int], labels) -> str:
+    """Backbone indices as runs of author residue numbers: "12-152, 301-340"."""
+    runs: list[list[int]] = []
+    for k in idx:
+        if runs and k == runs[-1][1] + 1:
+            runs[-1][1] = k
+        else:
+            runs.append([k, k])
+
+    def tag(k: int) -> str:
+        return f"{labels[k].seq}{(labels[k].icode or '').strip()}"
+
+    return ", ".join(tag(a) if a == b else f"{tag(a)}-{tag(b)}" for a, b in runs)
 
 
 def _join_band(owner: dict[str, tuple[str, int]], ref: dict[str, str], band: set[str]) -> None:
@@ -471,7 +592,11 @@ def _no_strays(domain: list[int], size: list[int]) -> list[int]:
 
 
 def _chain_domains(
-    sses: list[SSE], contacts: dict[frozenset[str], int], together, residues: tuple[np.ndarray, list[int]]
+    sses: list[SSE],
+    contacts: dict[frozenset[str], int],
+    together,
+    residues: tuple[np.ndarray, list[int]],
+    cuts: list | None = None,
 ) -> list[list[str]]:
     """One chain's domains, in sequence order: its residue domains (residue_domains; `residues`: the CA coordinates
     of the chain's residues and their indices in the backbone), each element in the one holding most of its
@@ -481,7 +606,7 @@ def _chain_domains(
     parts its residues, and should its elements still lie in several domains, the domains holding its strands
     merge and its helices follow its strands, so the row lies in one domain's panel (1LDM's Rossmann sheet); what
     that leaves too small folds again (1TIM: a 10-residue domain of two helices). [] when the chain reads as a
-    single domain."""
+    single domain. `cuts`: residue_domains' record of its cuts (_cut_record), residues as backbone indices."""
     import networkx as nx
 
     graph = nx.Graph()
@@ -510,7 +635,13 @@ def _chain_domains(
     at = {k: n for n, k in enumerate(index)}
     span = {s.id: range(s.start, s.end + 1) for s in sses}
     keep = [[at[k] for i in row if i in span for k in span[i] if k in at] for row in together]
-    label = dict(zip(index, residue_domains(ca, keep).tolist()))
+    found_cuts: list | None = [] if cuts is not None else None
+    label = dict(zip(index, residue_domains(ca, keep, found_cuts).tolist()))
+    for cut in found_cuts or ():  # chain positions -> backbone indices; a record that fails never stops the domains
+        try:
+            cuts.append({k: (np.asarray(index)[v] if k in ("part", "a", "b") else v) for k, v in cut.items()})
+        except Exception as err:  # noqa: BLE001
+            cuts.append({"error": type(err).__name__})
     mine = []
     for s in sses:
         votes = Counter(label[k] for k in span[s.id] if k in label)
