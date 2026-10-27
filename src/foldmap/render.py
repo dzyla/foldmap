@@ -1741,9 +1741,10 @@ def _place_mark(
     one with nothing clear within _SPOT_RADIUS). Every spot of the layers after the first lies on a loop line (or a
     disulfide bar), the first having found none clear of them within _SPOT_RADIUS, so a mark given them up sat on a
     line that seemed to end at it (plan 29 Task 4, triage proposal 1: 9SXF's A1JRG; docs/validation/app29/fix-ligand).
-    The spot off them further out is taken over that near one only when its tethers run over no more of the bodies
-    and along no more of the loops' lines (C9's measure, as _mark_spot ranks spots): further out, they lengthen and
-    can cross more (1GOX-A's FMN, tests/test_ligands.py), and neither fault is the lesser.
+    A spot clear of them further out, to _SPOT_FAR times _SPOT_RADIUS, is taken over the spot the later steps find
+    only when its tethers run over no more of the bodies and along no more of the loops' lines (C9's measure, as
+    _mark_spot ranks spots): further out, they lengthen and can cross more (1GOX-A's FMN, tests/test_ligands.py), and
+    neither fault is the lesser.
     `bound`: the home chain's main contact (its heaviest target), then its targets on other chains. Each of those lies
     within _TETHER_REACH of the main contact (_local_targets), but the anchor, the mean of all its targets, follows
     home contacts drawn far from it: a spot that leaves one of them farther than _TETHER_REACH gives way to the first
@@ -1772,17 +1773,21 @@ def _place_mark(
         over = _over_bodies(c, ts, bodies) + _along_loops(c, ts, runs)
         return (_stems_crossed(c, ts, na[0]), _strands_crossed(c, ts, na[1]), over) if na is not None else (over,)
 
-    off = None  # a spot clear of the loop lines further out, when none is within _SPOT_RADIUS
-    for k, (blocked, drawn) in enumerate(layers):
+    def chosen(spot, k: int):  # a spot the later steps found: the one off the lines instead, unless its tethers
+        if off is not None and cost(off) <= cost(spot):  # cross more (C9)
+            return kept(off, 0)
+        return kept(spot, k)
+
+    lined, drawn = layers[0]
+    spot = _mark_spot(anchor, half, targets, lined, texts, drawn, bodies, runs=runs, na=na, retarget=retarget)
+    if spot is not None:
+        return kept(spot, 0)
+    # nothing clear of the loop lines within _SPOT_RADIUS: a spot clear of them further out
+    off = _mark_spot(anchor, half, targets, lined, texts, drawn, bodies, far, runs, na, retarget)
+    for k, (blocked, drawn) in enumerate(layers[1:], 1):
         spot = _mark_spot(anchor, half, targets, blocked, texts, drawn, bodies, runs=runs, na=na, retarget=retarget)
-        if spot is None and k == 0:
-            off = _mark_spot(anchor, half, targets, blocked, texts, drawn, bodies, far, runs, na, retarget)
-        elif spot is not None and k == 0:
-            return kept(spot, k)
-        elif spot is not None:  # on a loop line: the spot off them, unless its tethers cross more (C9)
-            return kept(off, 0) if off is not None and cost(off) <= cost(spot) else kept(spot, k)
-    if off is not None:
-        return kept(off, 0)
+        if spot is not None:
+            return chosen(spot, k)
     # nothing clear within _SPOT_RADIUS (7QUP's crowded page dropped GTP:9E500): further out, else the least bad
     spot = _mark_spot(
         anchor,
@@ -1797,7 +1802,9 @@ def _place_mark(
         na=na,
         retarget=retarget,
     )
-    return kept(spot, 2) if spot is not None else _least_bad_spot(anchor, half, taken, bodies)
+    if spot is not None:
+        return chosen(spot, 2)
+    return kept(off, 0) if off is not None else _least_bad_spot(anchor, half, taken, bodies)
 
 
 def _least_bad_spot(anchor, half, taken, bodies) -> np.ndarray:
