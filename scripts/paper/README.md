@@ -16,8 +16,8 @@ of this checkout (gitignored), or the folder `$FOLDMAP_MANUSCRIPT` names.
 
 | Output | Command |
 |---|---|
-| everything except the figures, in order | `scripts/paper/run_all.sh [COMMIT]` (`M2_RERUN=1` reruns the M2 measurements first) |
-| `build/sources/`, `build/tree/`, `build/provenance.json` | `python scripts/paper/extract.py --commit COMMIT` (needs `.git`) |
+| everything except the figures, in order | `scripts/paper/run_all.sh TAG [HARNESS]` (`M2_RERUN=1` reruns the M2 measurements first) |
+| `build/sources/`, `build/tree/`, `build/provenance.json` | `python scripts/paper/extract.py --commit HARNESS --release TAG` (needs `.git`) |
 | `build/domains.json` (CATH domain scores, code from `build/tree`) | `python scripts/paper/domains.py` |
 | `build/runtime.*`, `build/tables/runtime.csv` | `python scripts/paper/runtime.py` |
 | `build/numbers.json`, `build/tables/{r100,na,domains,dssp,membrane}.tex` | `python scripts/paper/make_numbers.py` |
@@ -41,6 +41,50 @@ run COMMAND there in the checkout, copy each `--pull` path back); exit 75 means 
 `extract.py` reads git objects at the commit, never the working tree. Every other step reads what it wrote. The steps
 that run foldmap put `build/tree/src` (the code at that commit) first on the path and assert it is the foldmap they
 imported. `make_numbers.py` and `table_s1.py` read code constants with `ast` and never import foldmap.
+
+## The tag and the harness commit
+
+`run_all.sh` takes the release tag; there is no default commit. The fourth random sample is drawn and run at the tag
+and committed after it (`docs/validation/fourth-sample-protocol.md`, step 4), so the tag itself does not hold its
+report. A release's numbers are therefore read at the **harness commit**, the commit that adds the fourth sample's
+files (or a later one), with the tag named beside it: `run_all.sh vX.Y.Z HARNESS`. `extract.py --release vX.Y.Z`
+then stops unless:
+
+- the tag's commit is an ancestor of the harness commit and **no code commit** (`src/`, `scripts/`) lies between them,
+  so `build/tree` and every step that runs foldmap use the release's code;
+- the fourth sample's `report.json` and `sample.json` are stamped at the tag's commit (every stamp verified by
+  `verify_stamp.py`), and the sample's protocol names that tag.
+
+A fourth sample at the harness commit with no `--release` is refused. Before the release, `run_all.sh COMMIT` reads
+everything at one commit and the fourth sample's keys (`r100_fourth_seed`, `r100_fourth_cutoff`,
+`r100_fourth_pass` with its `_n`, `_ci_lo` and `_ci_hi`) stay pending. `provenance.json` records the release (tag and
+commit) beside the harness commit.
+
+Plan 28's records (sensitivity, prune, readability floor, domain uncertainty, NA fixes, metamorphic, topology
+transfer) are sources too (`common.CAMPAIGN`, the `_record` names): each is copied into `build/sources/`, its stamps
+verified, and the code commits since it was made listed in `provenance.json`. No number is read from them yet, as the
+claims table quotes none; a number the paper takes from one gets a reader in `make_numbers.py` first, never a number
+typed by hand. A record is made at one commit from runs made at others (the sensitivity record's runs, the prune
+record's equivalence runs), so its several commits are listed, not refused.
+
+## Inputs outside git
+
+"Every number from a clean tag" holds for what git holds. These inputs live in the manuscript folder, outside git,
+and are rebuilt, not checked out:
+
+| Input | What | How it is rebuilt |
+|---|---|---|
+| `MANUSCRIPT/main.tex`, `supplement.tex`, `refs.bib` | the text | the author's; not generated |
+| `MANUSCRIPT/data/opm/` | OPM's membrane files and `selection.json` | `python scripts/paper/opm_fetch.py` (network: OPM's API) |
+| `MANUSCRIPT/data/m2/membrane/` | the membrane estimate against OPM | `M2_RERUN=1 run_all.sh` (`membrane_opm.py`, after `opm_fetch.py`) |
+| `MANUSCRIPT/data/m2/dssp/` | foldmap's DSSP against mkdssp 3.1.2 | `M2_RERUN=1 run_all.sh` (`dssp_mkdssp.py`; needs `$MKDSSP`) |
+| `MANUSCRIPT/data/m2/na/` | the NA rerun with pseudoknots, against RNApolis | `M2_RERUN=1 run_all.sh` (`na_validate.py --require-rnapolis`; needs `$NA_RNAPOLIS_PYTHON`) |
+| `MANUSCRIPT/data/m2/determinism/` | the Linux leg's runs and the CI legs' records | `M2_RERUN=1 run_all.sh` (Linux leg), then `gh run download RUN -p 'determinism-*' -D MANUSCRIPT/data/m2/determinism` for the CI run at the tag |
+| `MANUSCRIPT/figures/data/` | the CI determinism artifacts Fig. 3d reads | `gh run download` of the tag's determinism run, as above |
+
+Each of these carries its own stamp (`common.run_stamp` or `foldmap.source_stamp`), and `make_numbers.py` reads what
+is there: rebuild them at the release before the numbers are quoted. Network access (OPM, the RCSB downloads the NA
+rerun makes), mkdssp, RNApolis and `gh` are needed for that.
 
 ## Layers, sets and intervals (plan 28 Task 2)
 
@@ -148,6 +192,7 @@ where a typed table differs from the code. `\input{tables/params.tex}` replaces 
 
 The fourth sample's protocol is `docs/validation/fourth-sample-protocol.md`: seed 20261025, cutoff 2026-10-13, no id
 of samples 1-3, drawn once in a clean checkout of the release tag (the sampler refuses anywhere else) and run once,
-whole, with that code (`random100.py run` refuses a second run, `--ids`, `--failed-from` or other code on a sample
-carrying a protocol record, unless `--not-for-paper`, which marks the report never to be quoted); its pass count is
-the one the paper quotes. The third sample stays as a historical prospective evaluation at 7696947.
+whole, in every view, with that code (`random100.py run` refuses, on a sample carrying a protocol record, a sample
+read from anywhere but its fixed path, a run written anywhere but beside it, a second run, `--ids`, `--failed-from`,
+fewer views than all, or other code, unless `--not-for-paper`, which marks the report never to be quoted); its pass
+count is the one the paper quotes (`r100_fourth_pass`). The third sample stays as a historical prospective evaluation at 7696947.

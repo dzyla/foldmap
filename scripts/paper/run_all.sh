@@ -2,8 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Regenerate the paper's numbers and tables (build/) from one commit: a release passes its tag.
 #
-#   scripts/paper/run_all.sh [COMMIT]               every step on this machine (COMMIT default 838c579)
-#   M2_RERUN=1 scripts/paper/run_all.sh [COMMIT]    the M2 measurements first (membrane vs OPM, DSSP vs mkdssp, the NA
+#   scripts/paper/run_all.sh TAG [HARNESS]          every step on this machine. TAG (required, no default) is the
+#                                                   release the paper describes; HARNESS (default TAG) the commit the
+#                                                   sources are read at: the commit that adds the fourth sample, run
+#                                                   at TAG and committed after it (extract.py --release checks its
+#                                                   stamps name TAG's commit and that no code commit lies between)
+#   M2_RERUN=1 scripts/paper/run_all.sh TAG          the M2 measurements first (membrane vs OPM, DSSP vs mkdssp, the NA
 #                                                   rerun with pseudoknots, the determinism Linux leg), then the rest
 #   PAPER_ZL=/path/to/zl scripts/paper/run_all.sh   the steps that compute or draw through a runner wrapper with zl's
 #                                                   interface, `zl [--push P]... [--pull P]... -- CMD` (sync this
@@ -12,8 +16,14 @@
 #
 # The manuscript folder (its text, inputs and build/) is docs/superpowers/work/manuscript of this checkout (gitignored)
 # or $FOLDMAP_MANUSCRIPT. `python` is the paper environment's (scripts/paper/requirements.lock, foldmap installed).
+# Inputs outside git (data/m2, data/opm, figures/data) are listed in scripts/paper/README.md with how to rebuild them.
 set -euo pipefail
-COMMIT=${1:-838c579}
+if [[ $# -lt 1 || $# -gt 2 ]]; then
+  echo "usage: run_all.sh TAG [HARNESS]: the release tag (no default) and the commit to read the sources at" >&2
+  exit 2
+fi
+TAG=$1
+COMMIT=${2:-$1}
 H=$(cd "$(dirname "$0")" && pwd)
 REPO=$(cd "$H/../.." && pwd)
 M=${FOLDMAP_MANUSCRIPT:-$REPO/docs/superpowers/work/manuscript}
@@ -37,7 +47,7 @@ heavy() {
   (cd "$REPO" && "$@")
 }
 
-python "$H/extract.py" --commit "$COMMIT"                                    # build/sources, tree, provenance.json
+python "$H/extract.py" --commit "$COMMIT" --release "$TAG"                   # build/sources, tree, provenance.json
 heavy --push "$M/build" --pull "$M/build/domains.json" -- env FOLDMAP_MANUSCRIPT="$M" python "$H/domains.py"
 heavy --push "$M/build" --pull "$M/build" -- env FOLDMAP_MANUSCRIPT="$M" python "$H/runtime.py"
 if [[ "${M2_RERUN:-0}" == 1 ]]; then  # the M2 measurements (raw outputs under data/m2/; make_numbers reads what is there)

@@ -35,6 +35,7 @@ from common import (
     TABLES,
     TREE,
     ZERO_BY_CONSTRUCTION,
+    has_source,
     load_source,
     median,
     na_measures,
@@ -53,8 +54,12 @@ from m2 import pct
 SAMPLES = {"tuned": "r100_tuned", "held": "r100_held", "third": "r100_third"}
 OUTCOMES = ("pass", "fail", "not judged", "does not apply")
 
+FOURTH = "the fourth random sample, drawn and run once at the release (docs/validation/fourth-sample-protocol.md)"
 PENDING = {
     "release_tag": ("freeze", "the frozen git tag of the release; no tag points at the harness commit"),
+    "r100_fourth_seed": ("freeze", f"{FOURTH}: not drawn at the harness commit"),
+    "r100_fourth_cutoff": ("freeze", f"{FOURTH}: not drawn at the harness commit"),
+    "r100_fourth_pass": ("freeze", f"{FOURTH}: not run at the harness commit; the paper's headline count"),
     "hom_usalign_agreement": (
         "freeze",
         "foldmap's aligner against US-align (plan 13a-3, measured in plan 23 Task 3): "
@@ -445,6 +450,37 @@ def write_r100_tables(summ: dict, reports: dict, first: dict):
                         "; ".join(e["failed"])[:300],
                     ]
                 )
+
+
+def build_fourth(nb: Numbers) -> None:
+    """The fourth sample's seed, cutoff and pass count with its Wilson interval (plan 28 final review F2), when
+    extract.py found it at the harness commit (it checked its stamps name the release's commit); else its keys stay
+    pending (PENDING)."""
+    if not has_source("r100_fourth_sample"):
+        return
+    sample = load_source("r100_fourth_sample")
+    nb.put("r100_fourth_seed", sample["seed"], str(sample["seed"]), ["r100_fourth_sample"], "sample.json seed")
+    nb.put(
+        "r100_fourth_cutoff",
+        sample["query_date"],
+        sample["query_date"],
+        ["r100_fourth_sample"],
+        "sample.json query_date (release-date cutoff)",
+    )
+    if not has_source("r100_fourth_report"):
+        return
+    report = load_source("r100_fourth_report")
+    quotable("r100_fourth_report", report)  # never a report of mixed code or one not for the paper
+    summ = sample_summary(report)
+    nb.put(
+        "r100_fourth_pass",
+        summ["passed"],
+        str(summ["passed"]),
+        ["r100_fourth_report"],
+        "entries with no criterion failed (report.json passed, recounted from the entries); the fourth sample, run "
+        "once at the release: the paper's headline count",
+    )
+    nb.rate("r100_fourth_pass", summ["passed"], summ["n"], "entries in the fourth sample's report")
 
 
 def build_na(nb: Numbers):
@@ -886,6 +922,7 @@ def build_runtime(nb: Numbers, reports: dict):
 def main() -> int:
     nb = Numbers()
     reports = build_r100(nb)
+    build_fourth(nb)
     build_na(nb)
     build_domains(nb)
     build_homologues(nb)

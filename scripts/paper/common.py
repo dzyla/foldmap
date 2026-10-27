@@ -28,7 +28,6 @@ BUILD = MANUSCRIPT / "build"
 SOURCES = BUILD / "sources"  # every source file as it is at the harness commit (extract.py)
 TREE = BUILD / "tree"  # src/ and tests/data/domains/ at the harness commit (for the steps that run foldmap)
 TABLES = BUILD / "tables"
-DEFAULT_COMMIT = "838c579"  # the commit the current numbers were read at; a release passes its own (--commit)
 
 # The campaign outputs the numbers come from: name -> (path in the repository, commit to read it at; None = the
 # harness commit). The held-out sample's first run is read at the commit that wrote it (controller ruling
@@ -45,7 +44,37 @@ CAMPAIGN = {
     "na_review": ("docs/validation/na/review.md", None),
     # plan 13a's held-out homologue pairs (Task 13a-11), measured once; present from the harness commit after it
     "hom_summary": ("docs/validation/homologues/heldout-summary.json", None),
+    # the fourth random sample (docs/validation/fourth-sample-protocol.md): drawn and run at the release tag, committed
+    # after it, so present only at a harness commit after the tag; extract.py checks its stamps name the tag's commit
+    # (--release) and that no code commit lies between the tag and the harness commit (plan 28 final review F2). The
+    # report is read as report.json or, when committed gzipped, report.json.gz (extract.py writes it out plain).
+    "r100_fourth_sample": ("docs/validation/random100-fourth/sample.json", None),
+    "r100_fourth_report": ("docs/validation/random100-fourth/report.json", None),
+    # plan 28's records, copied into the provenance with their stamps verified and the code commits since each listed
+    # (no number is read from them yet: the claims table quotes none; a number quoted later gets a reader here)
+    "sensitivity_record": ("docs/validation/sensitivity/report.json", None),
+    "prune_record": ("docs/validation/prune/report.json", None),
+    "floor_record": ("docs/validation/readability-floor/report.json", None),
+    "domain_uncertainty_record": ("docs/validation/domain-uncertainty/report.json", None),
+    "na_fixes_record": ("docs/validation/na-fixes/report.json", None),
+    "metamorphic_record": ("docs/validation/metamorphic/report.json", None),
+    "topology_transfer_record": ("docs/validation/homologues/topology-transfer/report.json", None),
 }
+# Sources a harness commit may lack (one from before they were made): skipped, and the keys they feed stay pending.
+OPTIONAL = frozenset(
+    {
+        "hom_summary",
+        "r100_fourth_sample",
+        "r100_fourth_report",
+        "sensitivity_record",
+        "prune_record",
+        "floor_record",
+        "domain_uncertainty_record",
+        "na_fixes_record",
+        "metamorphic_record",
+        "topology_transfer_record",
+    }
+)
 # Code read for constants (parsed with ast, never imported locally) and the domain fixtures (domains.py).
 TREE_PATHS = (
     "src",
@@ -80,6 +109,11 @@ def load_json(path: Path):
 
 def load_source(name: str):
     return load_json(source_path(name))
+
+
+def has_source(name: str) -> bool:
+    """Whether extract.py copied the source (an OPTIONAL one is absent at a harness commit from before it)."""
+    return source_path(name).is_file()
 
 
 def na_rows(report) -> list[dict]:

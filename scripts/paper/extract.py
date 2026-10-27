@@ -2,13 +2,22 @@
 # Copyright (C) 2026 Dawid Zyla. Additional terms (AGPL-3.0 section 7(b)): see NOTICE.
 """Step 1 (local, light): copy every source out of git at one commit and check what each source was measured at.
 
-    python scripts/paper/extract.py [--commit 838c579]
+    python scripts/paper/extract.py --commit HARNESS [--release TAG]
+
+HARNESS is the commit every source is read at. TAG is the frozen release the paper describes (run_all.sh passes it).
+The fourth random sample is drawn and run at the tag and committed after it, so a release's harness commit is the
+commit that adds it (or a later one): with --release, extract checks that the tag's commit is an ancestor of HARNESS,
+that no code commit (src/, scripts/) lies between them (code_between(tag, HARNESS) == []), and that the fourth
+sample's report and sample.json are stamped at the tag's commit (the protocol's release, by name, too). A fourth
+sample present at HARNESS without --release is a problem: its stamps would be checked against nothing (plan 28 final
+review F2).
 
 Writes
   build/sources/HEAD/<path>      each campaign output as it is at the harness commit
   build/sources/<sha>/<path>     a source read at an earlier commit (the held-out sample's first run, 1ef0706)
   build/tree/                    src/, tests/data/domains/ and pyproject.toml at the harness commit (domains.py)
-  build/provenance.json          the harness commit and, per source: the commit that last wrote the file, the code
+  build/provenance.json          the harness commit, the release (tag and commit) and, per source: the commit that last
+                                 wrote the file, the code
                                  the measurement inside it was made with (from the file's own source stamps only,
                                  each verified against the commit it names by verify_stamp.py; a file from before the
                                  stamps says so), and every code commit (src/, scripts/) between that commit and the
@@ -23,6 +32,7 @@ a stamp does not verify, and when a report mixes code (mixed_code) or is marked 
 from __future__ import annotations
 
 import argparse
+import gzip
 import io
 import json
 import re
@@ -31,12 +41,17 @@ import subprocess
 import sys
 import tarfile
 
-from common import BUILD, CAMPAIGN, DEFAULT_COMMIT, REPO, SOURCES, TREE, TREE_PATHS, full_sha, git, load_json
+from common import BUILD, CAMPAIGN, OPTIONAL, REPO, SOURCES, TREE, TREE_PATHS, full_sha, git, load_json
 from verify_stamp import verify_report
 
 CODE = ("src", "scripts")  # what can change a measurement
 # the sources whose stamps are verified: every JSON campaign output (hom_summary included: plan 28 final review F7)
 MEASURED = ("_report", "_sample", "_summary", "_record")
+
+
+def load_source_at(name: str):
+    """A source extract.py wrote (at the harness commit, or its CAMPAIGN commit)."""
+    return load_json(SOURCES / (CAMPAIGN[name][1] or "HEAD") / CAMPAIGN[name][0])
 
 
 def is_ancestor(a: str, b: str) -> bool:
@@ -70,8 +85,9 @@ def recorded_commits(name: str, data, repo=REPO) -> tuple[dict, str, list[str]]:
     """The code a source was measured (or a sample drawn) with, read from its own source stamps only (ruling Q11), each
     verified against the commit it names (verify_stamp.py); where that comes from; and the problems that stop the
     numbers: a stamp that does not verify (a dirty or unknown tree included: ruling Q16), entries measured by different
-    code (mixed_code) or at more than one commit (Q17), a report run outside its paper protocol (not_for_paper).
-    The record keeps the stamp's git source (git or asserted by runner) and dirty flag."""
+    code (mixed_code) or at more than one commit (Q17; a plan-28 record, `_record`, is rendered at one commit from runs
+    made at others by design, so its commits are listed, not refused), a report run outside its paper protocol
+    (not_for_paper). The record keeps the stamp's git source (git or asserted by runner) and dirty flag."""
     if not isinstance(data, dict):  # an NA report written before the stamp: the bare list of rows
         return {"report": None}, LEGACY, []
     st = data.get("source_stamp")
@@ -89,7 +105,7 @@ def recorded_commits(name: str, data, repo=REPO) -> tuple[dict, str, list[str]]:
         if not r["verified"]:
             problems.append(f"{name}: stamp {r['code_fingerprint']} not verified: {r['why']}")
     commits = sorted({r["commit"] for r in checked if r["verified"]})
-    if len(commits) > 1:  # entries measured at different commits (scripts/ outside the code key: ruling Q17)
+    if len(commits) > 1 and not name.endswith("_record"):  # entries at different commits (scripts/: ruling Q17)
         problems.append(f"{name}: measured at {len(commits)} commits {[c[:7] for c in commits]} (mixed)")
     git = st.get("git") or {}
     rec = {
@@ -106,6 +122,32 @@ def recorded_commits(name: str, data, repo=REPO) -> tuple[dict, str, list[str]]:
     return rec, how, problems
 
 
+def release_problems(head: str, release: str | None, fourth: dict | None, sample: dict | None) -> list[str]:
+    """Why the harness commit `head` may not stand for the release (both full SHAs; `release` None: no --release) with
+    the fourth sample's report and its sample.json as recorded_commits read them (`fourth`, `sample`; None when absent):
+    the tag not an ancestor of head, a code commit between them, a fourth sample with no release to check it against,
+    or measured or drawn at another commit than the tag's (plan 28 final review F2)."""
+    problems = []
+    if release is None:
+        if fourth is not None or sample is not None:
+            problems.append("the fourth sample is at the harness commit but no --release names the tag it ran at")
+        return problems
+    if not is_ancestor(release, head):
+        return [f"the release {release[:7]} is not an ancestor of the harness commit {head[:7]}"]
+    between = code_between(release, head)
+    if between:
+        problems.append(f"code commits between the release {release[:7]} and the harness commit {head[:7]}: "
+                        f"{[c['commit'] for c in between]}; the numbers would not be the release's")  # fmt: skip
+    for what, rec in (("report", fourth), ("sample", sample)):
+        if rec is None:
+            continue
+        commits = rec.get("commits") or []
+        if commits != [release]:
+            problems.append(f"the fourth sample's {what} is stamped at {[c[:7] for c in commits]}, not the release "
+                            f"{release[:7]}")  # fmt: skip
+    return problems
+
+
 def after_the_run(review_text: str) -> list[str]:
     """Lines of a review that say something changed after the run (quoted into the provenance, not interpreted)."""
     keep = []
@@ -118,9 +160,11 @@ def after_the_run(review_text: str) -> list[str]:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("--commit", default=DEFAULT_COMMIT)
+    ap.add_argument("--commit", required=True, help="the harness commit every source is read at")
+    ap.add_argument("--release", help="the release tag the paper describes (the fourth sample ran at it)")
     args = ap.parse_args()
     head = full_sha(args.commit)
+    release = full_sha(args.release) if args.release else None
 
     for d in (SOURCES, TREE):
         shutil.rmtree(d, ignore_errors=True)
@@ -139,12 +183,17 @@ def main() -> int:
             problems.append(f"{name}: read at {read_at[:7]}, not an ancestor of {head[:7]}")
         out = SOURCES / (at or "HEAD") / path
         out.parent.mkdir(parents=True, exist_ok=True)
-        if name == "hom_summary" and not git("ls-tree", "--name-only", read_at, "--", path):
-            continue  # a harness commit before plan 13a's held-out run: make_numbers leaves the hom_ keys unset
-        out.write_bytes(git("show", f"{read_at}:{path}", binary=True))
-        written = git("log", "-1", "--format=%H%x09%ad%x09%s", "--date=short", read_at, "--", path).split("\t")
+        stored = path
+        if not git("ls-tree", "--name-only", read_at, "--", path) and path.endswith(".json"):
+            if git("ls-tree", "--name-only", read_at, "--", f"{path}.gz"):
+                stored = f"{path}.gz"  # a large report committed gzipped: written out plain at the CAMPAIGN path
+        if name in OPTIONAL and not git("ls-tree", "--name-only", read_at, "--", stored):
+            continue  # a harness commit from before it was made: make_numbers leaves its keys pending
+        data = git("show", f"{read_at}:{stored}", binary=True)
+        out.write_bytes(gzip.decompress(data) if stored != path else data)
+        written = git("log", "-1", "--format=%H%x09%ad%x09%s", "--date=short", read_at, "--", stored).split("\t")
         sources[name] = {
-            "path": path,
+            "path": stored,
             "read_at": read_at[:7],
             "file_written_by": {"commit": written[0][:7], "date": written[1], "subject": written[2]},
         }
@@ -152,7 +201,7 @@ def main() -> int:
     for name, rec in sources.items():
         if not name.endswith(MEASURED):
             continue
-        data = load_json(SOURCES / (CAMPAIGN[name][1] or "HEAD") / rec["path"])
+        data = load_source_at(name)
         recorded, how, stop = recorded_commits(name, data)
         problems += stop
         rec["measured_at"] = recorded
@@ -174,6 +223,14 @@ def main() -> int:
             rec["code_changes_to_harness_commit"][c[:7]] = changes
         rec["code_changed_since_measured"] = any(rec["code_changes_to_harness_commit"].values())
 
+    fourth = sources.get("r100_fourth_report", {}).get("measured_at")
+    drew = sources.get("r100_fourth_sample", {}).get("measured_at")
+    problems += release_problems(head, release, fourth, drew)
+    drawn = load_source_at("r100_fourth_sample") if "r100_fourth_sample" in sources else None
+    if drawn is not None and release is not None and (drawn.get("protocol") or {}).get("release") != args.release:
+        problems.append(f"the fourth sample's protocol names the release {(drawn.get('protocol') or {}).get('release')}"
+                        f", not {args.release}")  # fmt: skip
+
     # what the reviews say happened after the runs (quoted, so the metadata does not hide it)
     reviews = {}
     for sample in ("random100", "random100-heldout", "random100-third"):
@@ -186,6 +243,13 @@ def main() -> int:
         "harness_commit_date": git("show", "-s", "--format=%ad", "--date=iso", head),
         "harness_commit_subject": git("show", "-s", "--format=%s", head),
         "tags_at_commit": git("tag", "--points-at", head).split(),
+        "release": {
+            "tag": args.release,
+            "commit": release,
+            "tags_at_commit": git("tag", "--points-at", release).split(),
+        }
+        if release
+        else None,
         "sources": sources,
         "reviews_after_the_run": reviews,
         "problems": problems,

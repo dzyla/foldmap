@@ -310,6 +310,38 @@ def test_extract_reads_commits_from_stamps_only_and_refuses_mixed_or_unquotable_
     assert rec["dirty"] is False and rec["source"] == "git" and rec["commits"] == [head]
 
 
+def test_the_release_and_the_harness_commit(monkeypatch):
+    """Final review F2: the fourth sample is committed after the tag, so the harness commit may follow the tag only
+    with no code between them, and the fourth sample's stamps must name the tag's commit; a fourth sample read with
+    no release named is refused."""
+    extract = _load("extract")
+    tag, head = "a" * 40, "b" * 40
+    between: list[dict] = []
+    monkeypatch.setattr(extract, "is_ancestor", lambda a, b: (a, b) in {(tag, head), (head, head), (tag, tag)})
+    monkeypatch.setattr(extract, "code_between", lambda a, b: between if a != b else [])
+    at_tag = {"commits": [tag]}
+    assert extract.release_problems(head, tag, at_tag, at_tag) == []
+    assert extract.release_problems(tag, tag, None, None) == []  # before the fourth sample: nothing to check
+    assert extract.release_problems(head, None, None, None) == []
+    assert "no --release" in extract.release_problems(head, None, at_tag, at_tag)[0]
+    assert "not an ancestor" in extract.release_problems(tag, head, None, None)[0]
+    elsewhere = {"commits": [head]}
+    got = extract.release_problems(head, tag, elsewhere, at_tag)
+    assert len(got) == 1 and "report is stamped at" in got[0]
+    assert "sample is stamped at" in extract.release_problems(head, tag, at_tag, {"commits": [tag, head]})[0]
+    between.append({"commit": "c0ffee0", "subject": "a fix", "files": ["src/foldmap/x.py"]})
+    assert "code commits between" in extract.release_problems(head, tag, at_tag, at_tag)[0]
+
+
+@pytest.mark.skipif(sys.platform == "win32" or shutil.which("bash") is None, reason="a bash script")
+def test_run_all_needs_the_tag():
+    """F2: no default commit: run_all.sh refuses to run without the release tag."""
+    done = subprocess.run(["bash", str(PAPER / "run_all.sh")], capture_output=True, text=True)
+    assert done.returncode == 2 and "usage: run_all.sh TAG" in done.stderr
+    assert "838c579" not in (PAPER / "run_all.sh").read_text(encoding="utf-8")
+    assert not hasattr(_load("common"), "DEFAULT_COMMIT")
+
+
 def test_extract_verifies_every_json_source():
     """Final review F7: no JSON campaign output (hom_summary included) escapes the stamp check."""
     extract, common = _load("extract"), _load("common")
@@ -432,6 +464,10 @@ def test_every_key_gets_a_layer_and_a_set(numbers, layers):
     assert family("r100_third_pass")[:2] == ("readability", "r100_third")
     assert family("r100_third_pass_ci_lo", {"r100_third_pass"})[:2] == ("readability", "r100_third")
     assert family("r100_held_pass_first")[1] == "r100_held_first"
+    assert family("r100_fourth_pass")[:2] == ("readability", "r100_fourth")  # the headline count (F2)
+    assert family("r100_fourth_pass_ci_hi", {"r100_fourth_pass"})[:2] == ("readability", "r100_fourth")
+    assert family("r100_fourth_seed")[1] == family("r100_fourth_cutoff")[1] == "r100_fourth"
+    assert {"r100_fourth_seed", "r100_fourth_cutoff", "r100_fourth_pass"} <= set(numbers.PENDING)
     assert family("r100_third_science")[0] is None and "S5" in family("r100_third_science_fail")[2]  # M4
     assert family("dom_r100_pass")[0] == "external" and family("bp_recall")[0] == "external"
     assert family("dom_held_nohom_f1")[1] == "dom_held_nohom" and family("dom_held_f1")[1] == "dom_held"

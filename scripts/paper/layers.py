@@ -37,9 +37,9 @@ GATE = (
 # first group. A layer of None: no measurement (seeds, entry counts, tables, timings) or one mixing layers (its note
 # says which); a set of None: no benchmark set.
 FAMILIES = [
-    (r"r100_(tuned|held|third)_(seed|cutoff)", None, "r100_{1}", None),
+    (r"r100_(tuned|held|third|fourth)_(seed|cutoff)", None, "r100_{1}", None),
     (r"r100_held_pass_first", "readability", "r100_held_first", GATE),
-    (r"r100_(tuned|held|third)_pass", "readability", "r100_{1}", GATE),
+    (r"r100_(tuned|held|third|fourth)_pass", "readability", "r100_{1}", GATE),
     (r"r100_third_(fail_by_check|fail_by_stratum|not_judged|a12_pass|a13_pass)", "readability", "r100_third", None),
     (
         r"r100_third_science(_fail)?",
