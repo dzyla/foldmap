@@ -1,6 +1,6 @@
 # Plan 29 fix record: fix-ligand
 
-Written by: foldmap 0.1.0, git 7f14eaf53d8b, code fingerprint 372baafb4776372e, scripts/app29_fix.py sha256 5501bb48c861; Python 3.12.9 on Linux-6.18.33.1-microsoft-standard-WSL2-x86_64-with-glibc2.39; gemmi 0.7.5, numpy 2.5.3, scipy 1.18.1, networkx 3.7, matplotlib 3.11.2, PyYAML 6.0.3
+Written by: foldmap 0.1.0, git fa95efc6bb76, code fingerprint 372baafb4776372e, scripts/app29_fix.py sha256 5e3285df4cc0; Python 3.12.9 on Linux-6.18.33.1-microsoft-standard-WSL2-x86_64-with-glibc2.39; gemmi 0.7.5, numpy 2.5.3, scipy 1.18.1, networkx 3.7, matplotlib 3.11.2, PyYAML 6.0.3
 
 **Verdict: better** (identical or better on every measure keeps the fix).
 
@@ -175,6 +175,16 @@ Tune marks still on a loop line: the spot clear of the lines further out (to _SP
 - `9WNE`: the Mg's two tethers, to R's and W's tips, which lie level, run along one line, one over the other: the far step's first zero-C9 spot is at angle 0 on its ring, and no check sees tethers drawn along each other (C9 counts loop lines only; parked by ruling P29-10 for the Task N+1 look test). MG:A1302 moved 4.409, tethers [0.788, 0.982] -> [4.75, 3.65]
 - `1KX5`: the Mn left a loop line for a spot further out; its tether is several times longer (the move below), won on a C9 tie (0 against 0). MN:E3132 moved 3.953, tethers [1.05] -> [3.5]
 - `9X4L`: ADP 32001's home tether to the target 15 units off is 13.9 units long, drawn in pieces under alpha17 and alpha18: ruled policy, home tethers are unpriced (plan 11; A20 bounds tethers to other chains only). ADP:32001 moved 5.777, tethers [2.418, 8.493, 8.218, 7.885] -> [4.467, 13.881, 2.919, 3.115]
+
+## Changed since e0303b7 (the last record), and why
+
+Each figure that moved since that record, with its tethers crossing text and its C9 then -> now. C9 can rise while the verdict stays better: _mark_spot's own order puts the text gate (a spot whose tethers cross no text is ranked) before C9, and these marks lost a tether crossing text.
+
+- `1NID`: NO2:A1503: its spot on the line was _mark_spot's fallback (a tether crossed text); the ranked spot off the line wins (fix round 1, I1); CU:A1502: moved with the marks above (their boxes and tethers keep it off). Tethers crossing text 3 -> 2; C9 13.984 -> 16.304 (C9 rises: the text gate comes first).
+- `4GWY`: MG:A3404: its spot on the line was _mark_spot's fallback (a tether crossed text); the ranked spot off the line wins (fix round 1, I1); MG:A4404: its spot on the line was _mark_spot's fallback (a tether crossed text); the ranked spot off the line wins (fix round 1, I1). Tethers crossing text 20 -> 16; C9 82.594 -> 82.596 (C9 rises: the text gate comes first).
+- `6PO4`: ADE:A302: its spot on the line was _mark_spot's fallback (a tether crossed text); the ranked spot off the line wins (fix round 1, I1); ADE:B301: its spot on the line was _mark_spot's fallback (a tether crossed text); the ranked spot off the line wins (fix round 1, I1). Tethers crossing text 7 -> 5; C9 39.435 -> 44.68 (C9 rises: the text gate comes first).
+- `6QIK`: ZN:g201: the spot off the line it took at e0303b7 was _mark_spot's fallback (a tether crossed text); the ranked spot on the line wins, as before the fix (fix round 1, I1). Tethers crossing text 4 -> 2; C9 7.596 -> 12.817 (C9 rises: the text gate comes first).
+- `7XBK`: ATP:G702: its spot on the line was _mark_spot's fallback (a tether crossed text); the ranked spot off the line wins (fix round 1, I1). Tethers crossing text 3 -> 2; C9 44.071 -> 48.192 (C9 rises: the text gate comes first).
 
 ## Pictures (gitignored, for looking)
 

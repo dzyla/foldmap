@@ -6,14 +6,14 @@
   "checkout_fingerprint": "372baafb4776372e",
   "installed_matches_checkout": true,
   "git": {
-   "commit": "7f14eaf53d8baa28d6839537de5ea0577d4bac45",
+   "commit": "fa95efc6bb76af055c7673b2337bb415526b1798",
    "dirty": false,
    "dirty_paths": [],
    "source": "git"
   },
   "script": {
    "name": "scripts/app29_fix.py",
-   "sha256": "5501bb48c86170693fd634bb5c34a5dd25da73870df6c30c17a5c65c74d24fdf"
+   "sha256": "5e3285df4cc02d076c1e63aab079e4deefdbca82f769f24653c4e2d5b68db129"
   },
   "python": {
    "version": "3.12.9",
@@ -172,13 +172,13 @@
    "checkout_fingerprint": "372baafb4776372e",
    "installed_matches_checkout": false,
    "git": {
-    "commit": "7f14eaf53d8baa28d6839537de5ea0577d4bac45",
+    "commit": "fa95efc6bb76af055c7673b2337bb415526b1798",
     "dirty": false,
     "source": "asserted by runner"
    },
    "script": {
     "name": "scripts/app29_fix.py",
-    "sha256": "5501bb48c86170693fd634bb5c34a5dd25da73870df6c30c17a5c65c74d24fdf"
+    "sha256": "5e3285df4cc02d076c1e63aab079e4deefdbca82f769f24653c4e2d5b68db129"
    },
    "python": {
     "version": "3.13.13",
@@ -205,13 +205,13 @@
    "checkout_fingerprint": "372baafb4776372e",
    "installed_matches_checkout": true,
    "git": {
-    "commit": "7f14eaf53d8baa28d6839537de5ea0577d4bac45",
+    "commit": "fa95efc6bb76af055c7673b2337bb415526b1798",
     "dirty": false,
     "source": "asserted by runner"
    },
    "script": {
     "name": "scripts/app29_fix.py",
-    "sha256": "5501bb48c86170693fd634bb5c34a5dd25da73870df6c30c17a5c65c74d24fdf"
+    "sha256": "5e3285df4cc02d076c1e63aab079e4deefdbca82f769f24653c4e2d5b68db129"
    },
    "python": {
     "version": "3.13.13",
@@ -4239,6 +4239,84 @@
    ]
   }
  ],
+ "since": {
+  "label": "e0303b7",
+  "figures": [
+   {
+    "id": "1NID",
+    "cause": [
+     "NO2:A1503: its spot on the line was _mark_spot's fallback (a tether crossed text); the ranked spot off the line wins (fix round 1, I1)",
+     "CU:A1502: moved with the marks above (their boxes and tethers keep it off)"
+    ],
+    "text_crossings": [
+     3,
+     2
+    ],
+    "c9": [
+     13.984,
+     16.304
+    ]
+   },
+   {
+    "id": "4GWY",
+    "cause": [
+     "MG:A3404: its spot on the line was _mark_spot's fallback (a tether crossed text); the ranked spot off the line wins (fix round 1, I1)",
+     "MG:A4404: its spot on the line was _mark_spot's fallback (a tether crossed text); the ranked spot off the line wins (fix round 1, I1)"
+    ],
+    "text_crossings": [
+     20,
+     16
+    ],
+    "c9": [
+     82.594,
+     82.596
+    ]
+   },
+   {
+    "id": "6PO4",
+    "cause": [
+     "ADE:A302: its spot on the line was _mark_spot's fallback (a tether crossed text); the ranked spot off the line wins (fix round 1, I1)",
+     "ADE:B301: its spot on the line was _mark_spot's fallback (a tether crossed text); the ranked spot off the line wins (fix round 1, I1)"
+    ],
+    "text_crossings": [
+     7,
+     5
+    ],
+    "c9": [
+     39.435,
+     44.68
+    ]
+   },
+   {
+    "id": "6QIK",
+    "cause": [
+     "ZN:g201: the spot off the line it took at e0303b7 was _mark_spot's fallback (a tether crossed text); the ranked spot on the line wins, as before the fix (fix round 1, I1)"
+    ],
+    "text_crossings": [
+     4,
+     2
+    ],
+    "c9": [
+     7.596,
+     12.817
+    ]
+   },
+   {
+    "id": "7XBK",
+    "cause": [
+     "ATP:G702: its spot on the line was _mark_spot's fallback (a tether crossed text); the ranked spot off the line wins (fix round 1, I1)"
+    ],
+    "text_crossings": [
+     3,
+     2
+    ],
+    "c9": [
+     44.071,
+     48.192
+    ]
+   }
+  ]
+ },
  "pngs": {
   "9SXF": {
    "before": "docs/superpowers/work/app29/fix-ligand/png/9SXF-before.png",
