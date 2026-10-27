@@ -4,7 +4,7 @@
 view foldmap offers, measured and shown on a contact sheet (plan 10, needs network; not run in CI).
 
     python scripts/random100.py sample [--seed 20261013] [--date YYYY-MM-DD] [--released-after YYYY-MM-DD]
-                                       [--out .../sample.json] [--check]
+                                       [--out .../sample.json] [--check] [--no-alphafold]
                                        [--exclude other/sample.json [--exclude another/sample.json ...]]
 
 sample draws the sample from the RCSB search API (https://search.rcsb.org/rcsbsearch/v2/query) and writes
@@ -19,7 +19,9 @@ follow PAIR_TYPES (one UniProt accession and one protein by sequence: same_prote
 A, Important 2); given more than once, the ids of every sample it names (the third sample: none of the tuned or the
 held-out ids). --released-after keeps only entries released after a date as well (a release window): a development
 sample drawn after the fourth sample's cutoff (2026-10-13) can hold none of its pools' entries (plan 28 final review
-F4, ruling Q59; CONTRIBUTING.md). The same seed, dates, pools and files give the same draw; the file also records the
+F4, ruling Q59; CONTRIBUTING.md). --no-alphafold draws no AlphaFold DB model (S12 is left out, its quota recorded short
+and named under "not_drawn"): an AF pool has no release window, so a development sample could reach the fourth
+sample's (ruling Q61). The same seed, dates, pools and files give the same draw; the file also records the
 foldmap commit, the gemmi version and the SHA-256 of every candidate file read, so a changed file is seen. --check
 re-queries the ids and lists those now obsolete, without changing the file.
 
@@ -882,15 +884,24 @@ class Sampler:
         self.records.append(rec)
 
 
-def sample(seed: int, date: str, exclude: Iterable[str] = (), after: str | None = None) -> dict:
+NO_ALPHAFOLD = "not drawn (--no-alphafold): an AlphaFold DB pool has no release window (ruling Q61)"
+
+
+def sample(seed: int, date: str, exclude: Iterable[str] = (), after: str | None = None, alphafold: bool = True) -> dict:
     """Draw the whole sample (network): every stratum, the pairs, then the cross-cutting top-up; `exclude`: ids never
-    drawn (another sample's); `after`: only entries released after this date too (a release window)."""
+    drawn (another sample's); `after`: only entries released after this date too (a release window); `alphafold`
+    False: no AlphaFold DB model (the computational strata are not queried; their quotas stay short, said under
+    "not_drawn"). A pool short of its quota gives what it has: the sample is written, its quotas say how short."""
     import gemmi
 
     s = Sampler(seed, date, exclude, after)
     rest: dict = {}
+    not_drawn = {}
     for st in STRATA:
-        if st["name"] == "S11":
+        if not alphafold and st.get("content") == "computational":
+            not_drawn[st["name"]] = NO_ALPHAFOLD
+            s.records.append({"name": st["name"], "title": st["title"], "n": st["n"], "not_drawn": NO_ALPHAFOLD})
+        elif st["name"] == "S11":
             s.pairs(st)
         else:
             rest.update(s.stratum(st))
@@ -938,6 +949,7 @@ def sample(seed: int, date: str, exclude: Iterable[str] = (), after: str | None 
         "seed": seed,
         "query_date": date,
         **({"released_after": after} if after else {}),
+        **({"not_drawn": not_drawn} if not_drawn else {}),
         "foldmap_commit": _commit(),
         "gemmi": gemmi.__version__,
         "source_stamp": SOURCE_STAMP,
@@ -989,7 +1001,7 @@ def cmd_sample(args) -> int:
     exclude = sorted({e["id"] for f in args.exclude or [] for e in _sample_entries(Path(f))})
     if args.released_after and args.released_after >= args.date:
         raise SystemExit(f"--released-after {args.released_after} is not before --date {args.date}: an empty window")
-    doc = sample(args.seed, args.date, exclude, after=args.released_after)
+    doc = sample(args.seed, args.date, exclude, after=args.released_after, alphafold=not args.no_alphafold)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(dump(doc), encoding="utf-8")
     print(quota_table(doc))
@@ -1305,51 +1317,132 @@ def measure_view(view: str, drawn, spec, path: Path, name: str, work: Path, na: 
     return out
 
 
-def app_view(path: Path, name: str) -> dict:
+_REDRAWN: dict = {}  # (path, SVG sha256) -> (drawn, spec): app_science's redraw, judged once more by app_judge
+
+
+def app_settings() -> str:
+    """The settings JSON of the app's default figure: what the app view draws with."""
+    from foldmap import app
+
+    return json.dumps({**app.LAYOUT_DEFAULTS, "theme": "publication"}, sort_keys=True)
+
+
+def app_view(path: Path, name: str, keep: Path | None = None) -> dict:
     """The app's way: the size check, then app_jobs.draw_job in a job process under the hosted limits, with the
-    app's default settings."""
-    from foldmap import app, app_jobs
+    app's default settings. What it drew is judged as `foldmap check` judges a figure (app_judge): "criteria" {code:
+    pass, fail or not measured} with "criteria_detail" for the codes not passed, and "floor" {ok, reasons}, R1; both
+    {} / None when nothing was drawn or the figure was not measured (measure_error). "seconds": the draw job's wall
+    time; "peak_mb": the job's own peak memory when app_jobs hands it back, else "not measured". "error": the draw
+    failed other than by a limit (its type and text), None otherwise. With `keep`, the figure is kept there as app.svg
+    (the job's SVG) and app.png, the app's PNG download (app_jobs.figure_file: files_job, or the job's own files when
+    it was slow); a PNG that fails says so in "png_error"."""
+    from foldmap import app_jobs
 
     lim = app_jobs.limits(hosted=True)
-    size = app_jobs.run_job(app_jobs.size_job, str(path), limits=lim)
+    out: dict = {"refused": None, "residues": None, "svg_bytes": None, "criteria": {}, "floor": None}
+    out.update(seconds=None, peak_mb="not measured", error=None)
+    try:
+        size = app_jobs.run_job(app_jobs.size_job, str(path), limits=lim)
+    except app_jobs.JobLimit as err:
+        return {**out, "refused": err.kind, "message": app_jobs.limit_message(name, err, lim)}
+    except Exception as err:  # unreadable: the app says so; here it is the view's error
+        return {**out, "error": f"{type(err).__name__}: {err}"[:2000]}
+    out["residues"] = size["residues"]
     if lim.max_residues and size["residues"] > lim.max_residues:
-        return {"refused": "size", "residues": size["residues"], "message": app_jobs.size_message(name, size, lim)}
-    settings = json.dumps({**app.LAYOUT_DEFAULTS, "theme": "publication"}, sort_keys=True)
+        return {**out, "refused": "size", "message": app_jobs.size_message(name, size, lim)}
+    settings = app_settings()
+    t0 = time.perf_counter()
     try:
         got = app_jobs.run_job(app_jobs.draw_job, str(path), settings, lim.slow, limits=lim)
     except app_jobs.JobLimit as err:
-        return {"refused": err.kind, "residues": size["residues"], "message": app_jobs.limit_message(name, err, lim)}
-    out = {"refused": None, "residues": size["residues"], "svg_bytes": len(got["svg"])}
+        out["seconds"] = round(time.perf_counter() - t0, 2)
+        return {**out, "refused": err.kind, "message": app_jobs.limit_message(name, err, lim)}
+    except Exception as err:
+        out["seconds"] = round(time.perf_counter() - t0, 2)
+        return {**out, "error": f"{type(err).__name__}: {err}"[:2000]}
+    out.update(seconds=round(time.perf_counter() - t0, 2), svg_bytes=len(got["svg"]))
+    out["peak_mb"] = got.get("peak_mb", "not measured")
+    if keep is not None:
+        keep = Path(keep)
+        keep.mkdir(parents=True, exist_ok=True)
+        (keep / "app.svg").write_text(got["svg"], encoding="utf-8", newline="\n")
+        try:
+            eager = tuple(sorted(got.get("files", {}).items())) or None
+            png = app_jobs.figure_file(str(path), settings, "png", lim, eager)
+            (keep / "app.png").write_bytes(png)
+            out["png_bytes"] = len(png)
+        except Exception as err:  # a download the app could not give: a JobLimit or a failure, said
+            out["png_error"] = f"{type(err).__name__}: {err}"[:2000]
     try:
         out["science"], out["science_judged"] = app_science(path, got["svg"])
+        out["criteria"], out["criteria_detail"], out["floor"] = app_judge(path, got["svg"])
     except Exception:  # not measured, which fails the view (fail closed, as measure_view's errors)
         import traceback
 
         out["measure_error"] = traceback.format_exc()[-2000:]
+    finally:
+        _REDRAWN.clear()
     return out
+
+
+def _app_redraw(path: Path, svg: str):
+    """(drawn, spec): the app's spec (app.spec_of, the app's default settings) drawn again here, outside the hosted
+    limits, once its SVG is found equal to the app's `svg` (else ValueError: not that figure)."""
+    import warnings
+
+    from foldmap import app, render
+    from foldmap.spec import draw_spec
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        spec = app.spec_of(path, json.loads(app_settings()))
+        drawn = draw_spec(spec)
+        again = render.save_svg(drawn.figure)
+    if again != svg:
+        raise ValueError(
+            f"the redraw differs from the figure the app drew (SVG sha256 {_sha256(again.encode())[:12]} vs "
+            f"{_sha256(svg.encode())[:12]})"
+        )
+    return drawn, spec
 
 
 def app_science(path: Path, svg: str) -> tuple[dict, dict]:
     """The science checks of the figure the app drew: the job process hands back its SVG (`svg`), not the figure, so
-    the same spec (app.spec_of, the app's default settings) is drawn again here, outside the hosted limits, and
-    measured, once its SVG is found equal to the app's (else ValueError: not that figure). The job's own warnings
-    are the app view's; this measuring's are not. With what each check had to judge (figcheck.science_judged)."""
+    the same spec is drawn again here and measured (_app_redraw: the redraw must give the app's SVG). The job's own
+    warnings are the app view's; this measuring's are not. With what each check had to judge
+    (figcheck.science_judged). The redraw is kept for app_judge."""
     import warnings
 
-    from foldmap import app, figcheck, render
-    from foldmap.spec import draw_spec
+    from foldmap import figcheck
 
-    settings = {**app.LAYOUT_DEFAULTS, "theme": "publication"}
+    drawn, spec = _app_redraw(path, svg)
+    _REDRAWN.clear()
+    _REDRAWN[(str(path), _sha256(svg.encode()))] = (drawn, spec)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        drawn = draw_spec(app.spec_of(path, settings))
-        again = render.save_svg(drawn.figure)
-        if again != svg:
-            raise ValueError(
-                f"the redraw differs from the figure the app drew (SVG sha256 {_sha256(again.encode())[:12]} vs "
-                f"{_sha256(svg.encode())[:12]})"
-            )
         return _jsonable(figcheck.science_checks(drawn)), figcheck.science_judged(drawn)
+
+
+def app_judge(path: Path, svg: str) -> tuple[dict, dict, dict]:
+    """The figure the app drew judged as `foldmap check` judges a figure (cli._cmd_check): criteria.check_figure's
+    A1-A20 and floor.check's R1, on the redraw that gives the app's SVG (app_science's, else drawn again). Returns
+    ({code: "pass" | "fail" | "not measured"}, {code: detail} for the codes not passed, {"ok", "reasons"})."""
+    import warnings
+
+    from foldmap.criteria import check_figure
+    from foldmap.floor import check as floor_check
+
+    drawn, spec = _REDRAWN.pop((str(path), _sha256(svg.encode())), None) or _app_redraw(path, svg)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        found = check_figure(drawn, spec, str(path))
+        floor = floor_check(drawn)
+    said, detail = {}, {}
+    for code, c in found["criteria"].items():
+        said[code] = "not measured" if c["pass"] is None else "pass" if c["pass"] else "fail"
+        if said[code] != "pass":
+            detail[code] = str(c.get("here") or c.get("detail") or "")
+    return said, detail, {"ok": floor["status"] == "pass", "reasons": [r["text"] for r in floor["reasons"]]}
 
 
 def cmd_view(args) -> int:
@@ -1383,7 +1476,9 @@ def cmd_view(args) -> int:
             for key in ("science", "science_judged", "measure_error"):  # judged with the other views' (science, A1)
                 if key in result["app"]:
                     result[key] = result["app"].pop(key)
-            code = 0
+            code = 1 if result["app"]["error"] else 0  # a draw that failed fails A1, as a crash did
+            if code:
+                print(f"app: {result['app']['error']}", file=sys.stderr)  # A1's detail reads the stderr tail
         else:
             result = {}
             try:
@@ -2595,6 +2690,11 @@ def main(argv=None) -> int:
     )
     s.add_argument("--out", default=str(OUT / "sample.json"))
     s.add_argument("--check", action="store_true", help="list the sampled ids now obsolete; change nothing")
+    s.add_argument(
+        "--no-alphafold",
+        action="store_true",
+        help="draw no AlphaFold DB model (S12): a development sample, as an AF pool has no release window (Q61)",
+    )
     s.add_argument(
         "--exclude",
         metavar="SAMPLE",

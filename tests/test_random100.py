@@ -1027,8 +1027,8 @@ def test_sample_excludes_the_ids_of_every_sample_named(r100, tmp_path, monkeypat
     )
     seen = {}
 
-    def fake(seed, date, exclude=(), after=None):
-        seen["exclude"], seen["after"] = list(exclude), after
+    def fake(seed, date, exclude=(), after=None, alphafold=True):
+        seen["exclude"], seen["after"], seen["alphafold"] = list(exclude), after, alphafold
         return {"entries": [], "quotas": {}}
 
     monkeypatch.setattr(r100, "sample", fake)
@@ -1039,7 +1039,9 @@ def test_sample_excludes_the_ids_of_every_sample_named(r100, tmp_path, monkeypat
     assert seen["exclude"] == []
     assert seen["after"] is None  # no release window unless asked (ruling Q59)
     r100.main(["sample", "--date", "2026-12-31", "--released-after", "2026-10-13", "--out", str(out)])
-    assert seen["after"] == "2026-10-13"
+    assert seen["after"] == "2026-10-13" and seen["alphafold"] is True  # AlphaFold models unless asked (Q61)
+    r100.main(["sample", "--date", "2026-12-31", "--no-alphafold", "--out", str(out)])
+    assert seen["alphafold"] is False
 
 
 def test_an_entrys_work_folder_starts_empty(r100, tmp_path):

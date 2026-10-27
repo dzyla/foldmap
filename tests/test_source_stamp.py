@@ -184,6 +184,7 @@ NOT_REPORTS = {
     ("make_na_fixtures.py", "main"): "committed test fixtures",
     ("perturb.py", "install_trace"): "the constants a process read, an input to sensitivity.py's stamped keys",
     ("random100.py", "cmd_sample"): "writes the sample sample() built, which carries the stamp",
+    ("app29.py", "add_split"): "adds the seeded split to the sample random100's sample() drew, which carries the stamp",
     ("random100.py", "cmd_view"): "a view's measures inside an entry's process; the entry record is stamped",
     ("random100.py", "finish"): "re-judges stamped entries and rewrites them with their measuring stamps",
     ("random100.py", "cmd_entry"): "writes the entry run_entry() built, which carries the stamp",

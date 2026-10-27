@@ -34,7 +34,10 @@ disjoint from the fourth sample by construction (ruling Q59), and excludes the e
 
     python scripts/random100.py sample --seed N --released-after 2026-10-13 --out docs/validation/<name>/sample.json \
         --exclude docs/validation/random100/sample.json --exclude docs/validation/random100-heldout/sample.json \
-        --exclude docs/validation/random100-third/sample.json
+        --exclude docs/validation/random100-third/sample.json --no-alphafold
+
+Development samples draw no AlphaFold models (`--no-alphafold`, ruling Q61), because an AlphaFold pool has no release
+window: it could hold the fourth sample's models.
 
 Such a sample skews to recent entries, and its pools are small for some time: on 2026-10-27 the window held no
 membrane (S6) or AlphaFold-model (S12) entry, so a draw then comes up short of those quotas; report the shortfall, do
