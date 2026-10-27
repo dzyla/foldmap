@@ -69,8 +69,8 @@ The anti-drift test `tests/test_model_docs.py` reads every backticked name on th
 
 ## Freeze rule
 
-Plan 28 Task 9.5: no new feature and no new special case without a named mechanism and a measurement on an unseen
-set. A page changes when the code or a record changes; `tests/test_model_docs.py` fails when a quoted name, check,
-record or test is gone, and when a constant quoted with its value (`layout._SIDE_CLEAR` (2.75 Å)) no longer has
-that value in the code. Numbers quoted from records are not pinned: a regenerated record means re-reading the pages
-that cite it.
+See [CONTRIBUTING.md](../../CONTRIBUTING.md): no new feature and no new special case without a named mechanism and a
+measurement on an unseen set. A page changes when the code or a record changes; `tests/test_model_docs.py` fails when
+a quoted name, check, record or test is gone, and when a constant quoted with its value (`layout._SIDE_CLEAR` (2.75 Å))
+no longer has that value in the code. Numbers quoted from records are not pinned: a regenerated record means
+re-reading the pages that cite it.

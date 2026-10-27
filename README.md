@@ -1137,6 +1137,8 @@ save(fig, "ubiquitin.pdf")
 
 ## Development
 
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the freeze rule: what a change needs before it goes in.
+
 ```bash
 python -m venv .venv && .venv/bin/pip install -e ".[dev,app,mcp]"
 .venv/bin/python -m pytest              # about 2200 tests, ~5 min
