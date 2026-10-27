@@ -109,7 +109,7 @@ def cmd_marks(args) -> int:
         sys.path.insert(0, str(ROOT / "src"))
     import foldmap
 
-    out = {"foldmap": str(Path(foldmap.__file__).resolve().parent), "entries": {}}
+    out = {"source_stamp": _stamp(), "foldmap": str(Path(foldmap.__file__).resolve().parent), "entries": {}}
     for i in [x.strip() for x in args.ids.split(",") if x.strip()]:
         out["entries"][i] = marks_of(i)["marks"]
         print(i, len(out["entries"][i]), flush=True)
@@ -372,7 +372,6 @@ def build(args) -> dict:
         patch = {"path": str(p), "sha256": hashlib.sha256(p.read_bytes()).hexdigest()}
     return {
         "name": args.name,
-        "source_stamp": _stamp(),
         "inputs": {
             "before_record": str(args.before),
             "before_stamp": before.get("source_stamp"),
@@ -381,7 +380,9 @@ def build(args) -> dict:
             "runs_before_stamp": third_b.get("report_stamp"),
             "runs_after_stamp": third_a.get("report_stamp"),
             "marks_before_foldmap": mb.get("foldmap"),
+            "marks_before_stamp": mb.get("source_stamp"),
             "marks_after_foldmap": ma.get("foldmap"),
+            "marks_after_stamp": ma.get("source_stamp"),
         },
         "tune": {"entries": len(tune), "svg_changed": changed, "rows": tune},
         "check": check_totals(before, after),
@@ -504,7 +505,7 @@ def render(doc: dict) -> str:
 
 
 def cmd_report(args) -> int:
-    doc = build(args)
+    doc = {"source_stamp": _stamp(), **build(args)}
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     (out / "report.json").write_text(json.dumps(doc, indent=1) + "\n", encoding="utf-8")
