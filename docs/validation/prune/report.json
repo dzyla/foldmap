@@ -1,0 +1,2766 @@
+{
+ "what": "special cases set for a named entry, turned off one at a time and measured; pruned only when every measure is identical or better and no test fails (scripts/prune.py, plan 28 Task 9.3, ruling Q46)",
+ "date": "2026-10-27",
+ "source_stamp": {
+  "foldmap": "0.1.0",
+  "code_fingerprint": "8f878e5bd79166bf",
+  "package": "checkout",
+  "checkout_fingerprint": "8f878e5bd79166bf",
+  "installed_matches_checkout": true,
+  "git": {
+   "commit": "c64ea7a4503195834028058919f99a1936bbaec5",
+   "dirty": false,
+   "dirty_paths": [],
+   "source": "git"
+  },
+  "script": {
+   "name": "scripts/prune.py",
+   "sha256": "e7ee21efc107d3569c2fc47667e0ebf5536b919148906498bba2cb1bafe600f9"
+  },
+  "python": {
+   "version": "3.12.9",
+   "implementation": "CPython"
+  },
+  "platform": {
+   "platform": "Linux-6.18.33.1-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+   "machine": "x86_64"
+  },
+  "packages": {
+   "gemmi": "0.7.5",
+   "numpy": "2.5.3",
+   "scipy": "1.18.1",
+   "networkx": "3.7",
+   "matplotlib": "3.11.2",
+   "PyYAML": "6.0.3"
+  }
+ },
+ "code_fingerprint": "4eb4cad74365b1ed",
+ "inventory_sha256": "bc3792f7940eed708a4505738a42f1c1e47a6a84ba15909c83485198981fdda9",
+ "sensitivity_sha256": "8b3fc7c7a1dd3347de3a596b5096b9e64236661a2f49a75b022f59eff9bc74bd",
+ "bench_before": ".superpowers/sdd/2026-10-17-15-heldout-failures/bench-before.json",
+ "counts": {
+  "candidates": 45,
+  "tried": 32,
+  "tried_values": 31,
+  "shared": 1,
+  "kept": 28,
+  "pruned": 2,
+  "held": 2,
+  "incomplete": 0,
+  "not_tried": 13,
+  "kept_by_measure": {
+   "domains": 2,
+   "membrane": 3,
+   "na": 4,
+   "r100": 7,
+   "suite": 27
+  }
+ },
+ "baselines": {
+  "r100_deterministic": {
+   "identical": true,
+   "moved": [],
+   "svg": []
+  },
+  "r100_passed": 82,
+  "r100_entries": 100,
+  "membrane_passed": 7,
+  "membrane_entries": 8,
+  "domains_passed": 42,
+  "domains_entries": 49,
+  "na_entries": 46,
+  "na_failed": [
+   "1YTB",
+   "30QM",
+   "3CRX",
+   "3EGZ",
+   "3KTQ",
+   "6QIK",
+   "6ZY7",
+   "8BW5",
+   "8VBG",
+   "8XJV",
+   "9K4F",
+   "9YLM"
+  ],
+  "bench": {
+   "exit": 0,
+   "changed": [],
+   "entries": 22
+  },
+  "domsets_chains": {
+   "dom_cal": 22,
+   "dom_held": 11,
+   "dom_fresh": 11
+  },
+  "suite": {
+   "exit": 0,
+   "tests": 4619,
+   "failed": 0,
+   "skipped": 56,
+   "failures": [],
+   "seconds": 92.4
+  }
+ },
+ "seconds": {
+  "r100": 2483.9,
+  "membrane": 24.6,
+  "domains": 636.0,
+  "na": 1397.2,
+  "domsets": 4.8,
+  "bench": 24.3,
+  "suite": 3173.5
+ },
+ "candidates": [
+  {
+   "id": "layout:_NAME_OPEN",
+   "kind": "constant",
+   "value": "_NAME_ROUTE + 0.1",
+   "origin": "named-entry:7NZ2",
+   "tests": "domains",
+   "not_exercised": false,
+   "off": 0.15,
+   "why": "= _NAME_ROUTE: a domain name keeps no more than its routing keep-out from a loop's way out (the 7NZ2 0.1 off)",
+   "perturb": "layout:_NAME_OPEN=0.15",
+   "view": "domains",
+   "measures": {
+    "r100": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "code": "4eb4cad74365b1ed"
+    },
+    "domains": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "code": "4eb4cad74365b1ed"
+    },
+    "na": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "code": "4eb4cad74365b1ed"
+    },
+    "domsets": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "reached": false,
+     "code": "4eb4cad74365b1ed"
+    },
+    "bench": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "reached": true,
+     "code": "4eb4cad74365b1ed"
+    },
+    "suite": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": []
+    }
+   },
+   "decision": "prune",
+   "kept_by": [],
+   "missing": [],
+   "removed": true
+  },
+  {
+   "id": "na_runs:_JOINT_NEAR",
+   "kind": "constant",
+   "value": "2.5",
+   "origin": "named-entry:9C75",
+   "tests": "na_layout",
+   "not_exercised": false,
+   "off": 0.0,
+   "why": "a near joint no route reaches is held to the far joints' test (na_runs._straight_joint)",
+   "perturb": "na_runs:_JOINT_NEAR=0.0",
+   "view": null,
+   "measures": {
+    "r100": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "code": "4eb4cad74365b1ed"
+    },
+    "na": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "code": "4eb4cad74365b1ed"
+    },
+    "domsets": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "reached": false,
+     "code": "4eb4cad74365b1ed"
+    },
+    "bench": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "reached": true,
+     "code": "4eb4cad74365b1ed"
+    },
+    "suite": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": []
+    }
+   },
+   "decision": "prune",
+   "kept_by": [],
+   "missing": [],
+   "removed": true
+  },
+  {
+   "id": "align:SAME_FOLD_TM",
+   "kind": "constant",
+   "value": "0.5",
+   "origin": "measured",
+   "tests": "align, sensitivity",
+   "not_exercised": true,
+   "off": 0.0,
+   "why": "any aligned pair is one fold by its TM-score (align.element_mates; H1)",
+   "perturb": "align:SAME_FOLD_TM=0.0",
+   "view": null,
+   "measures": {
+    "r100": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "code": "4eb4cad74365b1ed"
+    },
+    "na": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "code": "4eb4cad74365b1ed"
+    },
+    "domsets": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "reached": false,
+     "code": "4eb4cad74365b1ed"
+    },
+    "bench": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "reached": false,
+     "code": "4eb4cad74365b1ed"
+    },
+    "suite": {
+     "verdict": "worse",
+     "worse": [
+      "tests.test_align::test_auto_takes_the_sequence_only_when_its_pairs_superpose",
+      "tests.test_align::test_same_fold_needs_the_tm_score_and_the_elements",
+      "tests.test_homologues::test_the_comparison_counts_the_limits"
+     ],
+     "better": [],
+     "moved": []
+    }
+   },
+   "decision": "keep",
+   "kept_by": [
+    {
+     "measure": "suite",
+     "verdict": "worse",
+     "first": [
+      "tests.test_align::test_auto_takes_the_sequence_only_when_its_pairs_superpose",
+      "tests.test_align::test_same_fold_needs_the_tm_score_and_the_elements",
+      "tests.test_homologues::test_the_comparison_counts_the_limits"
+     ],
+     "count": 3
+    }
+   ],
+   "missing": [],
+   "removed": false
+  },
+  {
+   "id": "align:SAME_FOLD_FRACTION",
+   "kind": "constant",
+   "value": "0.5",
+   "origin": "measured",
+   "tests": "-",
+   "not_exercised": true,
+   "off": 0.0,
+   "why": "any aligned pair is one fold by its matched fraction (align.element_mates; H1)",
+   "perturb": "align:SAME_FOLD_FRACTION=0.0",
+   "view": null,
+   "measures": {
+    "r100": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "code": "4eb4cad74365b1ed"
+    },
+    "na": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "code": "4eb4cad74365b1ed"
+    },
+    "domsets": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "reached": false,
+     "code": "4eb4cad74365b1ed"
+    },
+    "bench": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "reached": false,
+     "code": "4eb4cad74365b1ed"
+    },
+    "suite": {
+     "verdict": "worse",
+     "worse": [
+      "tests.test_align::test_same_fold_needs_the_tm_score_and_the_elements"
+     ],
+     "better": [],
+     "moved": []
+    }
+   },
+   "decision": "keep",
+   "kept_by": [
+    {
+     "measure": "suite",
+     "verdict": "worse",
+     "first": [
+      "tests.test_align::test_same_fold_needs_the_tm_score_and_the_elements"
+     ],
+     "count": 1
+    }
+   ],
+   "missing": [],
+   "removed": false
+  },
+  {
+   "id": "io:PAIRED_MIN",
+   "kind": "constant",
+   "value": "3",
+   "origin": "named-entry:4PLX,3OWW",
+   "tests": "assembly",
+   "not_exercised": true,
+   "off": 1000000000,
+   "why": "no two chains are ever held together by base pairs (io._paired never true)",
+   "perturb": "io:PAIRED_MIN=1000000000",
+   "view": null,
+   "measures": {
+    "r100": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "code": "4eb4cad74365b1ed"
+    },
+    "na": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "code": "4eb4cad74365b1ed"
+    },
+    "domsets": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "reached": false,
+     "code": "4eb4cad74365b1ed"
+    },
+    "bench": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "reached": true,
+     "code": "4eb4cad74365b1ed"
+    },
+    "suite": {
+     "verdict": "worse",
+     "worse": [
+      "tests.test_assembly::test_a_lattice_contact_of_two_base_pairs_is_no_pairing",
+      "tests.test_assembly::test_chains_that_pair_are_one_object_and_auto_keeps_both",
+      "tests.test_assembly::test_paired_chains_must_be_assembled_together",
+      "tests.test_assembly::test_protein_copies_in_contact_are_not_paired_but_base_pairs_are"
+     ],
+     "better": [],
+     "moved": []
+    }
+   },
+   "decision": "keep",
+   "kept_by": [
+    {
+     "measure": "suite",
+     "verdict": "worse",
+     "first": [
+      "tests.test_assembly::test_a_lattice_contact_of_two_base_pairs_is_no_pairing",
+      "tests.test_assembly::test_chains_that_pair_are_one_object_and_auto_keeps_both",
+      "tests.test_assembly::test_paired_chains_must_be_assembled_together"
+     ],
+     "count": 4
+    }
+   ],
+   "missing": [],
+   "removed": false
+  },
+  {
+   "id": "io:_PAIR_DIST",
+   "kind": "constant",
+   "value": "3.4",
+   "origin": "named-entry:3OWW",
+   "tests": "-",
+   "not_exercised": true,
+   "off": 0.0,
+   "why": "no base atoms pair within 0 \u00c5: io._paired never true",
+   "perturb": "io:_PAIR_DIST=0.0",
+   "view": null,
+   "measures": {
+    "r100": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "code": "4eb4cad74365b1ed"
+    },
+    "na": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "code": "4eb4cad74365b1ed"
+    },
+    "domsets": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "reached": false,
+     "code": "4eb4cad74365b1ed"
+    },
+    "bench": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "reached": true,
+     "code": "4eb4cad74365b1ed"
+    },
+    "suite": {
+     "verdict": "worse",
+     "worse": [
+      "tests.test_assembly::test_a_lattice_contact_of_two_base_pairs_is_no_pairing",
+      "tests.test_assembly::test_chains_that_pair_are_one_object_and_auto_keeps_both",
+      "tests.test_assembly::test_paired_chains_must_be_assembled_together",
+      "tests.test_assembly::test_protein_copies_in_contact_are_not_paired_but_base_pairs_are"
+     ],
+     "better": [],
+     "moved": []
+    }
+   },
+   "decision": "keep",
+   "kept_by": [
+    {
+     "measure": "suite",
+     "verdict": "worse",
+     "first": [
+      "tests.test_assembly::test_a_lattice_contact_of_two_base_pairs_is_no_pairing",
+      "tests.test_assembly::test_chains_that_pair_are_one_object_and_auto_keeps_both",
+      "tests.test_assembly::test_paired_chains_must_be_assembled_together"
+     ],
+     "count": 4
+    }
+   ],
+   "missing": [],
+   "removed": false
+  },
+  {
+   "id": "layout:_TAIL_COUNT_NEAR",
+   "kind": "constant",
+   "value": "1.5",
+   "origin": "named-entry:7SMR",
+   "tests": "text_clear",
+   "not_exercised": false,
+   "off": 1000000000.0,
+   "why": "a tail count need not stand beside its letter (layout.tail_counts)",
+   "perturb": "layout:_TAIL_COUNT_NEAR=1000000000.0",
+   "view": null,
+   "measures": {
+    "r100": {
+     "verdict": "better",
+     "worse": [],
+     "better": [
+      "6QIK: fallback counts_hidden 1 -> 0",
+      "7F5S: fallback counts_hidden 5 -> 4",
+      "8XJV: fallback counts_hidden 5 -> 3"
+     ],
+     "moved": [],
+     "code": "4eb4cad74365b1ed"
+    },
+    "na": {
+     "verdict": "better",
+     "worse": [],
+     "better": [
+      "6QIK: named_fallbacks 54 -> 53",
+      "8XJV: named_fallbacks 111 -> 109"
+     ],
+     "moved": [],
+     "code": "4eb4cad74365b1ed"
+    },
+    "domsets": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "reached": false,
+     "code": "4eb4cad74365b1ed"
+    },
+    "bench": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "reached": true,
+     "code": "4eb4cad74365b1ed"
+    },
+    "suite": {
+     "verdict": "worse",
+     "worse": [
+      "tests.test_text_clear::test_tail_count_sits_clear_beyond_its_letter[2.0]"
+     ],
+     "better": [],
+     "moved": []
+    }
+   },
+   "decision": "keep",
+   "kept_by": [
+    {
+     "measure": "suite",
+     "verdict": "worse",
+     "first": [
+      "tests.test_text_clear::test_tail_count_sits_clear_beyond_its_letter[2.0]"
+     ],
+     "count": 1
+    }
+   ],
+   "missing": [],
+   "removed": false
+  },
+  {
+   "id": "layout:_SEP_MIRROR_ROOM",
+   "kind": "constant",
+   "value": "1.10",
+   "origin": "named-entry:9GEP",
+   "tests": "symmetry",
+   "not_exercised": false,
+   "off": 0.0,
+   "why": "mirror-image copies get no more room than other copies drawn alike (layout._separate: max(room, 0)); their extra push passes stay, as they are code",
+   "perturb": "layout:_SEP_MIRROR_ROOM=0.0",
+   "view": null,
+   "measures": {
+    "r100": {
+     "verdict": "moved",
+     "worse": [],
+     "better": [],
+     "moved": [
+      "3W96: area 3042.22 -> 3115.51"
+     ],
+     "code": "4eb4cad74365b1ed"
+    },
+    "na": {
+     "verdict": "worse",
+     "worse": [
+      "3W96: spearman 0.892 -> 0.891",
+      "3W96: procrustes 0.308 -> 0.309",
+      "3W96: na_run_crossings 5 -> 6",
+      "3W96: na_protein_crossings 2 -> 4"
+     ],
+     "better": [
+      "3W96: contact_auc 0.912 -> 0.913",
+      "30QM: contact_auc 0.787 -> 0.789",
+      "30QM: na_run_crossings 2 -> 1",
+      "30QM: na_protein_crossings 15 -> 14"
+     ],
+     "moved": [
+      "30QM: ss_contacts_nearer 0.857 -> 0.821"
+     ],
+     "code": "4eb4cad74365b1ed"
+    },
+    "domsets": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "reached": false,
+     "code": "4eb4cad74365b1ed"
+    },
+    "bench": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "reached": true,
+     "code": "4eb4cad74365b1ed"
+    },
+    "suite": {
+     "verdict": "worse",
+     "worse": [
+      "tests.test_snapshots::test_figure_matches_snapshot[30QM-ncrna]",
+      "tests.test_symmetry::test_mirror_images_are_kept_when_they_cost_a_little_more_room"
+     ],
+     "better": [],
+     "moved": []
+    }
+   },
+   "decision": "keep",
+   "kept_by": [
+    {
+     "measure": "r100",
+     "verdict": "moved",
+     "first": [
+      "3W96: area 3042.22 -> 3115.51"
+     ],
+     "count": 1
+    },
+    {
+     "measure": "na",
+     "verdict": "worse",
+     "first": [
+      "3W96: spearman 0.892 -> 0.891",
+      "3W96: procrustes 0.308 -> 0.309",
+      "3W96: na_run_crossings 5 -> 6"
+     ],
+     "count": 4
+    },
+    {
+     "measure": "suite",
+     "verdict": "worse",
+     "first": [
+      "tests.test_snapshots::test_figure_matches_snapshot[30QM-ncrna]",
+      "tests.test_symmetry::test_mirror_images_are_kept_when_they_cost_a_little_more_room"
+     ],
+     "count": 2
+    }
+   ],
+   "missing": [],
+   "removed": false
+  },
+  {
+   "id": "layout:_SEP_TIE_ROOM",
+   "kind": "constant",
+   "value": "2.0",
+   "origin": "named-entry:8QEM,6JLN,7QUP,9P1X",
+   "tests": "copies, symmetry",
+   "not_exercised": false,
+   "off": 0.0,
+   "why": "the second chance for copies drawn alike is never kept (layout._tied_again)",
+   "perturb": "layout:_SEP_TIE_ROOM=0.0",
+   "view": null,
+   "measures": {
+    "r100": {
+     "verdict": "worse",
+     "worse": [
+      "9FZL: PASS -> FAIL",
+      "9FZL: A15 now fails",
+      "9FZL: fallback counts_hidden 2 -> 3",
+      "9Y70: PASS -> FAIL",
+      "9Y70: A15 now fails"
+     ],
+     "better": [
+      "9FZL: fallback helix_name_moved 22 -> 0"
+     ],
+     "moved": [
+      "9FZL: area 65458.72 -> 34193.58",
+      "9Y70: area 3779.14 -> 3598.23"
+     ],
+     "code": "4eb4cad74365b1ed"
+    },
+    "na": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "code": "4eb4cad74365b1ed"
+    },
+    "domsets": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "reached": false,
+     "code": "4eb4cad74365b1ed"
+    },
+    "bench": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "reached": true,
+     "code": "4eb4cad74365b1ed"
+    },
+    "suite": {
+     "verdict": "worse",
+     "worse": [
+      "tests.test_app_controls::test_two_fold_choice_is_offered_for_a_two_fold_assembly",
+      "tests.test_hbonds::test_interaction_lines_follow_turned_and_mirrored_copies[1UAM-mirror]",
+      "tests.test_heldout_copies::test_heldout_copies_are_drawn_alike[13FZ]",
+      "tests.test_heldout_copies::test_the_second_chance_keeps_copies_alike_when_the_pushes_leave_a_jam",
+      "tests.test_layoutfile::test_an_old_layout_file_with_two_fold_mirror_still_mirrors",
+      "tests.test_symmetry::test_a_two_fold_assembly_is_drawn_as_one_copy_and_its_mirror_image[25IN]",
+      "tests.test_symmetry::test_a_two_fold_assembly_is_drawn_as_one_copy_and_its_mirror_image[2HHB]",
+      "tests.test_symmetry::test_copies_that_need_more_room_are_kept_alike_when_free_items_yield",
+      "tests.test_symmetry::test_symmetric_separation_never_costs_much_more_room_than_moving_items_alone",
+      "tests.test_symmetry::test_the_dyad_view_is_turned_to_keep_the_interface_together",
+      "tests.test_symmetry::test_two_fold_auto_mirrors_only_where_a_protomer_is_one_chain",
+      "tests.test_symmetry::test_two_fold_unrolled_draws_the_copies_side_by_side"
+     ],
+     "better": [],
+     "moved": []
+    }
+   },
+   "decision": "keep",
+   "kept_by": [
+    {
+     "measure": "r100",
+     "verdict": "worse",
+     "first": [
+      "9FZL: PASS -> FAIL",
+      "9FZL: A15 now fails",
+      "9FZL: fallback counts_hidden 2 -> 3"
+     ],
+     "count": 5
+    },
+    {
+     "measure": "suite",
+     "verdict": "worse",
+     "first": [
+      "tests.test_app_controls::test_two_fold_choice_is_offered_for_a_two_fold_assembly",
+      "tests.test_hbonds::test_interaction_lines_follow_turned_and_mirrored_copies[1UAM-mirror]",
+      "tests.test_heldout_copies::test_heldout_copies_are_drawn_alike[13FZ]"
+     ],
+     "count": 12
+    }
+   ],
+   "missing": [],
+   "removed": false
+  },
+  {
+   "id": "layout:_STACK_SHUT",
+   "kind": "constant",
+   "value": "0.6",
+   "origin": "named-entry:9P1X,8OZJ",
+   "tests": "layout",
+   "not_exercised": false,
+   "off": 0.0,
+   "why": "a stack gap needs no width to have a way out, so none is shut: no nudge, no move to the partner's other side, no pocket (layout._column_heights: they all ask way_out by _STACK_SHUT)",
+   "perturb": "layout:_STACK_SHUT=0.0",
+   "view": null,
+   "measures": {
+    "r100": {
+     "verdict": "worse",
+     "worse": [
+      "7U9Z: PASS -> FAIL",
+      "7U9Z: A3 now fails",
+      "7U9Z: fallback counts_hidden 0 -> 1",
+      "7U9Z: fallback loop_curve 0 -> 2"
+     ],
+     "better": [],
+     "moved": [
+      "7U9Z: area 6539.89 -> 6622.02",
+      "9NMN: area 10388.35 -> 9853.15"
+     ],
+     "code": "4eb4cad74365b1ed"
+    },
+    "na": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "code": "4eb4cad74365b1ed"
+    },
+    "domsets": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "reached": false,
+     "code": "4eb4cad74365b1ed"
+    },
+    "bench": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "reached": true,
+     "code": "4eb4cad74365b1ed"
+    },
+    "suite": {
+     "verdict": "worse",
+     "worse": [
+      "tests.test_domains::test_domain_names_and_leaders_leave_every_loop_its_way[8BCU]",
+      "tests.test_layout::test_stacked_accessories_leave_every_gap_a_way_out[2FR2]",
+      "tests.test_layout::test_stacked_accessories_leave_every_gap_a_way_out[8BCU]"
+     ],
+     "better": [],
+     "moved": []
+    }
+   },
+   "decision": "keep",
+   "kept_by": [
+    {
+     "measure": "r100",
+     "verdict": "worse",
+     "first": [
+      "7U9Z: PASS -> FAIL",
+      "7U9Z: A3 now fails",
+      "7U9Z: fallback counts_hidden 0 -> 1"
+     ],
+     "count": 4
+    },
+    {
+     "measure": "suite",
+     "verdict": "worse",
+     "first": [
+      "tests.test_domains::test_domain_names_and_leaders_leave_every_loop_its_way[8BCU]",
+      "tests.test_layout::test_stacked_accessories_leave_every_gap_a_way_out[2FR2]",
+      "tests.test_layout::test_stacked_accessories_leave_every_gap_a_way_out[8BCU]"
+     ],
+     "count": 3
+    }
+   ],
+   "missing": [],
+   "removed": false
+  },
+  {
+   "id": "layout:_STACK_NUDGE",
+   "kind": "constant",
+   "value": "1.0",
+   "origin": "named-entry:9P1X,8OZJ",
+   "tests": "-",
+   "not_exercised": false,
+   "off": 0.0,
+   "why": "a strand in a shut stack gap is never nudged (layout._column_heights.opened)",
+   "perturb": "layout:_STACK_NUDGE=0.0",
+   "view": null,
+   "measures": {
+    "r100": {
+     "verdict": "moved",
+     "worse": [],
+     "better": [
+      "9NMN: FAIL -> PASS",
+      "9NMN: A4 now passes",
+      "9NMN: A6 now passes",
+      "9NMN: fallback loop_over_text 1 -> 0"
+     ],
+     "moved": [
+      "9NMN: area 10388.35 -> 9556.46"
+     ],
+     "code": "4eb4cad74365b1ed"
+    },
+    "na": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "code": "4eb4cad74365b1ed"
+    },
+    "domsets": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "reached": false,
+     "code": "4eb4cad74365b1ed"
+    },
+    "bench": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "reached": true,
+     "code": "4eb4cad74365b1ed"
+    },
+    "suite": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": []
+    }
+   },
+   "decision": "keep",
+   "kept_by": [
+    {
+     "measure": "r100",
+     "verdict": "moved",
+     "first": [
+      "9NMN: area 10388.35 -> 9556.46"
+     ],
+     "count": 1
+    }
+   ],
+   "missing": [],
+   "removed": false
+  },
+  {
+   "id": "layout:_POCKET_REACH",
+   "kind": "constant",
+   "value": "2.0",
+   "origin": "named-entry:8BCU,12BM",
+   "tests": "-",
+   "not_exercised": true,
+   "off": 0.0,
+   "why": "an accessory closing a pocket never moves (layout._column_heights.unpocketed)",
+   "perturb": "layout:_POCKET_REACH=0.0",
+   "view": null,
+   "measures": {
+    "r100": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "code": "4eb4cad74365b1ed"
+    },
+    "na": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "code": "4eb4cad74365b1ed"
+    },
+    "domsets": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "reached": false,
+     "code": "4eb4cad74365b1ed"
+    },
+    "bench": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "reached": true,
+     "code": "4eb4cad74365b1ed"
+    },
+    "suite": {
+     "verdict": "worse",
+     "worse": [
+      "tests.test_domains::test_domain_names_and_leaders_leave_every_loop_its_way[8BCU]",
+      "tests.test_layout::test_stacked_accessories_leave_every_gap_a_way_out[8BCU]"
+     ],
+     "better": [],
+     "moved": []
+    }
+   },
+   "decision": "keep",
+   "kept_by": [
+    {
+     "measure": "suite",
+     "verdict": "worse",
+     "first": [
+      "tests.test_domains::test_domain_names_and_leaders_leave_every_loop_its_way[8BCU]",
+      "tests.test_layout::test_stacked_accessories_leave_every_gap_a_way_out[8BCU]"
+     ],
+     "count": 2
+    }
+   ],
+   "missing": [],
+   "removed": false
+  },
+  {
+   "id": "layout:_END_ROOM",
+   "kind": "constant",
+   "value": "END_LABEL - 0.15",
+   "origin": "named-entry:9FWZ",
+   "tests": "layout",
+   "not_exercised": false,
+   "off": 0.0,
+   "why": "a stack gap a chain end faces gets no more room (layout._column_heights.room)",
+   "perturb": "layout:_END_ROOM=0.0",
+   "view": null,
+   "measures": {
+    "r100": {
+     "verdict": "worse",
+     "worse": [
+      "6DQN: PASS -> FAIL",
+      "6DQN: A4 now fails",
+      "6DQN: fallback loop_over_text 0 -> 1",
+      "9FZL: PASS -> FAIL",
+      "9FZL: A4 now fails",
+      "9FZL: A6 now fails",
+      "9FZL: fallback loop_over_text 0 -> 2"
+     ],
+     "better": [
+      "9FZL: fallback counts_hidden 2 -> 0",
+      "9FZL: fallback helix_name_moved 22 -> 13"
+     ],
+     "moved": [
+      "2AIQ: area 225.48 -> 213.8",
+      "5ES7: area 1004.49 -> 958.89",
+      "6DQN: area 4941.13 -> 4870.76",
+      "9FZL: area 65458.72 -> 55656.15",
+      "AF_AFQ8ZPJ0F1: area 421.83 -> 389.15"
+     ],
+     "code": "4eb4cad74365b1ed"
+    },
+    "na": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "code": "4eb4cad74365b1ed"
+    },
+    "domsets": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "reached": false,
+     "code": "4eb4cad74365b1ed"
+    },
+    "bench": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "reached": true,
+     "code": "4eb4cad74365b1ed"
+    },
+    "suite": {
+     "verdict": "worse",
+     "worse": [
+      "tests.test_figcheck::test_accessories_named_not_drawn_level_are_reported[2OMF-A-3-3]",
+      "tests.test_provenance::test_a_pairing_named_but_not_level_is_counted",
+      "tests.test_provenance::test_the_command_line_prints_one_block",
+      "tests.test_random100::test_accessories_named_are_reported_per_view_and_never_gate",
+      "tests.test_text_clear::test_a_tail_count_with_no_clear_spot_is_left_out_and_listed"
+     ],
+     "better": [],
+     "moved": []
+    }
+   },
+   "decision": "keep",
+   "kept_by": [
+    {
+     "measure": "r100",
+     "verdict": "worse",
+     "first": [
+      "6DQN: PASS -> FAIL",
+      "6DQN: A4 now fails",
+      "6DQN: fallback loop_over_text 0 -> 1"
+     ],
+     "count": 7
+    },
+    {
+     "measure": "suite",
+     "verdict": "worse",
+     "first": [
+      "tests.test_figcheck::test_accessories_named_not_drawn_level_are_reported[2OMF-A-3-3]",
+      "tests.test_provenance::test_a_pairing_named_but_not_level_is_counted",
+      "tests.test_provenance::test_the_command_line_prints_one_block"
+     ],
+     "count": 5
+    }
+   ],
+   "missing": [],
+   "removed": false
+  },
+  {
+   "id": "layout:_BA_MAX",
+   "kind": "constant",
+   "value": "10",
+   "origin": "named-entry:2BNH",
+   "tests": "template",
+   "not_exercised": false,
+   "off": 1000000000,
+   "why": "a \u03b2\u03b1 row may hold any number of parallel strands (layout.can_be_row)",
+   "perturb": "layout:_BA_MAX=1000000000",
+   "view": null,
+   "measures": {
+    "r100": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "code": "4eb4cad74365b1ed"
+    },
+    "na": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "code": "4eb4cad74365b1ed"
+    },
+    "domsets": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "reached": false,
+     "code": "4eb4cad74365b1ed"
+    },
+    "bench": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "reached": true,
+     "code": "4eb4cad74365b1ed"
+    },
+    "suite": {
+     "verdict": "worse",
+     "worse": [
+      "tests.test_template::test_a_row_holds_at_most_ten_strands[10-True]",
+      "tests.test_template::test_a_row_holds_at_most_ten_strands[11-False]"
+     ],
+     "better": [],
+     "moved": []
+    }
+   },
+   "decision": "keep",
+   "kept_by": [
+    {
+     "measure": "suite",
+     "verdict": "worse",
+     "first": [
+      "tests.test_template::test_a_row_holds_at_most_ten_strands[10-True]",
+      "tests.test_template::test_a_row_holds_at_most_ten_strands[11-False]"
+     ],
+     "count": 2
+    }
+   ],
+   "missing": [],
+   "removed": false
+  },
+  {
+   "id": "layout:_PART_BLOWUP",
+   "kind": "constant",
+   "value": "2.0",
+   "origin": "named-entry:1WWL,2ILU,7SMR,6JLN,5LDW",
+   "tests": "-",
+   "not_exercised": false,
+   "off": 1000000000.0,
+   "why": "parting domains never starts over (layout._part_domains)",
+   "perturb": "layout:_PART_BLOWUP=1000000000.0",
+   "view": "domains",
+   "measures": {
+    "r100": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "code": "4eb4cad74365b1ed"
+    },
+    "domains": {
+     "verdict": "moved",
+     "worse": [],
+     "better": [],
+     "moved": [
+      "8U1N: area 1331.46 -> 8059.7"
+     ],
+     "code": "4eb4cad74365b1ed"
+    },
+    "na": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "code": "4eb4cad74365b1ed"
+    },
+    "domsets": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "reached": false,
+     "code": "4eb4cad74365b1ed"
+    },
+    "bench": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "reached": true,
+     "code": "4eb4cad74365b1ed"
+    },
+    "suite": {
+     "verdict": "worse",
+     "worse": [
+      "tests.test_copy_labels::test_no_chain_draws_one_label_twice[8UTF-auto-none-auto]",
+      "tests.test_domains::test_domains_sharing_a_sheet_of_copies_are_not_parted",
+      "tests.test_domains::test_parting_domains_sums_no_overlap_unless_it_may_stop",
+      "tests.test_figcheck::test_interleaved_copies_panels_are_measured_with_their_holes",
+      "tests.test_route::test_a_large_domain_view_routes_every_loop"
+     ],
+     "better": [],
+     "moved": []
+    }
+   },
+   "decision": "keep",
+   "kept_by": [
+    {
+     "measure": "domains",
+     "verdict": "moved",
+     "first": [
+      "8U1N: area 1331.46 -> 8059.7"
+     ],
+     "count": 1
+    },
+    {
+     "measure": "suite",
+     "verdict": "worse",
+     "first": [
+      "tests.test_copy_labels::test_no_chain_draws_one_label_twice[8UTF-auto-none-auto]",
+      "tests.test_domains::test_domains_sharing_a_sheet_of_copies_are_not_parted",
+      "tests.test_domains::test_parting_domains_sums_no_overlap_unless_it_may_stop"
+     ],
+     "count": 5
+    }
+   ],
+   "missing": [],
+   "removed": false
+  },
+  {
+   "id": "membrane:_MAX_POLAR_CROSSED",
+   "kind": "constant",
+   "value": "0.20",
+   "origin": "named-entry:6JO6",
+   "tests": "membrane",
+   "not_exercised": false,
+   "off": 0.15,
+   "why": "= _MAX_POLAR: a slab many elements cross is held to the ordinary polarity",
+   "perturb": "membrane:_MAX_POLAR_CROSSED=0.15",
+   "view": "membrane",
+   "measures": {
+    "r100": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "code": "4eb4cad74365b1ed"
+    },
+    "membrane": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "code": "4eb4cad74365b1ed"
+    },
+    "na": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "code": "4eb4cad74365b1ed"
+    },
+    "domsets": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "reached": false,
+     "code": "4eb4cad74365b1ed"
+    },
+    "bench": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "reached": true,
+     "code": "4eb4cad74365b1ed"
+    },
+    "suite": {
+     "verdict": "worse",
+     "worse": [
+      "tests.test_membrane::test_a_slab_crossed_by_many_long_elements_may_be_more_polar",
+      "tests.test_membrane::test_a_slab_many_long_elements_cross_but_not_oily_enough_is_refused",
+      "tests.test_membrane::test_the_membrane_is_found_on_every_chain_whatever_chains_draws"
+     ],
+     "better": [],
+     "moved": []
+    }
+   },
+   "decision": "keep",
+   "kept_by": [
+    {
+     "measure": "suite",
+     "verdict": "worse",
+     "first": [
+      "tests.test_membrane::test_a_slab_crossed_by_many_long_elements_may_be_more_polar",
+      "tests.test_membrane::test_a_slab_many_long_elements_cross_but_not_oily_enough_is_refused",
+      "tests.test_membrane::test_the_membrane_is_found_on_every_chain_whatever_chains_draws"
+     ],
+     "count": 3
+    }
+   ],
+   "missing": [],
+   "removed": false
+  },
+  {
+   "id": "membrane:_MANY_CROSSING",
+   "kind": "constant",
+   "value": "10",
+   "origin": "named-entry:6JO6",
+   "tests": "membrane",
+   "not_exercised": false,
+   "off": 1000000000,
+   "why": "no slab is crossed by enough elements to relax its polarity limit",
+   "perturb": "membrane:_MANY_CROSSING=1000000000",
+   "view": "membrane",
+   "measures": {
+    "r100": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "code": "4eb4cad74365b1ed"
+    },
+    "membrane": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "code": "4eb4cad74365b1ed"
+    },
+    "na": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "code": "4eb4cad74365b1ed"
+    },
+    "domsets": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "reached": false,
+     "code": "4eb4cad74365b1ed"
+    },
+    "bench": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "reached": true,
+     "code": "4eb4cad74365b1ed"
+    },
+    "suite": {
+     "verdict": "worse",
+     "worse": [
+      "tests.test_membrane::test_a_slab_crossed_by_many_long_elements_may_be_more_polar",
+      "tests.test_membrane::test_a_slab_many_long_elements_cross_but_not_oily_enough_is_refused",
+      "tests.test_membrane::test_the_membrane_is_found_on_every_chain_whatever_chains_draws"
+     ],
+     "better": [],
+     "moved": []
+    }
+   },
+   "decision": "keep",
+   "kept_by": [
+    {
+     "measure": "suite",
+     "verdict": "worse",
+     "first": [
+      "tests.test_membrane::test_a_slab_crossed_by_many_long_elements_may_be_more_polar",
+      "tests.test_membrane::test_a_slab_many_long_elements_cross_but_not_oily_enough_is_refused",
+      "tests.test_membrane::test_the_membrane_is_found_on_every_chain_whatever_chains_draws"
+     ],
+     "count": 3
+    }
+   ],
+   "missing": [],
+   "removed": false
+  },
+  {
+   "id": "membrane:MIN_CROSSING_HELICES",
+   "kind": "constant",
+   "value": "3",
+   "origin": "named-entry:7PIU,7VVK",
+   "tests": "membrane",
+   "not_exercised": false,
+   "off": 1000000000,
+   "why": "the normal is never refitted to the crossing helices (membrane._refit)",
+   "perturb": "membrane:MIN_CROSSING_HELICES=1000000000",
+   "view": "membrane",
+   "measures": {
+    "r100": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "code": "4eb4cad74365b1ed"
+    },
+    "membrane": {
+     "verdict": "moved",
+     "worse": [],
+     "better": [],
+     "moved": [
+      "6BO8: area 2905.01 -> 3003.33",
+      "6DQN: area 3776.94 -> 3393.39",
+      "6QUE: area 3673.36 -> 4215.02",
+      "6UW4: area 2759.8 -> 2760.66",
+      "6VBG: area 1068.13 -> 1000.6",
+      "7Y63: area 2061.57 -> 2061.64",
+      "8GG4: area 1443.94 -> 1465.57"
+     ],
+     "code": "4eb4cad74365b1ed"
+    },
+    "na": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "code": "4eb4cad74365b1ed"
+    },
+    "domsets": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "reached": false,
+     "code": "4eb4cad74365b1ed"
+    },
+    "bench": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "reached": true,
+     "code": "4eb4cad74365b1ed"
+    },
+    "suite": {
+     "verdict": "worse",
+     "worse": [
+      "tests.test_membrane::test_a_soluble_helix_bundle_beside_the_membrane_does_not_tilt_its_normal",
+      "tests.test_membrane::test_fewer_than_three_crossing_helices_keep_the_first_estimate",
+      "tests.test_membrane::test_helical_membranes_are_unchanged_by_the_barrel_estimate[1BL8.cif]",
+      "tests.test_membrane::test_helical_membranes_are_unchanged_by_the_barrel_estimate[1C3W.cif]",
+      "tests.test_membrane::test_membrane_proteins_are_recognised[1BL8]",
+      "tests.test_membrane::test_membrane_proteins_are_recognised[1C3W]",
+      "tests.test_membrane::test_the_refit_repeats_until_the_crossing_helices_stop_changing"
+     ],
+     "better": [],
+     "moved": []
+    }
+   },
+   "decision": "keep",
+   "kept_by": [
+    {
+     "measure": "membrane",
+     "verdict": "moved",
+     "first": [
+      "6BO8: area 2905.01 -> 3003.33",
+      "6DQN: area 3776.94 -> 3393.39",
+      "6QUE: area 3673.36 -> 4215.02"
+     ],
+     "count": 7
+    },
+    {
+     "measure": "suite",
+     "verdict": "worse",
+     "first": [
+      "tests.test_membrane::test_a_soluble_helix_bundle_beside_the_membrane_does_not_tilt_its_normal",
+      "tests.test_membrane::test_fewer_than_three_crossing_helices_keep_the_first_estimate",
+      "tests.test_membrane::test_helical_membranes_are_unchanged_by_the_barrel_estimate[1BL8.cif]"
+     ],
+     "count": 7
+    }
+   ],
+   "missing": [],
+   "removed": false
+  },
+  {
+   "id": "membrane:FACE_FLAT_TILT",
+   "kind": "constant",
+   "value": "35.0",
+   "origin": "named-entry:32KS",
+   "tests": "membrane",
+   "not_exercised": false,
+   "off": 45.0,
+   "why": "= FLAT_TILT: a helix at a face lies flat from the ordinary tilt",
+   "perturb": "membrane:FACE_FLAT_TILT=45.0",
+   "view": "membrane",
+   "measures": {
+    "r100": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "code": "4eb4cad74365b1ed"
+    },
+    "membrane": {
+     "verdict": "moved",
+     "worse": [],
+     "better": [],
+     "moved": [
+      "6BO8: area 2905.01 -> 2891.84",
+      "6DQN: area 3776.94 -> 3444.04",
+      "6QUE: area 3673.36 -> 3819.28",
+      "6VBG: area 1068.13 -> 1054.13"
+     ],
+     "code": "4eb4cad74365b1ed"
+    },
+    "na": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "code": "4eb4cad74365b1ed"
+    },
+    "domsets": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "reached": false,
+     "code": "4eb4cad74365b1ed"
+    },
+    "bench": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "reached": true,
+     "code": "4eb4cad74365b1ed"
+    },
+    "suite": {
+     "verdict": "worse",
+     "worse": [
+      "tests.test_membrane::test_a_helix_at_a_face_lies_flat_from_35_degrees",
+      "tests.test_membrane::test_comec_reads_as_its_figure_1c"
+     ],
+     "better": [],
+     "moved": []
+    }
+   },
+   "decision": "keep",
+   "kept_by": [
+    {
+     "measure": "membrane",
+     "verdict": "moved",
+     "first": [
+      "6BO8: area 2905.01 -> 2891.84",
+      "6DQN: area 3776.94 -> 3444.04",
+      "6QUE: area 3673.36 -> 3819.28"
+     ],
+     "count": 4
+    },
+    {
+     "measure": "suite",
+     "verdict": "worse",
+     "first": [
+      "tests.test_membrane::test_a_helix_at_a_face_lies_flat_from_35_degrees",
+      "tests.test_membrane::test_comec_reads_as_its_figure_1c"
+     ],
+     "count": 2
+    }
+   ],
+   "missing": [],
+   "removed": false
+  },
+  {
+   "id": "membrane:JOIN_GAP",
+   "kind": "constant",
+   "value": "2",
+   "origin": "named-entry:32KS,6UW4",
+   "tests": "sensitivity",
+   "not_exercised": false,
+   "off": 0,
+   "why": "no two helix runs are joined in a membrane view (membrane._apart: 1 <= gap <= 0)",
+   "perturb": "membrane:JOIN_GAP=0",
+   "view": "membrane",
+   "measures": {
+    "r100": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "code": "4eb4cad74365b1ed"
+    },
+    "membrane": {
+     "verdict": "moved",
+     "worse": [],
+     "better": [],
+     "moved": [
+      "6DQN: area 3776.94 -> 3538.28",
+      "6QUE: area 3673.36 -> 4118.51"
+     ],
+     "code": "4eb4cad74365b1ed"
+    },
+    "na": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "code": "4eb4cad74365b1ed"
+    },
+    "domsets": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "reached": false,
+     "code": "4eb4cad74365b1ed"
+    },
+    "bench": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "reached": true,
+     "code": "4eb4cad74365b1ed"
+    },
+    "suite": {
+     "verdict": "worse",
+     "worse": [
+      "tests.test_membrane::test_comec_reads_as_its_figure_1c",
+      "tests.test_membrane::test_copies_broken_where_the_joined_helix_crosses_are_joined_not_cut",
+      "tests.test_membrane::test_flat_helix_pieces_a_break_apart_are_joined_only_going_on_as_one"
+     ],
+     "better": [],
+     "moved": []
+    }
+   },
+   "decision": "keep",
+   "kept_by": [
+    {
+     "measure": "membrane",
+     "verdict": "moved",
+     "first": [
+      "6DQN: area 3776.94 -> 3538.28",
+      "6QUE: area 3673.36 -> 4118.51"
+     ],
+     "count": 2
+    },
+    {
+     "measure": "suite",
+     "verdict": "worse",
+     "first": [
+      "tests.test_membrane::test_comec_reads_as_its_figure_1c",
+      "tests.test_membrane::test_copies_broken_where_the_joined_helix_crosses_are_joined_not_cut",
+      "tests.test_membrane::test_flat_helix_pieces_a_break_apart_are_joined_only_going_on_as_one"
+     ],
+     "count": 3
+    }
+   ],
+   "missing": [],
+   "removed": false
+  },
+  {
+   "id": "na_runs:_JOINT_REACH",
+   "kind": "constant",
+   "value": "5.0",
+   "origin": "named-entry:8VWQ",
+   "tests": "na_layout",
+   "not_exercised": false,
+   "off": 0.0,
+   "why": "no far joint is drawn straight (na_runs._straight_joint)",
+   "perturb": "na_runs:_JOINT_REACH=0.0",
+   "view": null,
+   "measures": {
+    "r100": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "code": "4eb4cad74365b1ed"
+    },
+    "na": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "code": "4eb4cad74365b1ed"
+    },
+    "domsets": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "reached": false,
+     "code": "4eb4cad74365b1ed"
+    },
+    "bench": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "reached": true,
+     "code": "4eb4cad74365b1ed"
+    },
+    "suite": {
+     "verdict": "worse",
+     "worse": [
+      "tests.test_na_layout::test_a_joint_no_route_reaches_is_drawn_straight_a_little_further",
+      "tests.test_na_layout::test_joined_pieces_kept_end_to_end_may_join_straight_farther_apart"
+     ],
+     "better": [],
+     "moved": []
+    }
+   },
+   "decision": "keep",
+   "kept_by": [
+    {
+     "measure": "suite",
+     "verdict": "worse",
+     "first": [
+      "tests.test_na_layout::test_a_joint_no_route_reaches_is_drawn_straight_a_little_further",
+      "tests.test_na_layout::test_joined_pieces_kept_end_to_end_may_join_straight_farther_apart"
+     ],
+     "count": 2
+    }
+   ],
+   "missing": [],
+   "removed": false
+  },
+  {
+   "id": "na_runs:_BESIDE_TOLL",
+   "kind": "constant",
+   "value": "50.0",
+   "origin": "named-entry:7Y7C",
+   "tests": "na_layout",
+   "not_exercised": false,
+   "off": 0.0,
+   "why": "a route from beside a face pays nothing for cells under strands drawn before",
+   "perturb": "na_runs:_BESIDE_TOLL=0.0",
+   "view": null,
+   "measures": {
+    "r100": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "code": "4eb4cad74365b1ed"
+    },
+    "na": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "code": "4eb4cad74365b1ed"
+    },
+    "domsets": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "reached": false,
+     "code": "4eb4cad74365b1ed"
+    },
+    "bench": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "reached": true,
+     "code": "4eb4cad74365b1ed"
+    },
+    "suite": {
+     "verdict": "worse",
+     "worse": [
+      "tests.test_na_layout::test_a_route_from_beside_a_face_keeps_off_the_strands_drawn_before_it"
+     ],
+     "better": [],
+     "moved": []
+    }
+   },
+   "decision": "keep",
+   "kept_by": [
+    {
+     "measure": "suite",
+     "verdict": "worse",
+     "first": [
+      "tests.test_na_layout::test_a_route_from_beside_a_face_keeps_off_the_strands_drawn_before_it"
+     ],
+     "count": 1
+    }
+   ],
+   "missing": [],
+   "removed": false
+  },
+  {
+   "id": "nucleic:HBOND_STRETCH",
+   "kind": "constant",
+   "value": "4.0",
+   "origin": "named-entry:1HYS,1AOI",
+   "tests": "independent_kernels",
+   "not_exercised": false,
+   "off": 3.8,
+   "why": "= HBOND_MAX: no stretched pair is taken in the second pass (nucleic pairs)",
+   "perturb": "nucleic:HBOND_STRETCH=3.8",
+   "view": null,
+   "measures": {
+    "r100": {
+     "verdict": "worse",
+     "worse": [
+      "7F5S: PASS -> FAIL",
+      "7F5S: A17 now fails",
+      "7F5S: A6 now fails",
+      "7F5S: fallback page_text_small 0 -> 1",
+      "8XJV: fallback counts_hidden 5 -> 9",
+      "8XJV: fallback na_gap_unclear 3 -> 5",
+      "8XJV: fallback na_tail_straight 4 -> 5"
+     ],
+     "better": [
+      "3G6E: FAIL -> PASS",
+      "3G6E: A6 now passes",
+      "6QIK: A6 now passes",
+      "7F5S: fallback counts_hidden 5 -> 3",
+      "8XJV: fallback helix_name_moved 19 -> 14"
+     ],
+     "moved": [
+      "3G6E: area 19741.12 -> 18811.74",
+      "6LAB: area 7149.65 -> 7418.37",
+      "6QIK: area 27350.66 -> 29845.41",
+      "7F5S: area 29136.7 -> 33941.82",
+      "8XJV: area 43551.94 -> 43195.71",
+      "9OWM: area 2626.22 -> 2626.69",
+      "9XSF: area 2382.08 -> 2350.25"
+     ],
+     "code": "4eb4cad74365b1ed"
+    },
+    "na": {
+     "verdict": "worse",
+     "worse": [
+      "6QIK: stem_recall 1.0 -> 0.994",
+      "6QIK: spearman 0.752 -> 0.735",
+      "6QIK: procrustes 0.217 -> 0.286",
+      "6QIK: contact_auc 0.948 -> 0.914",
+      "6QIK: stems_nearer_frac 1.0 -> 0.984",
+      "6QIK: na_crossings 1 -> 2",
+      "6QIK: na_run_crossings 404 -> 538",
+      "6QIK: na_protein_crossings 360 -> 592",
+      "8XJV: fallbacks 10 -> 13",
+      "8XJV: na_crossings 10 -> 18",
+      "8XJV: na_run_crossings 191 -> 211",
+      "8XJV: na_protein_crossings 725 -> 763",
+      "8XJV: named_fallbacks 111 -> 113",
+      "6LAB: pair_f1 0.994 -> 0.988",
+      "9XSF: pair_f1 0.967 -> 0.962",
+      "9XSF: spearman 0.922 -> 0.863",
+      "9XSF: procrustes 0.208 -> 0.269",
+      "9XSF: contact_auc 0.934 -> 0.924",
+      "9XSF: na_protein_crossings 0 -> 1",
+      "9OWM: pair_f1 0.987 -> 0.983",
+      "5K7Z: pair_f1 1.0 -> 0.889",
+      "5K7Z: contact_auc 0.889 -> 0.839",
+      "5K7Z: na_protein_crossings 0 -> 1",
+      "9WB3: pair_f1 1.0 -> 0.981",
+      "1Z43: pair_f1 0.984 -> 0.968",
+      "1Z43: procrustes 0.21 -> 0.216",
+      "7XSP: pair_f1 0.957 -> 0.909",
+      "7XSP: angle_median 0.0 -> 10.3",
+      "7XSP: angle_max 0.0 -> 20.5",
+      "7XSP: contact_auc 0.801 -> 0.641",
+      "7XSP: na_protein_crossings 0 -> 4",
+      "1HYS: pair_f1 0.974 -> 0.947",
+      "1HYS: stem_recall 1.0 -> 0.0"
+     ],
+     "better": [
+      "8XJV: spearman 0.715 -> 0.733",
+      "8XJV: procrustes 0.409 -> 0.401",
+      "8XJV: contact_auc 0.955 -> 0.964",
+      "8XJV: stems_nearer_frac 0.969 -> 1.0",
+      "8XJV: bead_overlaps 127 -> 98",
+      "6LAB: spearman 0.952 -> 0.956",
+      "6LAB: procrustes 0.212 -> 0.2",
+      "6LAB: contact_auc 0.948 -> 0.95",
+      "6LAB: na_protein_crossings 1 -> 0",
+      "9XSF: na_run_crossings 3 -> 2",
+      "9OWM: spearman 0.806 -> 0.807",
+      "9OWM: procrustes 0.25 -> 0.249",
+      "1Z43: spearman 0.793 -> 0.8",
+      "1HYS: contact_auc 0.836 -> 0.852"
+     ],
+     "moved": [
+      "6QIK: pair_precision 0.992 -> 0.994",
+      "6QIK: pair_recall 0.988 -> 0.986",
+      "6QIK: pairs_foldmap 911 -> 907",
+      "6QIK: stems_drawn 176 -> 174",
+      "6QIK: contact_precision_at_k 0.102 -> 0.087",
+      "6QIK: ss_contacts_nearer 0.998 -> 0.986",
+      "6QIK: bend_3d -53.3 -> -54.5",
+      "6QIK: bend_drawn -53.3 -> -54.5",
+      "8XJV: pair_precision 0.944 -> 0.951",
+      "8XJV: pair_recall 0.788 -> 0.783",
+      "8XJV: pairs_foldmap 288 -> 284",
+      "8XJV: stems_drawn 58 -> 57",
+      "8XJV: contact_precision_at_k 0.115 -> 0.184",
+      "8XJV: ss_contacts_nearer 0.965 -> 0.946",
+      "8XJV: bend_3d 142.7 -> 143.7",
+      "8XJV: bend_drawn 142.7 -> 143.7",
+      "6LAB: pair_recall 0.988 -> 0.976",
+      "6LAB: pairs_foldmap 333 -> 329",
+      "6LAB: stems_drawn 48 -> 47",
+      "6LAB: contact_precision_at_k 0.343 -> 0.326",
+      "6LAB: bend_3d 1217.2 -> 1217.7",
+      "6LAB: bend_drawn 1217.2 -> 1217.8",
+      "9XSF: pair_precision 0.972 -> 0.971",
+      "9XSF: pair_recall 0.963 -> 0.953",
+      "9XSF: pairs_foldmap 106 -> 105",
+      "9XSF: contact_precision_at_k 0.314 -> 0.358",
+      "9XSF: bend_3d -467.3 -> -463.3",
+      "9XSF: bend_drawn -467.3 -> -463.3",
+      "9OWM: pair_recall 0.987 -> 0.98",
+      "9OWM: pairs_foldmap 151 -> 150",
+      "5K7Z: pair_recall 1.0 -> 0.8",
+      "5K7Z: pairs_foldmap 10 -> 8",
+      "9WB3: pair_recall 1.0 -> 0.963",
+      "9WB3: pairs_foldmap 27 -> 26",
+      "1Z43: pair_recall 0.969 -> 0.938",
+      "1Z43: pairs_foldmap 31 -> 30",
+      "7XSP: pair_recall 0.917 -> 0.833",
+      "7XSP: pairs_foldmap 11 -> 10",
+      "7XSP: contact_precision_at_k 0.437 -> 0.278",
+      "7XSP: ss_contacts_nearer 0.611 -> 1.0",
+      "1HYS: procrustes None -> 0.064",
+      "1HYS: pair_recall 0.95 -> 0.9",
+      "1HYS: pairs_foldmap 19 -> 18",
+      "1HYS: stems_drawn 2 -> 3",
+      "1HYS: contact_precision_at_k 0.222 -> 0.194",
+      "1HYS: bend_3d -12.7 -> -8.9",
+      "1HYS: bend_drawn -12.7 -> -8.9"
+     ],
+     "code": "4eb4cad74365b1ed"
+    },
+    "domsets": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "reached": true,
+     "code": "4eb4cad74365b1ed"
+    },
+    "bench": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "reached": true,
+     "code": "4eb4cad74365b1ed"
+    },
+    "suite": {
+     "verdict": "worse",
+     "worse": [
+      "tests.test_deep_check::test_f2_pairs_are_rnapolis_pairs[1AOI-outside0-agreement0]",
+      "tests.test_independent_kernels::test_the_findings_are_exactly_these",
+      "tests.test_independent_kernels::test_the_record_names_these_findings",
+      "tests.test_na_pairs::test_an_in_register_pair_with_one_stretched_bond_is_accepted",
+      "tests.test_na_pairs::test_pairs_agree_with_rnapolis[1HYS]",
+      "tests.test_na_structure::test_the_1aoi_nucleosome_dna_is_one_duplex_cut_only_where_it_bends"
+     ],
+     "better": [],
+     "moved": []
+    }
+   },
+   "decision": "keep",
+   "kept_by": [
+    {
+     "measure": "r100",
+     "verdict": "worse",
+     "first": [
+      "7F5S: PASS -> FAIL",
+      "7F5S: A17 now fails",
+      "7F5S: A6 now fails"
+     ],
+     "count": 7
+    },
+    {
+     "measure": "na",
+     "verdict": "worse",
+     "first": [
+      "6QIK: stem_recall 1.0 -> 0.994",
+      "6QIK: spearman 0.752 -> 0.735",
+      "6QIK: procrustes 0.217 -> 0.286"
+     ],
+     "count": 33
+    },
+    {
+     "measure": "suite",
+     "verdict": "worse",
+     "first": [
+      "tests.test_deep_check::test_f2_pairs_are_rnapolis_pairs[1AOI-outside0-agreement0]",
+      "tests.test_independent_kernels::test_the_findings_are_exactly_these",
+      "tests.test_independent_kernels::test_the_record_names_these_findings"
+     ],
+     "count": 6
+    }
+   ],
+   "missing": [],
+   "removed": false
+  },
+  {
+   "id": "panels:CLOSE",
+   "kind": "constant",
+   "value": "2.0",
+   "origin": "named-entry:2LZM",
+   "tests": "perf",
+   "not_exercised": false,
+   "off": 0.0,
+   "why": "no gap between a domain's padded elements is filled (panels.panel_fields)",
+   "perturb": "panels:CLOSE=0.0",
+   "view": "domains",
+   "measures": {
+    "r100": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "code": "4eb4cad74365b1ed"
+    },
+    "domains": {
+     "verdict": "worse",
+     "worse": [
+      "6QIK: fallback counts_hidden 3 -> 4",
+      "8EM7: fallback counts_hidden 0 -> 1"
+     ],
+     "better": [
+      "9FZL: fallback loop_over_text 11 -> 10"
+     ],
+     "moved": [
+      "3W96: area 3069.82 -> 3052.25",
+      "4B2T: area 24179.22 -> 24243.67",
+      "4YJ5: area 1034.45 -> 1044.84",
+      "5NF8: area 766.96 -> 788.78",
+      "6LAB: area 8135.74 -> 8057.16",
+      "7Y63: area 2179.52 -> 2244.75",
+      "8VBG: area 2290.41 -> 2285.22",
+      "9NMN: area 14221.44 -> 14298.62"
+     ],
+     "code": "4eb4cad74365b1ed"
+    },
+    "na": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "code": "4eb4cad74365b1ed"
+    },
+    "domsets": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "reached": false,
+     "code": "4eb4cad74365b1ed"
+    },
+    "bench": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "reached": true,
+     "code": "4eb4cad74365b1ed"
+    },
+    "suite": {
+     "verdict": "worse",
+     "worse": [
+      "tests.test_perf::test_panel_fields_equal_the_domain_by_domain_rivals[0]",
+      "tests.test_perf::test_panel_fields_equal_the_domain_by_domain_rivals[1]",
+      "tests.test_perf::test_panel_fields_equal_the_domain_by_domain_rivals[2]",
+      "tests.test_perf::test_panel_fields_equal_the_domain_by_domain_rivals[3]",
+      "tests.test_perf::test_panel_fields_equal_the_domain_by_domain_rivals[4]",
+      "tests.test_perf::test_panel_fields_equal_the_domain_by_domain_rivals[5]",
+      "tests.test_perf::test_panel_fields_equal_the_domain_by_domain_rivals[6]",
+      "tests.test_perf::test_panel_fields_equal_the_domain_by_domain_rivals[7]",
+      "tests.test_snapshots::test_figure_matches_snapshot[2LZM-domains-rainbow]"
+     ],
+     "better": [],
+     "moved": []
+    }
+   },
+   "decision": "keep",
+   "kept_by": [
+    {
+     "measure": "domains",
+     "verdict": "worse",
+     "first": [
+      "6QIK: fallback counts_hidden 3 -> 4",
+      "8EM7: fallback counts_hidden 0 -> 1"
+     ],
+     "count": 2
+    },
+    {
+     "measure": "suite",
+     "verdict": "worse",
+     "first": [
+      "tests.test_perf::test_panel_fields_equal_the_domain_by_domain_rivals[0]",
+      "tests.test_perf::test_panel_fields_equal_the_domain_by_domain_rivals[1]",
+      "tests.test_perf::test_panel_fields_equal_the_domain_by_domain_rivals[2]"
+     ],
+     "count": 9
+    }
+   ],
+   "missing": [],
+   "removed": false
+  },
+  {
+   "id": "render:_SPOT_FAR",
+   "kind": "constant",
+   "value": "3",
+   "origin": "named-entry:7QUP",
+   "tests": "ligands, text_clear",
+   "not_exercised": false,
+   "off": 1,
+   "why": "a ligand mark is never looked for beyond _SPOT_RADIUS (render._place_mark)",
+   "perturb": "render:_SPOT_FAR=1",
+   "view": null,
+   "measures": {
+    "r100": {
+     "verdict": "worse",
+     "worse": [
+      "3G6E: fallback mark_least_bad_spot 0 -> 1",
+      "4D5B: PASS -> FAIL",
+      "4D5B: A6 now fails",
+      "4D5B: fallback mark_least_bad_spot 0 -> 1",
+      "6PO4: PASS -> FAIL",
+      "6PO4: A6 now fails",
+      "6PO4: fallback mark_least_bad_spot 0 -> 2"
+     ],
+     "better": [],
+     "moved": [],
+     "code": "4eb4cad74365b1ed"
+    },
+    "na": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "code": "4eb4cad74365b1ed"
+    },
+    "domsets": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "reached": false,
+     "code": "4eb4cad74365b1ed"
+    },
+    "bench": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "reached": true,
+     "code": "4eb4cad74365b1ed"
+    },
+    "suite": {
+     "verdict": "worse",
+     "worse": [
+      "tests.test_text_clear::test_a_ligand_boxed_in_by_elements_and_text_still_gets_a_mark"
+     ],
+     "better": [],
+     "moved": []
+    }
+   },
+   "decision": "keep",
+   "kept_by": [
+    {
+     "measure": "r100",
+     "verdict": "worse",
+     "first": [
+      "3G6E: fallback mark_least_bad_spot 0 -> 1",
+      "4D5B: PASS -> FAIL",
+      "4D5B: A6 now fails"
+     ],
+     "count": 7
+    },
+    {
+     "measure": "suite",
+     "verdict": "worse",
+     "first": [
+      "tests.test_text_clear::test_a_ligand_boxed_in_by_elements_and_text_still_gets_a_mark"
+     ],
+     "count": 1
+    }
+   ],
+   "missing": [],
+   "removed": false
+  },
+  {
+   "id": "render:_SPOT_MORE_RINGS",
+   "kind": "constant",
+   "value": "4",
+   "origin": "named-entry:7LX9,9YLM,3MHT,1GOX",
+   "tests": "-",
+   "not_exercised": false,
+   "off": 0,
+   "why": "no ring past the first clear spot is searched for fewer crossed bodies",
+   "perturb": "render:_SPOT_MORE_RINGS=0",
+   "view": null,
+   "measures": {
+    "r100": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "code": "4eb4cad74365b1ed"
+    },
+    "na": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "code": "4eb4cad74365b1ed"
+    },
+    "domsets": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "reached": false,
+     "code": "4eb4cad74365b1ed"
+    },
+    "bench": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "reached": true,
+     "code": "4eb4cad74365b1ed"
+    },
+    "suite": {
+     "verdict": "worse",
+     "worse": [
+      "tests.test_hbonds::test_hbond_figures_are_byte_identical_to_those_before_the_overlay[1ZAA]",
+      "tests.test_snapshots::test_figure_matches_snapshot[1C3W-membrane]"
+     ],
+     "better": [],
+     "moved": []
+    }
+   },
+   "decision": "keep",
+   "kept_by": [
+    {
+     "measure": "suite",
+     "verdict": "worse",
+     "first": [
+      "tests.test_hbonds::test_hbond_figures_are_byte_identical_to_those_before_the_overlay[1ZAA]",
+      "tests.test_snapshots::test_figure_matches_snapshot[1C3W-membrane]"
+     ],
+     "count": 2
+    }
+   ],
+   "missing": [],
+   "removed": false
+  },
+  {
+   "id": "route:_SLAB_RUN",
+   "kind": "constant",
+   "value": "12.0",
+   "origin": "named-entry:7SMR",
+   "tests": "route",
+   "not_exercised": false,
+   "off": 3.0,
+   "why": "= _SLAB_COST: a step along the slab costs what a step across it does",
+   "perturb": "route:_SLAB_RUN=3.0",
+   "view": null,
+   "measures": {
+    "r100": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "code": "4eb4cad74365b1ed"
+    },
+    "na": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "code": "4eb4cad74365b1ed"
+    },
+    "domsets": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "reached": false,
+     "code": "4eb4cad74365b1ed"
+    },
+    "bench": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "reached": true,
+     "code": "4eb4cad74365b1ed"
+    },
+    "suite": {
+     "verdict": "worse",
+     "worse": [
+      "tests.test_route::test_a_loop_leaves_the_slab_rather_than_run_along_it_over_an_element"
+     ],
+     "better": [],
+     "moved": []
+    }
+   },
+   "decision": "keep",
+   "kept_by": [
+    {
+     "measure": "suite",
+     "verdict": "worse",
+     "first": [
+      "tests.test_route::test_a_loop_leaves_the_slab_rather_than_run_along_it_over_an_element"
+     ],
+     "count": 1
+    }
+   ],
+   "missing": [],
+   "removed": false
+  },
+  {
+   "id": "route:_MAX_NODES_PAGE",
+   "kind": "constant",
+   "value": "8_000_000",
+   "origin": "named-entry:7QUP",
+   "tests": "heldout_budgets, route",
+   "not_exercised": false,
+   "off": 1000000000000,
+   "why": "a page's second route searches have no shared budget (never refused)",
+   "perturb": "route:_MAX_NODES_PAGE=1000000000000",
+   "view": null,
+   "measures": {
+    "r100": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "code": "4eb4cad74365b1ed"
+    },
+    "na": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "code": "4eb4cad74365b1ed"
+    },
+    "domsets": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "reached": false,
+     "code": "4eb4cad74365b1ed"
+    },
+    "bench": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "reached": true,
+     "code": "4eb4cad74365b1ed"
+    },
+    "suite": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": []
+    }
+   },
+   "decision": "held",
+   "kept_by": [],
+   "missing": [],
+   "held": "it bounds the time a page's second route searches take (7QUP's focus view took 158 s of its 180), and no measure judges time; identical says these sets never spend the budget. Its named entry 7QUP's focus view drew identically without it, but 7NZ2's domains view (the held-out sample, which spends it: 6 searches refused) did not: A4 and A6 newly failed, loop_over_text 0 -> 1, helix_name_moved 0 -> 1 (one random100 run each way at 46f5ebf, outside Q46's measures). Removing it also removes route_second_search_refused and the readability floor's route_budget reason",
+   "removed": false
+  },
+  {
+   "id": "route:_NA_TEXT_TOLL",
+   "kind": "constant",
+   "value": "25.0",
+   "origin": "named-entry:6SO9,9CJI,7XSP",
+   "tests": "-",
+   "not_exercised": false,
+   "off": 0.0,
+   "why": "a loop routed again off nucleic-acid text pays nothing for that text's cells",
+   "perturb": "route:_NA_TEXT_TOLL=0.0",
+   "view": null,
+   "measures": {
+    "r100": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "code": "4eb4cad74365b1ed"
+    },
+    "na": {
+     "verdict": "worse",
+     "worse": [
+      "1IHF: na_protein_crossings 4 -> 5",
+      "30QM: na_protein_crossings 15 -> 17"
+     ],
+     "better": [
+      "9K4F: na_protein_crossings 10 -> 8"
+     ],
+     "moved": [],
+     "code": "4eb4cad74365b1ed"
+    },
+    "domsets": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "reached": false,
+     "code": "4eb4cad74365b1ed"
+    },
+    "bench": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "reached": true,
+     "code": "4eb4cad74365b1ed"
+    },
+    "suite": {
+     "verdict": "worse",
+     "worse": [
+      "tests.test_snapshots::test_figure_matches_snapshot[30QM-ncrna]"
+     ],
+     "better": [],
+     "moved": []
+    }
+   },
+   "decision": "keep",
+   "kept_by": [
+    {
+     "measure": "na",
+     "verdict": "worse",
+     "first": [
+      "1IHF: na_protein_crossings 4 -> 5",
+      "30QM: na_protein_crossings 15 -> 17"
+     ],
+     "count": 2
+    },
+    {
+     "measure": "suite",
+     "verdict": "worse",
+     "first": [
+      "tests.test_snapshots::test_figure_matches_snapshot[30QM-ncrna]"
+     ],
+     "count": 1
+    }
+   ],
+   "missing": [],
+   "removed": false
+  },
+  {
+   "id": "route:_REROUTE_TURNS_INK",
+   "kind": "constant",
+   "value": "12",
+   "origin": "named-entry:7XSP",
+   "tests": "route",
+   "not_exercised": false,
+   "off": 4,
+   "why": "= _REROUTE_TURNS: a reroute off text's ink may add no more corners than off its clearance",
+   "perturb": "route:_REROUTE_TURNS_INK=4",
+   "view": null,
+   "measures": {
+    "r100": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "code": "4eb4cad74365b1ed"
+    },
+    "na": {
+     "verdict": "worse",
+     "worse": [
+      "1IHF: na_protein_crossings 4 -> 5"
+     ],
+     "better": [],
+     "moved": [],
+     "code": "4eb4cad74365b1ed"
+    },
+    "domsets": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "reached": false,
+     "code": "4eb4cad74365b1ed"
+    },
+    "bench": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "reached": true,
+     "code": "4eb4cad74365b1ed"
+    },
+    "suite": {
+     "verdict": "worse",
+     "worse": [
+      "tests.test_route::test_a_reroute_may_turn_more_to_free_text_it_ran_through"
+     ],
+     "better": [],
+     "moved": []
+    }
+   },
+   "decision": "keep",
+   "kept_by": [
+    {
+     "measure": "na",
+     "verdict": "worse",
+     "first": [
+      "1IHF: na_protein_crossings 4 -> 5"
+     ],
+     "count": 1
+    },
+    {
+     "measure": "suite",
+     "verdict": "worse",
+     "first": [
+      "tests.test_route::test_a_reroute_may_turn_more_to_free_text_it_ran_through"
+     ],
+     "count": 1
+    }
+   ],
+   "missing": [],
+   "removed": false
+  },
+  {
+   "id": "symmetry:MIN_HELIX_COPIES",
+   "kind": "constant",
+   "value": "4",
+   "origin": "named-entry:1URN",
+   "tests": "prune",
+   "not_exercised": false,
+   "off": 3,
+   "why": "= MIN_HELIX_COPIES_ASKED: auto calls a screw of three copies helical",
+   "perturb": "symmetry:MIN_HELIX_COPIES=3",
+   "view": null,
+   "measures": {
+    "r100": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "code": "4eb4cad74365b1ed"
+    },
+    "na": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "code": "4eb4cad74365b1ed"
+    },
+    "domsets": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "reached": false,
+     "code": "4eb4cad74365b1ed"
+    },
+    "bench": {
+     "verdict": "identical",
+     "worse": [],
+     "better": [],
+     "moved": [],
+     "reached": true,
+     "code": "4eb4cad74365b1ed"
+    },
+    "suite": {
+     "verdict": "worse",
+     "worse": [
+      "tests.test_assembly::test_crystal_packing_of_copies_in_the_asymmetric_unit_is_not_reported_as_symmetry",
+      "tests.test_symmetry_scenarios::test_three_copies_on_a_screw_are_helical_only_when_asked"
+     ],
+     "better": [],
+     "moved": []
+    }
+   },
+   "decision": "keep",
+   "kept_by": [
+    {
+     "measure": "suite",
+     "verdict": "worse",
+     "first": [
+      "tests.test_assembly::test_crystal_packing_of_copies_in_the_asymmetric_unit_is_not_reported_as_symmetry",
+      "tests.test_symmetry_scenarios::test_three_copies_on_a_screw_are_helical_only_when_asked"
+     ],
+     "count": 2
+    }
+   ],
+   "missing": [],
+   "removed": false
+  }
+ ],
+ "shared": [
+  {
+   "id": "route:_Router.second:fallback:route_second_search_refused",
+   "kind": "fallback",
+   "value": "route_second_search_refused",
+   "origin": "named-entry:7QUP",
+   "tests": "floor",
+   "not_exercised": false,
+   "with": "route:_MAX_NODES_PAGE",
+   "decision": "held",
+   "kept_by": []
+  }
+ ],
+ "not_tried": [
+  {
+   "id": "layout:_place_domain_names:fallback:domain_name_least_bad",
+   "kind": "fallback",
+   "value": "domain_name_least_bad",
+   "origin": "named-entry:7NZ2",
+   "tests": "-",
+   "not_exercised": false,
+   "site": "layout._place_domain_names: the name with no clear place must go somewhere or be left out; either is code"
+  },
+  {
+   "id": "layout:_place_domain_names:fallback-marker",
+   "kind": "fallback-marker",
+   "value": "1",
+   "origin": "named-entry:7NZ2",
+   "tests": "domains",
+   "not_exercised": false,
+   "site": "layout._place_domain_names: the marker of domain_name_least_bad (the same code)"
+  },
+  {
+   "id": "na_ends:_OFF_TURNS",
+   "kind": "constant",
+   "value": "tuple(np.radians(a) for a in range(0, 360, 5))",
+   "origin": "named-entry:13FZ",
+   "tests": "sensitivity",
+   "not_exercised": false,
+   "site": "na_ends.off_unheld: a tuple; the hook sets an int or a float only (scripts/perturb.py, ruling Q29): turning the nudge off removes its search"
+  },
+  {
+   "id": "na_ends:off_unheld:fallback-marker",
+   "kind": "fallback-marker",
+   "value": "1",
+   "origin": "named-entry:13FZ",
+   "tests": "na_text_keepoff",
+   "not_exercised": false,
+   "site": "na_ends.off_unheld, called by layout.build_layout: turning the 13FZ nudge off removes that call (its search constants are tuples)"
+  },
+  {
+   "id": "na_labels:_GAP_OUT",
+   "kind": "constant",
+   "value": "(1.0, 2.0, 3.0, 4.0, 6.0)",
+   "origin": "named-entry:7Y7C",
+   "tests": "na_layout, na_text_keepoff, sensitivity",
+   "not_exercised": false,
+   "site": "na_labels._label_gaps: a tuple; the hook sets an int or a float only (scripts/perturb.py, ruling Q29): dropping 4 and 6 (7Y7C) edits the tuple"
+  },
+  {
+   "id": "na_labels:_GAP_TURNS",
+   "kind": "constant",
+   "value": "tuple(math.radians(a) for a in range(0, 360, 5))",
+   "origin": "named-entry:8ZTU",
+   "tests": "sensitivity",
+   "not_exercised": false,
+   "site": "na_labels._gap_ring: a tuple; the hook sets an int or a float only (scripts/perturb.py, ruling Q29): turning the ring off removes _gap_ring's call"
+  },
+  {
+   "id": "na_runs:_JOINT_BENDS",
+   "kind": "constant",
+   "value": "(1.0, 1.5, 2.0, 0.5, 3.0)",
+   "origin": "named-entry:8VWQ",
+   "tests": "sensitivity",
+   "not_exercised": false,
+   "site": "na_runs._joint_bend: a tuple; the hook sets an int or a float only (scripts/perturb.py, ruling Q29): turning the bends off removes _joint_bend"
+  },
+  {
+   "id": "na_runs:_JOINT_SWINGS",
+   "kind": "constant",
+   "value": "(0.0, 1.0, 2.0, -1.0, -2.0)",
+   "origin": "named-entry:8VWQ,7Y7C",
+   "tests": "na_layout, sensitivity",
+   "not_exercised": false,
+   "site": "na_runs._joint_bend: a tuple; the hook sets an int or a float only (scripts/perturb.py, ruling Q29): turning the swings off edits the tuple"
+  },
+  {
+   "id": "render:_draw:fallback:mark_least_bad_spot",
+   "kind": "fallback",
+   "value": "mark_least_bad_spot",
+   "origin": "named-entry:7QUP",
+   "tests": "-",
+   "not_exercised": false,
+   "site": "render._place_mark and _least_bad_spot: the mark with no clear spot went on its anchor before; that is code"
+  },
+  {
+   "id": "route:_MAX_NODES_WINDOWS",
+   "kind": "constant",
+   "value": "8_000_000",
+   "origin": "named-entry:7NZ2,9FZL",
+   "tests": "heldout_budgets, sensitivity",
+   "not_exercised": false,
+   "site": "route._Router.__init__ and route_loops: the special case is the windows' own pool (drawing from the page's budget gave 7NZ2 3 fallback curves); no value of it draws them from the page's budget again, which is code"
+  },
+  {
+   "id": "route:_NAME_ALONG",
+   "kind": "constant",
+   "value": "(0.0, -0.25, 0.25, -0.4, 0.4)",
+   "origin": "named-entry:6MHS,7SMR,8UUP,1KX5",
+   "tests": "sensitivity",
+   "not_exercised": false,
+   "site": "route._clear_helix_names: a tuple; the hook sets an int or a float only (scripts/perturb.py, ruling Q29): no value turns the moves along a helix off"
+  },
+  {
+   "id": "route:_clear_helix_names:fallback:helix_name_moved",
+   "kind": "fallback",
+   "value": "helix_name_moved",
+   "origin": "named-entry:6MHS,7SMR,8UUP,1KX5",
+   "tests": "floor, inventory",
+   "not_exercised": false,
+   "site": "route._clear_helix_names, called by route.route_loops: turning the moves off removes that call"
+  },
+  {
+   "id": "route:<module>:fallback-marker",
+   "kind": "fallback-marker",
+   "value": "5",
+   "origin": "named-entry:7QUP",
+   "tests": "-",
+   "not_exercised": false,
+   "site": "route: route_unsnapped (_TOUCH), route_second_search_refused (measured by route:_MAX_NODES_PAGE) and the windows' pool: code paths"
+  }
+ ],
+ "pruned": [
+  "layout:_NAME_OPEN",
+  "na_runs:_JOINT_NEAR"
+ ],
+ "removed": [
+  "layout:_NAME_OPEN",
+  "na_runs:_JOINT_NEAR"
+ ],
+ "held": {
+  "route:_MAX_NODES_PAGE": "it bounds the time a page's second route searches take (7QUP's focus view took 158 s of its 180), and no measure judges time; identical says these sets never spend the budget. Its named entry 7QUP's focus view drew identically without it, but 7NZ2's domains view (the held-out sample, which spends it: 6 searches refused) did not: A4 and A6 newly failed, loop_over_text 0 -> 1, helix_name_moved 0 -> 1 (one random100 run each way at 46f5ebf, outside Q46's measures). Removing it also removes route_second_search_refused and the readability floor's route_budget reason"
+ },
+ "named_looks": [
+  "layout:_NAME_OPEN, 7NZ2 (held-out sample) domains view: keys identical (pass, failing A17 only, fallbacks, area); its SVG differs (the name's place)",
+  "na_runs:_JOINT_NEAR, 9C75 default view: identical, SVG too (9C75 is also an NA control, measured above)",
+  "route:_MAX_NODES_PAGE, 7QUP focus view: identical, SVG too, 161.7 s both; 7NZ2 domains view: worse (see held)"
+ ]
+}
