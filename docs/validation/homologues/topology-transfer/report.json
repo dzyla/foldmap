@@ -1,0 +1,3279 @@
+{
+ "source_stamp": {
+  "foldmap": "0.1.0",
+  "code_fingerprint": "4eb4cad74365b1ed",
+  "package": "checkout",
+  "checkout_fingerprint": "4eb4cad74365b1ed",
+  "installed_matches_checkout": true,
+  "git": {
+   "commit": "c6e94c1ccddb5d76999cbfea9f2b88ca9189a84e",
+   "dirty": false,
+   "source": "asserted by runner"
+  },
+  "script": {
+   "name": "scripts/topology_transfer.py",
+   "sha256": "84ce27f28860ae55851622b5c4559d692e6bb3cee6be8e2f8e53fdab4ad0a336"
+  },
+  "python": {
+   "version": "3.13.13",
+   "implementation": "CPython"
+  },
+  "platform": {
+   "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+   "machine": "x86_64"
+  },
+  "packages": {
+   "gemmi": "0.7.5",
+   "numpy": "2.5.4",
+   "scipy": "1.18.1",
+   "networkx": "3.7",
+   "matplotlib": "3.11.2",
+   "PyYAML": "6.0.3"
+  }
+ },
+ "tags": {
+  "hom_tuning": {
+   "tag": "tuning",
+   "what": "plan 13a's homologue tuning pairs (docs/validation/homologues/tuning.json: 11 positive, 4 negative)",
+   "reason": "the H1-H5 limits (criteria.LIMITS like_*) were frozen at 76fd936 while looking at this set's results (docs/validation/homologues/tuning-report.md)"
+  },
+  "hom_heldout": {
+   "tag": "unseen at c099787, historical",
+   "what": "plan 13a's held-out homologue pairs (docs/validation/homologues/heldout.json: 30 positive, 10 negative)",
+   "reason": "one run at c099787 with the limits frozen at 76fd936 on the tuning set; nothing changed after the run; its count describes c099787, not the release (reruns since give 17 of 30 positives against the frozen 16; docs/validation/homologues/review.md)"
+  }
+ },
+ "summary": {
+  "hom_tuning": {
+   "carried": {
+    "positives": 11,
+    "all_pass": 8,
+    "pass": {
+     "H1": 11,
+     "H2": 8,
+     "H3": 8,
+     "H4": 11,
+     "H5": 11
+    },
+    "negatives": 4,
+    "refused": 4,
+    "sheets": 31,
+    "order_set": 25,
+    "reads_and_points": 25,
+    "none_why": {
+     "fewer than two mated": 2,
+     "mates in two of A's sheets": 2,
+     "mates not in one order across A's sheet": 2
+    },
+    "pairs_with_sheet_orders": [
+     "2VWD_A-2ZB5_A",
+     "2ZB5_A-1E8T_A",
+     "4CH9_A-2VWD_A"
+    ]
+   },
+   "withheld": {
+    "positives": 11,
+    "all_pass": 8,
+    "pass": {
+     "H1": 11,
+     "H2": 8,
+     "H3": 8,
+     "H4": 11,
+     "H5": 11
+    },
+    "negatives": 4,
+    "refused": 4,
+    "sheets": 31,
+    "order_set": 0,
+    "reads_and_points": 0,
+    "none_why": {
+     "withheld": 31
+    },
+    "pairs_with_sheet_orders": [
+     "2VWD_A-2ZB5_A",
+     "2ZB5_A-1E8T_A",
+     "4CH9_A-2VWD_A"
+    ]
+   },
+   "changed": [
+    {
+     "pair": "2ZB5_A-1E8T_A",
+     "checks": [],
+     "lost": []
+    },
+    {
+     "pair": "4CH9_A-2VWD_A",
+     "checks": [],
+     "lost": []
+    }
+   ],
+   "lost_any": []
+  },
+  "hom_heldout": {
+   "carried": {
+    "positives": 30,
+    "all_pass": 17,
+    "pass": {
+     "H1": 23,
+     "H2": 18,
+     "H3": 19,
+     "H4": 23,
+     "H5": 30
+    },
+    "negatives": 10,
+    "refused": 9,
+    "sheets": 25,
+    "order_set": 21,
+    "reads_and_points": 21,
+    "none_why": {
+     "fewer than two mated": 2,
+     "mates in two of A's sheets": 2
+    },
+    "pairs_with_sheet_orders": [
+     "2F20_A-1ZN6_A",
+     "4E2U_A-2LWY_A"
+    ]
+   },
+   "withheld": {
+    "positives": 30,
+    "all_pass": 16,
+    "pass": {
+     "H1": 23,
+     "H2": 17,
+     "H3": 17,
+     "H4": 23,
+     "H5": 30
+    },
+    "negatives": 10,
+    "refused": 9,
+    "sheets": 25,
+    "order_set": 0,
+    "reads_and_points": 0,
+    "none_why": {
+     "withheld": 25
+    },
+    "pairs_with_sheet_orders": [
+     "1JK4_A-2HNW_A",
+     "2F20_A-1ZN6_A",
+     "3WZ0_A-2AV5_A",
+     "4E2U_A-2LWY_A"
+    ]
+   },
+   "changed": [
+    {
+     "pair": "1JK4_A-2HNW_A",
+     "checks": [
+      "H3"
+     ],
+     "lost": []
+    },
+    {
+     "pair": "3WZ0_A-2AV5_A",
+     "checks": [
+      "H2",
+      "H3"
+     ],
+     "lost": []
+    }
+   ],
+   "lost_any": []
+  }
+ },
+ "sets": {
+  "hom_tuning": [
+   {
+    "alignment": {
+     "method": "structure",
+     "tm_score": 0.8871
+    },
+    "carried": {
+     "H1": true,
+     "H2": true,
+     "H3": true,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      0.277,
+      0.364
+     ],
+     "h3": 1.0,
+     "sheet_orders": [],
+     "sheets": [
+      {
+       "closed": true,
+       "mated": 11,
+       "order": false,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 11
+      }
+     ]
+    },
+    "kind": "positive",
+    "pair": "1EMA_A-1G7K_A",
+    "stratum": null,
+    "withheld": {
+     "H1": true,
+     "H2": true,
+     "H3": true,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      0.277,
+      0.364
+     ],
+     "h3": 1.0,
+     "sheet_orders": [],
+     "sheets": [
+      {
+       "closed": true,
+       "mated": 11,
+       "order": null,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 11,
+       "why": "withheld"
+      }
+     ]
+    }
+   },
+   {
+    "alignment": {
+     "method": "structure",
+     "tm_score": 0.8606
+    },
+    "carried": {
+     "H1": true,
+     "H2": true,
+     "H3": true,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      0.184,
+      0.334
+     ],
+     "h3": 1.0,
+     "sheet_orders": [],
+     "sheets": [
+      {
+       "closed": false,
+       "mated": 7,
+       "order": true,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 7
+      }
+     ]
+    },
+    "kind": "positive",
+    "pair": "1HDC_A-1CYD_A",
+    "stratum": null,
+    "withheld": {
+     "H1": true,
+     "H2": true,
+     "H3": true,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      0.184,
+      0.334
+     ],
+     "h3": 1.0,
+     "sheet_orders": [],
+     "sheets": [
+      {
+       "closed": false,
+       "mated": 7,
+       "order": null,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 7,
+       "why": "withheld"
+      }
+     ]
+    }
+   },
+   {
+    "alignment": {
+     "method": "structure",
+     "tm_score": 0.7982
+    },
+    "carried": {
+     "H1": true,
+     "H2": true,
+     "H3": true,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      0.093,
+      0.167
+     ],
+     "h3": 1.0,
+     "sheet_orders": [],
+     "sheets": []
+    },
+    "kind": "positive",
+    "pair": "1MBN_A-1ECA_A",
+    "stratum": null,
+    "withheld": {
+     "H1": true,
+     "H2": true,
+     "H3": true,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      0.093,
+      0.167
+     ],
+     "h3": 1.0,
+     "sheet_orders": [],
+     "sheets": []
+    }
+   },
+   {
+    "alignment": {
+     "method": "structure",
+     "tm_score": 0.4192
+    },
+    "carried": {
+     "H1": true,
+     "H2": null,
+     "H3": null,
+     "H4": null,
+     "H5": true,
+     "alike": false,
+     "h2": null,
+     "h3": null,
+     "sheet_orders": []
+    },
+    "kind": "negative",
+    "pair": "1REI_A-1TNF_A",
+    "stratum": null,
+    "withheld": {
+     "H1": true,
+     "H2": null,
+     "H3": null,
+     "H4": null,
+     "H5": true,
+     "alike": false,
+     "h2": null,
+     "h3": null,
+     "sheet_orders": []
+    }
+   },
+   {
+    "alignment": {
+     "method": "structure",
+     "tm_score": 0.8431
+    },
+    "carried": {
+     "H1": true,
+     "H2": true,
+     "H3": true,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      0.0,
+      0.0
+     ],
+     "h3": 1.0,
+     "sheet_orders": [],
+     "sheets": [
+      {
+       "closed": false,
+       "mated": 5,
+       "order": true,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 5
+      }
+     ]
+    },
+    "kind": "positive",
+    "pair": "1SHG_A-1CKA_A",
+    "stratum": null,
+    "withheld": {
+     "H1": true,
+     "H2": true,
+     "H3": true,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      0.0,
+      0.0
+     ],
+     "h3": 1.0,
+     "sheet_orders": [],
+     "sheets": [
+      {
+       "closed": false,
+       "mated": 5,
+       "order": null,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 5,
+       "why": "withheld"
+      }
+     ]
+    }
+   },
+   {
+    "alignment": {
+     "method": "structure",
+     "tm_score": 0.3991
+    },
+    "carried": {
+     "H1": true,
+     "H2": null,
+     "H3": null,
+     "H4": null,
+     "H5": true,
+     "alike": false,
+     "h2": null,
+     "h3": null,
+     "sheet_orders": []
+    },
+    "kind": "negative",
+    "pair": "1TIM_A-1HDC_A",
+    "stratum": null,
+    "withheld": {
+     "H1": true,
+     "H2": null,
+     "H3": null,
+     "H4": null,
+     "H5": true,
+     "alike": false,
+     "h2": null,
+     "h3": null,
+     "sheet_orders": []
+    }
+   },
+   {
+    "alignment": {
+     "method": "structure",
+     "tm_score": 0.6195
+    },
+    "carried": {
+     "H1": true,
+     "H2": true,
+     "H3": true,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      0.002,
+      0.028
+     ],
+     "h3": 1.0,
+     "sheet_orders": [],
+     "sheets": [
+      {
+       "closed": true,
+       "mated": 8,
+       "order": null,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 8,
+       "why": "mates not in one order across A's sheet"
+      }
+     ]
+    },
+    "kind": "positive",
+    "pair": "1TIM_A-1IGS_A",
+    "stratum": null,
+    "withheld": {
+     "H1": true,
+     "H2": true,
+     "H3": true,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      0.002,
+      0.028
+     ],
+     "h3": 1.0,
+     "sheet_orders": [],
+     "sheets": [
+      {
+       "closed": true,
+       "mated": 8,
+       "order": null,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 8,
+       "why": "withheld"
+      }
+     ]
+    }
+   },
+   {
+    "alignment": {
+     "method": "structure",
+     "tm_score": 0.8044
+    },
+    "carried": {
+     "H1": true,
+     "H2": true,
+     "H3": true,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      0.0,
+      0.0
+     ],
+     "h3": 1.0,
+     "sheet_orders": [],
+     "sheets": [
+      {
+       "closed": false,
+       "mated": 5,
+       "order": true,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 5
+      }
+     ]
+    },
+    "kind": "positive",
+    "pair": "1UBQ_A-1WM3_A",
+    "stratum": null,
+    "withheld": {
+     "H1": true,
+     "H2": true,
+     "H3": true,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      0.0,
+      0.0
+     ],
+     "h3": 1.0,
+     "sheet_orders": [],
+     "sheets": [
+      {
+       "closed": false,
+       "mated": 5,
+       "order": null,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 5,
+       "why": "withheld"
+      }
+     ]
+    }
+   },
+   {
+    "alignment": {
+     "method": "structure",
+     "tm_score": 0.3529
+    },
+    "carried": {
+     "H1": true,
+     "H2": null,
+     "H3": null,
+     "H4": null,
+     "H5": true,
+     "alike": false,
+     "h2": null,
+     "h3": null,
+     "sheet_orders": []
+    },
+    "kind": "negative",
+    "pair": "1UBQ_A-2ACY_A",
+    "stratum": null,
+    "withheld": {
+     "H1": true,
+     "H2": null,
+     "H3": null,
+     "H4": null,
+     "H5": true,
+     "alike": false,
+     "h2": null,
+     "h3": null,
+     "sheet_orders": []
+    }
+   },
+   {
+    "alignment": {
+     "method": "structure",
+     "tm_score": 0.4353
+    },
+    "carried": {
+     "H1": true,
+     "H2": null,
+     "H3": null,
+     "H4": null,
+     "H5": true,
+     "alike": false,
+     "h2": null,
+     "h3": null,
+     "sheet_orders": []
+    },
+    "kind": "negative",
+    "pair": "256B_A-1MBN_A",
+    "stratum": null,
+    "withheld": {
+     "H1": true,
+     "H2": null,
+     "H3": null,
+     "H4": null,
+     "H5": true,
+     "alike": false,
+     "h2": null,
+     "h3": null,
+     "sheet_orders": []
+    }
+   },
+   {
+    "alignment": {
+     "method": "structure",
+     "tm_score": 0.5246
+    },
+    "carried": {
+     "H1": true,
+     "H2": true,
+     "H3": true,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      0.076,
+      0.187
+     ],
+     "h3": 1.0,
+     "sheet_orders": [],
+     "sheets": [
+      {
+       "closed": false,
+       "mated": 4,
+       "order": false,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 4
+      },
+      {
+       "closed": false,
+       "mated": 0,
+       "order": null,
+       "strands": 2,
+       "why": "fewer than two mated"
+      }
+     ]
+    },
+    "kind": "positive",
+    "pair": "2ACY_A-1URN_A",
+    "stratum": null,
+    "withheld": {
+     "H1": true,
+     "H2": true,
+     "H3": true,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      0.076,
+      0.187
+     ],
+     "h3": 1.0,
+     "sheet_orders": [],
+     "sheets": [
+      {
+       "closed": false,
+       "mated": 4,
+       "order": null,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 4,
+       "why": "withheld"
+      },
+      {
+       "closed": false,
+       "mated": 0,
+       "order": null,
+       "strands": 2,
+       "why": "withheld"
+      }
+     ]
+    }
+   },
+   {
+    "alignment": {
+     "method": "sequence",
+     "tm_score": 0.9782
+    },
+    "carried": {
+     "H1": true,
+     "H2": true,
+     "H3": true,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      0.003,
+      0.064
+     ],
+     "h3": 1.0,
+     "sheet_orders": [],
+     "sheets": [
+      {
+       "closed": false,
+       "mated": 4,
+       "order": true,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 4
+      },
+      {
+       "closed": false,
+       "mated": 4,
+       "order": true,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 5
+      },
+      {
+       "closed": false,
+       "mated": 4,
+       "order": false,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 4
+      },
+      {
+       "closed": false,
+       "mated": 5,
+       "order": true,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 5
+      },
+      {
+       "closed": false,
+       "mated": 4,
+       "order": true,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 4
+      },
+      {
+       "closed": false,
+       "mated": 4,
+       "order": false,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 4
+      }
+     ]
+    },
+    "kind": "positive",
+    "pair": "2VWD_A-2X9M_A",
+    "stratum": null,
+    "withheld": {
+     "H1": true,
+     "H2": true,
+     "H3": true,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      0.003,
+      0.064
+     ],
+     "h3": 1.0,
+     "sheet_orders": [],
+     "sheets": [
+      {
+       "closed": false,
+       "mated": 4,
+       "order": null,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 4,
+       "why": "withheld"
+      },
+      {
+       "closed": false,
+       "mated": 4,
+       "order": null,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 5,
+       "why": "withheld"
+      },
+      {
+       "closed": false,
+       "mated": 4,
+       "order": null,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 4,
+       "why": "withheld"
+      },
+      {
+       "closed": false,
+       "mated": 5,
+       "order": null,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 5,
+       "why": "withheld"
+      },
+      {
+       "closed": false,
+       "mated": 4,
+       "order": null,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 4,
+       "why": "withheld"
+      },
+      {
+       "closed": false,
+       "mated": 4,
+       "order": null,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 4,
+       "why": "withheld"
+      }
+     ]
+    }
+   },
+   {
+    "alignment": {
+     "method": "structure",
+     "tm_score": 0.7233
+    },
+    "carried": {
+     "H1": true,
+     "H2": false,
+     "H3": false,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      0.265,
+      4.374
+     ],
+     "h3": 0.8892,
+     "sheet_orders": [
+      "L, M, O, N, K for K, M, L, N, O"
+     ],
+     "sheets": [
+      {
+       "closed": false,
+       "mated": 3,
+       "order": true,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 4
+      },
+      {
+       "closed": false,
+       "mated": 4,
+       "order": false,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 4
+      },
+      {
+       "closed": false,
+       "mated": 7,
+       "order": null,
+       "points": true,
+       "reads": false,
+       "reads_all": false,
+       "strands": 8,
+       "why": "mates in two of A's sheets"
+      },
+      {
+       "closed": false,
+       "mated": 4,
+       "order": true,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 4
+      },
+      {
+       "closed": false,
+       "mated": 0,
+       "order": null,
+       "strands": 2,
+       "why": "fewer than two mated"
+      },
+      {
+       "closed": false,
+       "mated": 4,
+       "order": false,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 4
+      }
+     ]
+    },
+    "kind": "positive",
+    "pair": "2VWD_A-2ZB5_A",
+    "stratum": null,
+    "withheld": {
+     "H1": true,
+     "H2": false,
+     "H3": false,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      0.265,
+      4.374
+     ],
+     "h3": 0.8892,
+     "sheet_orders": [
+      "L, M, O, N, K for K, M, L, N, O"
+     ],
+     "sheets": [
+      {
+       "closed": false,
+       "mated": 3,
+       "order": null,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 4,
+       "why": "withheld"
+      },
+      {
+       "closed": false,
+       "mated": 4,
+       "order": null,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 4,
+       "why": "withheld"
+      },
+      {
+       "closed": false,
+       "mated": 7,
+       "order": null,
+       "points": true,
+       "reads": false,
+       "reads_all": false,
+       "strands": 8,
+       "why": "withheld"
+      },
+      {
+       "closed": false,
+       "mated": 4,
+       "order": null,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 4,
+       "why": "withheld"
+      },
+      {
+       "closed": false,
+       "mated": 0,
+       "order": null,
+       "strands": 2,
+       "why": "withheld"
+      },
+      {
+       "closed": false,
+       "mated": 4,
+       "order": null,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 4,
+       "why": "withheld"
+      }
+     ]
+    }
+   },
+   {
+    "alignment": {
+     "method": "structure",
+     "tm_score": 0.6977
+    },
+    "carried": {
+     "H1": true,
+     "H2": false,
+     "H3": false,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      2.695,
+      6.348
+     ],
+     "h3": 0.8439,
+     "sheet_orders": [
+      "K, M, N, L, O for L, M, O, K, N"
+     ],
+     "sheets": [
+      {
+       "closed": false,
+       "mated": 3,
+       "order": false,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 5
+      },
+      {
+       "closed": false,
+       "mated": 5,
+       "order": null,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 5,
+       "why": "mates in two of A's sheets"
+      },
+      {
+       "closed": false,
+       "mated": 4,
+       "order": false,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 4
+      },
+      {
+       "closed": false,
+       "mated": 4,
+       "order": false,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 4
+      },
+      {
+       "closed": false,
+       "mated": 4,
+       "order": null,
+       "points": true,
+       "reads": false,
+       "reads_all": false,
+       "strands": 4,
+       "why": "mates not in one order across A's sheet"
+      },
+      {
+       "closed": false,
+       "mated": 4,
+       "order": true,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 4
+      }
+     ]
+    },
+    "kind": "positive",
+    "pair": "2ZB5_A-1E8T_A",
+    "stratum": null,
+    "withheld": {
+     "H1": true,
+     "H2": false,
+     "H3": false,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      3.102,
+      5.797
+     ],
+     "h3": 0.8757,
+     "sheet_orders": [
+      "W, X, Y for Y, X, W",
+      "K, M, N, L, O for L, M, O, K, N"
+     ],
+     "sheets": [
+      {
+       "closed": false,
+       "mated": 3,
+       "order": null,
+       "points": true,
+       "reads": false,
+       "reads_all": false,
+       "strands": 5,
+       "why": "withheld"
+      },
+      {
+       "closed": false,
+       "mated": 5,
+       "order": null,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 5,
+       "why": "withheld"
+      },
+      {
+       "closed": false,
+       "mated": 4,
+       "order": null,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 4,
+       "why": "withheld"
+      },
+      {
+       "closed": false,
+       "mated": 4,
+       "order": null,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 4,
+       "why": "withheld"
+      },
+      {
+       "closed": false,
+       "mated": 4,
+       "order": null,
+       "points": true,
+       "reads": false,
+       "reads_all": false,
+       "strands": 4,
+       "why": "withheld"
+      },
+      {
+       "closed": false,
+       "mated": 4,
+       "order": null,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 4,
+       "why": "withheld"
+      }
+     ]
+    }
+   },
+   {
+    "alignment": {
+     "method": "structure",
+     "tm_score": 0.6937
+    },
+    "carried": {
+     "H1": true,
+     "H2": false,
+     "H3": false,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      2.1,
+      5.218
+     ],
+     "h3": 0.9481,
+     "sheet_orders": [
+      "M, P, L, Q for L, M, P, Q"
+     ],
+     "sheets": [
+      {
+       "closed": false,
+       "mated": 2,
+       "order": true,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 4
+      },
+      {
+       "closed": false,
+       "mated": 4,
+       "order": false,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 4
+      },
+      {
+       "closed": false,
+       "mated": 4,
+       "order": false,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 4
+      },
+      {
+       "closed": false,
+       "mated": 3,
+       "order": true,
+       "points": true,
+       "reads": true,
+       "reads_all": false,
+       "strands": 5
+      },
+      {
+       "closed": false,
+       "mated": 4,
+       "order": true,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 4
+      },
+      {
+       "closed": false,
+       "mated": 4,
+       "order": true,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 4
+      }
+     ]
+    },
+    "kind": "positive",
+    "pair": "4CH9_A-2VWD_A",
+    "stratum": null,
+    "withheld": {
+     "H1": true,
+     "H2": false,
+     "H3": false,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      1.981,
+      5.221
+     ],
+     "h3": 0.9177,
+     "sheet_orders": [
+      "M, P, L, Q for L, M, P, Q",
+      "S27, Z, Y, X for X, Y, Z, S27"
+     ],
+     "sheets": [
+      {
+       "closed": false,
+       "mated": 2,
+       "order": null,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 4,
+       "why": "withheld"
+      },
+      {
+       "closed": false,
+       "mated": 4,
+       "order": null,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 4,
+       "why": "withheld"
+      },
+      {
+       "closed": false,
+       "mated": 4,
+       "order": null,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 4,
+       "why": "withheld"
+      },
+      {
+       "closed": false,
+       "mated": 3,
+       "order": null,
+       "points": true,
+       "reads": true,
+       "reads_all": false,
+       "strands": 5,
+       "why": "withheld"
+      },
+      {
+       "closed": false,
+       "mated": 4,
+       "order": null,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 4,
+       "why": "withheld"
+      },
+      {
+       "closed": false,
+       "mated": 4,
+       "order": null,
+       "points": true,
+       "reads": false,
+       "reads_all": false,
+       "strands": 4,
+       "why": "withheld"
+      }
+     ]
+    }
+   }
+  ],
+  "hom_heldout": [
+   {
+    "alignment": {
+     "method": "sequence",
+     "tm_score": 0.8218
+    },
+    "carried": {
+     "H1": true,
+     "H2": true,
+     "H3": true,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      0.118,
+      0.82
+     ],
+     "h3": 1.0,
+     "sheet_orders": [],
+     "sheets": []
+    },
+    "kind": "positive",
+    "pair": "1CO6_A-1JDL_A",
+    "stratum": "close",
+    "withheld": {
+     "H1": true,
+     "H2": true,
+     "H3": true,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      0.118,
+      0.82
+     ],
+     "h3": 1.0,
+     "sheet_orders": [],
+     "sheets": []
+    }
+   },
+   {
+    "alignment": {
+     "method": "structure",
+     "tm_score": 0.5113
+    },
+    "carried": {
+     "H1": true,
+     "H2": true,
+     "H3": true,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      0.307,
+      0.855
+     ],
+     "h3": 1.0,
+     "sheet_orders": [],
+     "sheets": [
+      {
+       "closed": false,
+       "mated": 7,
+       "order": false,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 7
+      },
+      {
+       "closed": false,
+       "mated": 2,
+       "order": false,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 2
+      },
+      {
+       "closed": false,
+       "mated": 0,
+       "order": null,
+       "strands": 2,
+       "why": "fewer than two mated"
+      }
+     ]
+    },
+    "kind": "positive",
+    "pair": "1G9R_A-1JYL_A",
+    "stratum": "remote",
+    "withheld": {
+     "H1": true,
+     "H2": true,
+     "H3": true,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      0.307,
+      0.855
+     ],
+     "h3": 1.0,
+     "sheet_orders": [],
+     "sheets": [
+      {
+       "closed": false,
+       "mated": 7,
+       "order": null,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 7,
+       "why": "withheld"
+      },
+      {
+       "closed": false,
+       "mated": 2,
+       "order": null,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 2,
+       "why": "withheld"
+      },
+      {
+       "closed": false,
+       "mated": 0,
+       "order": null,
+       "strands": 2,
+       "why": "withheld"
+      }
+     ]
+    }
+   },
+   {
+    "alignment": {
+     "method": "structure",
+     "tm_score": 0.2713
+    },
+    "carried": {
+     "H1": false,
+     "H2": null,
+     "H3": null,
+     "H4": null,
+     "H5": true,
+     "alike": false,
+     "h2": null,
+     "h3": null,
+     "sheet_orders": []
+    },
+    "kind": "positive",
+    "pair": "1JBI_A-3U7Z_A",
+    "stratum": "remote",
+    "withheld": {
+     "H1": false,
+     "H2": null,
+     "H3": null,
+     "H4": null,
+     "H5": true,
+     "alike": false,
+     "h2": null,
+     "h3": null,
+     "sheet_orders": []
+    }
+   },
+   {
+    "alignment": {
+     "method": "sequence",
+     "tm_score": 0.8941
+    },
+    "carried": {
+     "H1": true,
+     "H2": false,
+     "H3": true,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      1.111,
+      2.0
+     ],
+     "h3": 1.0,
+     "sheet_orders": [],
+     "sheets": [
+      {
+       "closed": false,
+       "mated": 4,
+       "order": true,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 4
+      },
+      {
+       "closed": false,
+       "mated": 2,
+       "order": false,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 2
+      }
+     ]
+    },
+    "kind": "positive",
+    "pair": "1JK4_A-2HNW_A",
+    "stratum": "close",
+    "withheld": {
+     "H1": true,
+     "H2": false,
+     "H3": false,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      1.117,
+      1.741
+     ],
+     "h3": 0.9643,
+     "sheet_orders": [
+      "G, H for H, G"
+     ],
+     "sheets": [
+      {
+       "closed": false,
+       "mated": 4,
+       "order": null,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 4,
+       "why": "withheld"
+      },
+      {
+       "closed": false,
+       "mated": 2,
+       "order": null,
+       "points": true,
+       "reads": false,
+       "reads_all": false,
+       "strands": 2,
+       "why": "withheld"
+      }
+     ]
+    }
+   },
+   {
+    "alignment": {
+     "method": "structure",
+     "tm_score": 0.1929
+    },
+    "carried": {
+     "H1": true,
+     "H2": null,
+     "H3": null,
+     "H4": null,
+     "H5": true,
+     "alike": false,
+     "h2": null,
+     "h3": null,
+     "sheet_orders": []
+    },
+    "kind": "negative",
+    "pair": "1LSH_B-5MLC_3",
+    "stratum": "negative",
+    "withheld": {
+     "H1": true,
+     "H2": null,
+     "H3": null,
+     "H4": null,
+     "H5": true,
+     "alike": false,
+     "h2": null,
+     "h3": null,
+     "sheet_orders": []
+    }
+   },
+   {
+    "alignment": {
+     "method": "structure",
+     "tm_score": 0.7488
+    },
+    "carried": {
+     "H1": true,
+     "H2": null,
+     "H3": null,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": null,
+     "h3": null,
+     "sheet_orders": [],
+     "sheets": []
+    },
+    "kind": "positive",
+    "pair": "1NKP_A-1AM9_A",
+    "stratum": "remote",
+    "withheld": {
+     "H1": true,
+     "H2": null,
+     "H3": null,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": null,
+     "h3": null,
+     "sheet_orders": [],
+     "sheets": []
+    }
+   },
+   {
+    "alignment": {
+     "method": "structure",
+     "tm_score": 0.3161
+    },
+    "carried": {
+     "H1": true,
+     "H2": null,
+     "H3": null,
+     "H4": null,
+     "H5": true,
+     "alike": false,
+     "h2": null,
+     "h3": null,
+     "sheet_orders": []
+    },
+    "kind": "negative",
+    "pair": "1PZW_A-1QHL_A",
+    "stratum": "negative",
+    "withheld": {
+     "H1": true,
+     "H2": null,
+     "H3": null,
+     "H4": null,
+     "H5": true,
+     "alike": false,
+     "h2": null,
+     "h3": null,
+     "sheet_orders": []
+    }
+   },
+   {
+    "carried": {
+     "H1": null,
+     "H2": null,
+     "H3": null,
+     "H4": null,
+     "H5": true,
+     "alike": false,
+     "h2": null,
+     "h3": null,
+     "sheet_orders": []
+    },
+    "kind": "negative",
+    "pair": "1RPU_A-1ZWT_A",
+    "stratum": "negative",
+    "withheld": {
+     "H1": null,
+     "H2": null,
+     "H3": null,
+     "H4": null,
+     "H5": true,
+     "alike": false,
+     "h2": null,
+     "h3": null,
+     "sheet_orders": []
+    }
+   },
+   {
+    "alignment": {
+     "method": "sequence",
+     "tm_score": 0.9771
+    },
+    "carried": {
+     "H1": true,
+     "H2": true,
+     "H3": true,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      0.0,
+      0.0
+     ],
+     "h3": 1.0,
+     "sheet_orders": [],
+     "sheets": [
+      {
+       "closed": false,
+       "mated": 5,
+       "order": true,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 5
+      },
+      {
+       "closed": false,
+       "mated": 2,
+       "order": true,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 2
+      }
+     ]
+    },
+    "kind": "positive",
+    "pair": "1T5B_A-2Z9C_A",
+    "stratum": "close",
+    "withheld": {
+     "H1": true,
+     "H2": true,
+     "H3": true,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      0.0,
+      0.0
+     ],
+     "h3": 1.0,
+     "sheet_orders": [],
+     "sheets": [
+      {
+       "closed": false,
+       "mated": 5,
+       "order": null,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 5,
+       "why": "withheld"
+      },
+      {
+       "closed": false,
+       "mated": 2,
+       "order": null,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 2,
+       "why": "withheld"
+      }
+     ]
+    }
+   },
+   {
+    "alignment": {
+     "method": "structure",
+     "tm_score": 0.8885
+    },
+    "carried": {
+     "H1": true,
+     "H2": true,
+     "H3": true,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      0.094,
+      1.04
+     ],
+     "h3": 0.9972,
+     "sheet_orders": [],
+     "sheets": [
+      {
+       "closed": false,
+       "mated": 9,
+       "order": true,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 9
+      },
+      {
+       "closed": false,
+       "mated": 4,
+       "order": true,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 4
+      }
+     ]
+    },
+    "kind": "positive",
+    "pair": "1TYY_A-3IQ0_A",
+    "stratum": "remote",
+    "withheld": {
+     "H1": true,
+     "H2": true,
+     "H3": true,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      0.094,
+      1.04
+     ],
+     "h3": 0.9972,
+     "sheet_orders": [],
+     "sheets": [
+      {
+       "closed": false,
+       "mated": 9,
+       "order": null,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 9,
+       "why": "withheld"
+      },
+      {
+       "closed": false,
+       "mated": 4,
+       "order": null,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 4,
+       "why": "withheld"
+      }
+     ]
+    }
+   },
+   {
+    "alignment": {
+     "method": "structure",
+     "tm_score": 0.2643
+    },
+    "carried": {
+     "H1": false,
+     "H2": null,
+     "H3": null,
+     "H4": null,
+     "H5": true,
+     "alike": false,
+     "h2": null,
+     "h3": null,
+     "sheet_orders": []
+    },
+    "kind": "positive",
+    "pair": "1XU6_A-1PS2_A",
+    "stratum": "remote",
+    "withheld": {
+     "H1": false,
+     "H2": null,
+     "H3": null,
+     "H4": null,
+     "H5": true,
+     "alike": false,
+     "h2": null,
+     "h3": null,
+     "sheet_orders": []
+    }
+   },
+   {
+    "alignment": {
+     "method": "structure",
+     "tm_score": 0.291
+    },
+    "carried": {
+     "H1": true,
+     "H2": null,
+     "H3": null,
+     "H4": null,
+     "H5": true,
+     "alike": false,
+     "h2": null,
+     "h3": null,
+     "sheet_orders": []
+    },
+    "kind": "negative",
+    "pair": "2C3E_A-1HZF_A",
+    "stratum": "negative",
+    "withheld": {
+     "H1": true,
+     "H2": null,
+     "H3": null,
+     "H4": null,
+     "H5": true,
+     "alike": false,
+     "h2": null,
+     "h3": null,
+     "sheet_orders": []
+    }
+   },
+   {
+    "alignment": {
+     "method": "structure",
+     "tm_score": 0.3826
+    },
+    "carried": {
+     "H1": false,
+     "H2": null,
+     "H3": null,
+     "H4": null,
+     "H5": true,
+     "alike": false,
+     "h2": null,
+     "h3": null,
+     "sheet_orders": []
+    },
+    "kind": "positive",
+    "pair": "2D46_A-3F42_B",
+    "stratum": "remote",
+    "withheld": {
+     "H1": false,
+     "H2": null,
+     "H3": null,
+     "H4": null,
+     "H5": true,
+     "alike": false,
+     "h2": null,
+     "h3": null,
+     "sheet_orders": []
+    }
+   },
+   {
+    "alignment": {
+     "method": "sequence",
+     "tm_score": 0.9958
+    },
+    "carried": {
+     "H1": true,
+     "H2": true,
+     "H3": true,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      0.003,
+      0.057
+     ],
+     "h3": 1.0,
+     "sheet_orders": [],
+     "sheets": [
+      {
+       "closed": false,
+       "mated": 5,
+       "order": false,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 5
+      },
+      {
+       "closed": false,
+       "mated": 2,
+       "order": false,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 2
+      }
+     ]
+    },
+    "kind": "positive",
+    "pair": "2EWR_A-2FCL_A",
+    "stratum": "close",
+    "withheld": {
+     "H1": true,
+     "H2": true,
+     "H3": true,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      0.003,
+      0.057
+     ],
+     "h3": 1.0,
+     "sheet_orders": [],
+     "sheets": [
+      {
+       "closed": false,
+       "mated": 5,
+       "order": null,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 5,
+       "why": "withheld"
+      },
+      {
+       "closed": false,
+       "mated": 2,
+       "order": null,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 2,
+       "why": "withheld"
+      }
+     ]
+    }
+   },
+   {
+    "alignment": {
+     "method": "structure",
+     "tm_score": 0.1649
+    },
+    "carried": {
+     "H1": true,
+     "H2": null,
+     "H3": null,
+     "H4": null,
+     "H5": true,
+     "alike": false,
+     "h2": null,
+     "h3": null,
+     "sheet_orders": []
+    },
+    "kind": "negative",
+    "pair": "2EX5_A-4NTQ_A",
+    "stratum": "negative",
+    "withheld": {
+     "H1": true,
+     "H2": null,
+     "H3": null,
+     "H4": null,
+     "H5": true,
+     "alike": false,
+     "h2": null,
+     "h3": null,
+     "sheet_orders": []
+    }
+   },
+   {
+    "alignment": {
+     "method": "structure",
+     "tm_score": 0.7817
+    },
+    "carried": {
+     "H1": true,
+     "H2": false,
+     "H3": false,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      2.445,
+      6.179
+     ],
+     "h3": 0.6732,
+     "sheet_orders": [
+      "A, H, B, M for M, H, A, B",
+      "C, D, K, J, E, I, F for F, I, E, J, K, D, C"
+     ],
+     "sheets": [
+      {
+       "closed": false,
+       "mated": 7,
+       "order": null,
+       "points": true,
+       "reads": false,
+       "reads_all": false,
+       "strands": 7,
+       "why": "mates in two of A's sheets"
+      },
+      {
+       "closed": false,
+       "mated": 0,
+       "order": null,
+       "strands": 2,
+       "why": "fewer than two mated"
+      }
+     ]
+    },
+    "kind": "positive",
+    "pair": "2F20_A-1ZN6_A",
+    "stratum": "remote",
+    "withheld": {
+     "H1": true,
+     "H2": false,
+     "H3": false,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      2.445,
+      6.179
+     ],
+     "h3": 0.6732,
+     "sheet_orders": [
+      "A, H, B, M for M, H, A, B",
+      "C, D, K, J, E, I, F for F, I, E, J, K, D, C"
+     ],
+     "sheets": [
+      {
+       "closed": false,
+       "mated": 7,
+       "order": null,
+       "points": true,
+       "reads": false,
+       "reads_all": false,
+       "strands": 7,
+       "why": "withheld"
+      },
+      {
+       "closed": false,
+       "mated": 0,
+       "order": null,
+       "strands": 2,
+       "why": "withheld"
+      }
+     ]
+    }
+   },
+   {
+    "alignment": {
+     "method": "structure",
+     "tm_score": 0.2958
+    },
+    "carried": {
+     "H1": true,
+     "H2": null,
+     "H3": null,
+     "H4": null,
+     "H5": true,
+     "alike": false,
+     "h2": null,
+     "h3": null,
+     "sheet_orders": []
+    },
+    "kind": "negative",
+    "pair": "2H5F_A-4Z42_B",
+    "stratum": "negative",
+    "withheld": {
+     "H1": true,
+     "H2": null,
+     "H3": null,
+     "H4": null,
+     "H5": true,
+     "alike": false,
+     "h2": null,
+     "h3": null,
+     "sheet_orders": []
+    }
+   },
+   {
+    "alignment": {
+     "method": "structure",
+     "tm_score": 0.3285
+    },
+    "carried": {
+     "H1": true,
+     "H2": null,
+     "H3": null,
+     "H4": null,
+     "H5": true,
+     "alike": false,
+     "h2": null,
+     "h3": null,
+     "sheet_orders": []
+    },
+    "kind": "negative",
+    "pair": "2IAY_A-4XZD_A",
+    "stratum": "negative",
+    "withheld": {
+     "H1": true,
+     "H2": null,
+     "H3": null,
+     "H4": null,
+     "H5": true,
+     "alike": false,
+     "h2": null,
+     "h3": null,
+     "sheet_orders": []
+    }
+   },
+   {
+    "alignment": {
+     "method": "structure",
+     "tm_score": 0.7385
+    },
+    "carried": {
+     "H1": true,
+     "H2": true,
+     "H3": true,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      0.829,
+      2.128
+     ],
+     "h3": 0.9872,
+     "sheet_orders": [],
+     "sheets": []
+    },
+    "kind": "positive",
+    "pair": "2IJE_S-3T6A_A",
+    "stratum": "remote",
+    "withheld": {
+     "H1": true,
+     "H2": true,
+     "H3": true,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      0.829,
+      2.128
+     ],
+     "h3": 0.9872,
+     "sheet_orders": [],
+     "sheets": []
+    }
+   },
+   {
+    "alignment": {
+     "method": "structure",
+     "tm_score": 0.3952
+    },
+    "carried": {
+     "H1": false,
+     "H2": null,
+     "H3": null,
+     "H4": null,
+     "H5": true,
+     "alike": false,
+     "h2": null,
+     "h3": null,
+     "sheet_orders": []
+    },
+    "kind": "positive",
+    "pair": "2JCA_A-3LQ9_A",
+    "stratum": "remote",
+    "withheld": {
+     "H1": false,
+     "H2": null,
+     "H3": null,
+     "H4": null,
+     "H5": true,
+     "alike": false,
+     "h2": null,
+     "h3": null,
+     "sheet_orders": []
+    }
+   },
+   {
+    "alignment": {
+     "method": "structure",
+     "tm_score": 0.8106
+    },
+    "carried": {
+     "H1": true,
+     "H2": true,
+     "H3": true,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      0.0,
+      0.0
+     ],
+     "h3": 1.0,
+     "sheet_orders": [],
+     "sheets": []
+    },
+    "kind": "positive",
+    "pair": "2LSR_A-4YL6_A",
+    "stratum": "remote",
+    "withheld": {
+     "H1": true,
+     "H2": true,
+     "H3": true,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      0.0,
+      0.0
+     ],
+     "h3": 1.0,
+     "sheet_orders": [],
+     "sheets": []
+    }
+   },
+   {
+    "alignment": {
+     "method": "structure",
+     "tm_score": 0.4918
+    },
+    "carried": {
+     "H1": false,
+     "H2": null,
+     "H3": null,
+     "H4": null,
+     "H5": true,
+     "alike": false,
+     "h2": null,
+     "h3": null,
+     "sheet_orders": []
+    },
+    "kind": "positive",
+    "pair": "2MJ7_A-2EHB_D",
+    "stratum": "remote",
+    "withheld": {
+     "H1": false,
+     "H2": null,
+     "H3": null,
+     "H4": null,
+     "H5": true,
+     "alike": false,
+     "h2": null,
+     "h3": null,
+     "sheet_orders": []
+    }
+   },
+   {
+    "alignment": {
+     "method": "sequence",
+     "tm_score": 0.976
+    },
+    "carried": {
+     "H1": true,
+     "H2": true,
+     "H3": true,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      0.0,
+      0.0
+     ],
+     "h3": 1.0,
+     "sheet_orders": [],
+     "sheets": [
+      {
+       "closed": false,
+       "mated": 6,
+       "order": true,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 6
+      },
+      {
+       "closed": false,
+       "mated": 2,
+       "order": false,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 2
+      }
+     ]
+    },
+    "kind": "positive",
+    "pair": "2OKF_A-2INB_A",
+    "stratum": "close",
+    "withheld": {
+     "H1": true,
+     "H2": true,
+     "H3": true,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      0.0,
+      0.0
+     ],
+     "h3": 1.0,
+     "sheet_orders": [],
+     "sheets": [
+      {
+       "closed": false,
+       "mated": 6,
+       "order": null,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 6,
+       "why": "withheld"
+      },
+      {
+       "closed": false,
+       "mated": 2,
+       "order": null,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 2,
+       "why": "withheld"
+      }
+     ]
+    }
+   },
+   {
+    "alignment": {
+     "method": "structure",
+     "tm_score": 0.3967
+    },
+    "carried": {
+     "H1": false,
+     "H2": null,
+     "H3": null,
+     "H4": null,
+     "H5": true,
+     "alike": false,
+     "h2": null,
+     "h3": null,
+     "sheet_orders": []
+    },
+    "kind": "positive",
+    "pair": "2Q82_A-2JTR_A",
+    "stratum": "remote",
+    "withheld": {
+     "H1": false,
+     "H2": null,
+     "H3": null,
+     "H4": null,
+     "H5": true,
+     "alike": false,
+     "h2": null,
+     "h3": null,
+     "sheet_orders": []
+    }
+   },
+   {
+    "alignment": {
+     "method": "structure",
+     "tm_score": 0.3301
+    },
+    "carried": {
+     "H1": true,
+     "H2": null,
+     "H3": null,
+     "H4": null,
+     "H5": true,
+     "alike": false,
+     "h2": null,
+     "h3": null,
+     "sheet_orders": []
+    },
+    "kind": "negative",
+    "pair": "3BUU_A-3VDI_A",
+    "stratum": "negative",
+    "withheld": {
+     "H1": true,
+     "H2": null,
+     "H3": null,
+     "H4": null,
+     "H5": true,
+     "alike": false,
+     "h2": null,
+     "h3": null,
+     "sheet_orders": []
+    }
+   },
+   {
+    "alignment": {
+     "method": "sequence",
+     "tm_score": 0.9567
+    },
+    "carried": {
+     "H1": true,
+     "H2": true,
+     "H3": true,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      0.469,
+      0.625
+     ],
+     "h3": 1.0,
+     "sheet_orders": [],
+     "sheets": [
+      {
+       "closed": false,
+       "mated": 3,
+       "order": true,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 4
+      },
+      {
+       "closed": false,
+       "mated": 4,
+       "order": true,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 4
+      }
+     ]
+    },
+    "kind": "positive",
+    "pair": "3IE4_A-3AQX_A",
+    "stratum": "close",
+    "withheld": {
+     "H1": true,
+     "H2": true,
+     "H3": true,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      0.469,
+      0.625
+     ],
+     "h3": 1.0,
+     "sheet_orders": [],
+     "sheets": [
+      {
+       "closed": false,
+       "mated": 3,
+       "order": null,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 4,
+       "why": "withheld"
+      },
+      {
+       "closed": false,
+       "mated": 4,
+       "order": null,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 4,
+       "why": "withheld"
+      }
+     ]
+    }
+   },
+   {
+    "alignment": {
+     "method": "structure",
+     "tm_score": 0.7424
+    },
+    "carried": {
+     "H1": true,
+     "H2": true,
+     "H3": true,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      0.04,
+      0.117
+     ],
+     "h3": 1.0,
+     "sheet_orders": [],
+     "sheets": [
+      {
+       "closed": false,
+       "mated": 4,
+       "order": false,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 4
+      }
+     ]
+    },
+    "kind": "positive",
+    "pair": "3N4H_A-4JCU_A",
+    "stratum": "remote",
+    "withheld": {
+     "H1": true,
+     "H2": true,
+     "H3": true,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      0.04,
+      0.117
+     ],
+     "h3": 1.0,
+     "sheet_orders": [],
+     "sheets": [
+      {
+       "closed": false,
+       "mated": 4,
+       "order": null,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 4,
+       "why": "withheld"
+      }
+     ]
+    }
+   },
+   {
+    "alignment": {
+     "method": "structure",
+     "tm_score": 0.7236
+    },
+    "carried": {
+     "H1": true,
+     "H2": false,
+     "H3": true,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      1.159,
+      1.508
+     ],
+     "h3": 0.9524,
+     "sheet_orders": [],
+     "sheets": []
+    },
+    "kind": "positive",
+    "pair": "3O7I_A-2O8I_A",
+    "stratum": "remote",
+    "withheld": {
+     "H1": true,
+     "H2": false,
+     "H3": true,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      1.159,
+      1.508
+     ],
+     "h3": 0.9524,
+     "sheet_orders": [],
+     "sheets": []
+    }
+   },
+   {
+    "alignment": {
+     "method": "sequence",
+     "tm_score": 0.988
+    },
+    "carried": {
+     "H1": true,
+     "H2": true,
+     "H3": true,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      0.0,
+      0.0
+     ],
+     "h3": 1.0,
+     "sheet_orders": [],
+     "sheets": []
+    },
+    "kind": "positive",
+    "pair": "3OQL_A-4WWJ_A",
+    "stratum": "close",
+    "withheld": {
+     "H1": true,
+     "H2": true,
+     "H3": true,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      0.0,
+      0.0
+     ],
+     "h3": 1.0,
+     "sheet_orders": [],
+     "sheets": []
+    }
+   },
+   {
+    "alignment": {
+     "method": "structure",
+     "tm_score": 0.2599
+    },
+    "carried": {
+     "H1": true,
+     "H2": null,
+     "H3": null,
+     "H4": null,
+     "H5": true,
+     "alike": false,
+     "h2": null,
+     "h3": null,
+     "sheet_orders": []
+    },
+    "kind": "negative",
+    "pair": "3VDJ_A-2JXW_A",
+    "stratum": "negative",
+    "withheld": {
+     "H1": true,
+     "H2": null,
+     "H3": null,
+     "H4": null,
+     "H5": true,
+     "alike": false,
+     "h2": null,
+     "h3": null,
+     "sheet_orders": []
+    }
+   },
+   {
+    "alignment": {
+     "method": "sequence",
+     "tm_score": 0.9696
+    },
+    "carried": {
+     "H1": true,
+     "H2": true,
+     "H3": true,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      0.226,
+      0.72
+     ],
+     "h3": 1.0,
+     "sheet_orders": [],
+     "sheets": [
+      {
+       "closed": false,
+       "mated": 4,
+       "order": true,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 5
+      }
+     ]
+    },
+    "kind": "positive",
+    "pair": "3WZ0_A-2AV5_A",
+    "stratum": "close",
+    "withheld": {
+     "H1": true,
+     "H2": false,
+     "H3": false,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      0.929,
+      3.264
+     ],
+     "h3": 0.7143,
+     "sheet_orders": [
+      "D, A, C, B for B, C, A, D"
+     ],
+     "sheets": [
+      {
+       "closed": false,
+       "mated": 4,
+       "order": null,
+       "points": true,
+       "reads": false,
+       "reads_all": false,
+       "strands": 5,
+       "why": "withheld"
+      }
+     ]
+    }
+   },
+   {
+    "alignment": {
+     "method": "structure",
+     "tm_score": 0.7005
+    },
+    "carried": {
+     "H1": true,
+     "H2": false,
+     "H3": false,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      0.073,
+      7.58
+     ],
+     "h3": 0.7582,
+     "sheet_orders": [
+      "A, M, L, H, I for H, I, M, A, L"
+     ],
+     "sheets": [
+      {
+       "closed": false,
+       "mated": 4,
+       "order": null,
+       "points": false,
+       "reads": false,
+       "reads_all": false,
+       "strands": 4,
+       "why": "mates in two of A's sheets"
+      },
+      {
+       "closed": false,
+       "mated": 2,
+       "order": false,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 2
+      },
+      {
+       "closed": false,
+       "mated": 2,
+       "order": false,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 2
+      },
+      {
+       "closed": false,
+       "mated": 2,
+       "order": false,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 2
+      }
+     ]
+    },
+    "kind": "positive",
+    "pair": "4E2U_A-2LWY_A",
+    "stratum": "remote",
+    "withheld": {
+     "H1": true,
+     "H2": false,
+     "H3": false,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      0.073,
+      7.58
+     ],
+     "h3": 0.7582,
+     "sheet_orders": [
+      "A, M, L, H, I for H, I, M, A, L"
+     ],
+     "sheets": [
+      {
+       "closed": false,
+       "mated": 4,
+       "order": null,
+       "points": false,
+       "reads": false,
+       "reads_all": false,
+       "strands": 4,
+       "why": "withheld"
+      },
+      {
+       "closed": false,
+       "mated": 2,
+       "order": null,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 2,
+       "why": "withheld"
+      },
+      {
+       "closed": false,
+       "mated": 2,
+       "order": null,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 2,
+       "why": "withheld"
+      },
+      {
+       "closed": false,
+       "mated": 2,
+       "order": null,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 2,
+       "why": "withheld"
+      }
+     ]
+    }
+   },
+   {
+    "alignment": {
+     "method": "structure",
+     "tm_score": 0.3032
+    },
+    "carried": {
+     "H1": true,
+     "H2": null,
+     "H3": null,
+     "H4": null,
+     "H5": true,
+     "alike": false,
+     "h2": null,
+     "h3": null,
+     "sheet_orders": []
+    },
+    "kind": "negative",
+    "pair": "4IPV_A-4N2P_A",
+    "stratum": "negative",
+    "withheld": {
+     "H1": true,
+     "H2": null,
+     "H3": null,
+     "H4": null,
+     "H5": true,
+     "alike": false,
+     "h2": null,
+     "h3": null,
+     "sheet_orders": []
+    }
+   },
+   {
+    "alignment": {
+     "method": "structure",
+     "tm_score": 0.768
+    },
+    "carried": {
+     "H1": true,
+     "H2": true,
+     "H3": true,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      0.0,
+      0.0
+     ],
+     "h3": 1.0,
+     "sheet_orders": [],
+     "sheets": []
+    },
+    "kind": "positive",
+    "pair": "4U12_A-4NPX_A",
+    "stratum": "remote",
+    "withheld": {
+     "H1": true,
+     "H2": true,
+     "H3": true,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      0.0,
+      0.0
+     ],
+     "h3": 1.0,
+     "sheet_orders": [],
+     "sheets": []
+    }
+   },
+   {
+    "alignment": {
+     "method": "structure",
+     "tm_score": 0.6181
+    },
+    "carried": {
+     "H1": true,
+     "H2": true,
+     "H3": false,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      0.291,
+      1.039
+     ],
+     "h3": 0.9333,
+     "sheet_orders": [],
+     "sheets": [
+      {
+       "closed": false,
+       "mated": 2,
+       "order": true,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 2
+      }
+     ]
+    },
+    "kind": "positive",
+    "pair": "5E4E_A-3TGX_B",
+    "stratum": "remote",
+    "withheld": {
+     "H1": true,
+     "H2": true,
+     "H3": false,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      0.291,
+      1.039
+     ],
+     "h3": 0.9333,
+     "sheet_orders": [],
+     "sheets": [
+      {
+       "closed": false,
+       "mated": 2,
+       "order": null,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 2,
+       "why": "withheld"
+      }
+     ]
+    }
+   },
+   {
+    "alignment": {
+     "method": "structure",
+     "tm_score": 0.4463
+    },
+    "carried": {
+     "H1": false,
+     "H2": null,
+     "H3": null,
+     "H4": null,
+     "H5": true,
+     "alike": false,
+     "h2": null,
+     "h3": null,
+     "sheet_orders": []
+    },
+    "kind": "positive",
+    "pair": "5GL3_A-1WPN_A",
+    "stratum": "remote",
+    "withheld": {
+     "H1": false,
+     "H2": null,
+     "H3": null,
+     "H4": null,
+     "H5": true,
+     "alike": false,
+     "h2": null,
+     "h3": null,
+     "sheet_orders": []
+    }
+   },
+   {
+    "alignment": {
+     "method": "structure",
+     "tm_score": 0.7989
+    },
+    "carried": {
+     "H1": true,
+     "H2": true,
+     "H3": true,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      0.301,
+      0.437
+     ],
+     "h3": 1.0,
+     "sheet_orders": [],
+     "sheets": [
+      {
+       "closed": false,
+       "mated": 2,
+       "order": true,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 2
+      }
+     ]
+    },
+    "kind": "positive",
+    "pair": "5GY2_C-2D4X_A",
+    "stratum": "remote",
+    "withheld": {
+     "H1": true,
+     "H2": true,
+     "H3": true,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      0.301,
+      0.437
+     ],
+     "h3": 1.0,
+     "sheet_orders": [],
+     "sheets": [
+      {
+       "closed": false,
+       "mated": 2,
+       "order": null,
+       "points": true,
+       "reads": true,
+       "reads_all": true,
+       "strands": 2,
+       "why": "withheld"
+      }
+     ]
+    }
+   },
+   {
+    "alignment": {
+     "method": "structure",
+     "tm_score": 0.7967
+    },
+    "carried": {
+     "H1": true,
+     "H2": true,
+     "H3": true,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      0.8,
+      1.276
+     ],
+     "h3": 1.0,
+     "sheet_orders": [],
+     "sheets": []
+    },
+    "kind": "positive",
+    "pair": "5KDI_A-4NT2_A",
+    "stratum": "remote",
+    "withheld": {
+     "H1": true,
+     "H2": true,
+     "H3": true,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      0.8,
+      1.276
+     ],
+     "h3": 1.0,
+     "sheet_orders": [],
+     "sheets": []
+    }
+   },
+   {
+    "alignment": {
+     "method": "sequence",
+     "tm_score": 0.6979
+    },
+    "carried": {
+     "H1": true,
+     "H2": true,
+     "H3": true,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      0.0,
+      0.0
+     ],
+     "h3": 1.0,
+     "sheet_orders": [],
+     "sheets": []
+    },
+    "kind": "positive",
+    "pair": "5LNK_A-6G2J_A",
+    "stratum": "close",
+    "withheld": {
+     "H1": true,
+     "H2": true,
+     "H3": true,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      0.0,
+      0.0
+     ],
+     "h3": 1.0,
+     "sheet_orders": [],
+     "sheets": []
+    }
+   },
+   {
+    "alignment": {
+     "method": "sequence",
+     "tm_score": 0.9372
+    },
+    "carried": {
+     "H1": true,
+     "H2": true,
+     "H3": true,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      0.059,
+      0.211
+     ],
+     "h3": 1.0,
+     "sheet_orders": [],
+     "sheets": []
+    },
+    "kind": "positive",
+    "pair": "5U5S_A-2WP1_A",
+    "stratum": "close",
+    "withheld": {
+     "H1": true,
+     "H2": true,
+     "H3": true,
+     "H4": true,
+     "H5": true,
+     "alike": true,
+     "h2": [
+      0.059,
+      0.211
+     ],
+     "h3": 1.0,
+     "sheet_orders": [],
+     "sheets": []
+    }
+   }
+  ]
+ }
+}

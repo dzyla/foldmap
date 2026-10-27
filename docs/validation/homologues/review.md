@@ -245,3 +245,22 @@ changes**: every pair passes and fails the same checks on both sets.
   2MJ7-2EHB 0.492 (now US-align's own 0.492), 2Q82-2JTR 0.397, 5GL3-1WPN 0.446.
 - `foldmap compare`/`--like` on 2LZM against 1UBQ (tests): TM 0.33 with 2 of 13 elements matched (was 0.32, 3),
   still not one fold.
+
+## The sheet order carried (plan 28 Task 6, post hoc)
+
+The external review's 3.5 quoted 3WZ0-2AV5 from the held-out run above (B C A D drawn D A C B at TM 0.97). Its
+mechanism was fixed after that run, at 1a3f9d6 (plan 13a-12, Like.order), and `topology-transfer/report.md` measures
+it at c6e94c1 on both sets, each pair drawn with the reference's sheet order carried (as foldmap draws) and withheld.
+Nothing frozen above changes.
+- **Mechanism**: with the order withheld, layout._sheet_order decides a sheet's left-right reading from its own end
+  strands; 2AV5's sheet is seen nearly edge-on and ends in C′, a strand 3WZ0 lacks, so it reads D A C B, the mirror
+  image. Withheld reproduces the held-out run's numbers for the pair exactly (H2 0.93 / 3.26, H3 0.714). Carried, it
+  passes H1-H5 (H2 0.23 / 0.72, H3 1.000).
+- **Held-out set**: positives passing H1-H5, 16 of 30 withheld and 17 of 30 carried; H2 17 to 18, H3 17 to 19
+  (3WZ0-2AV5's H2 and H3, and 1JK4-2HNW's H3, its swapped pair G, H: the two the section above found passing
+  "after the layout work since c099787"; Like.order is that work for both). **Tuning set**: 8 of 11 both ways. No
+  pair on either set loses an H check carried.
+- **Still in another order**: five pairs (three propellers of the tuning set, 2F20-1ZN6, 4E2U-2LWY). In four, the
+  sheet in another order is one whose mates lie in two of A's sheets (B pairs strands A does not: a pairing
+  difference, where Like.order says nothing), or one A draws in two columns; in 4CH9-2VWD it is a strand B places
+  off its sheet's track. Every sheet Like.order sets (46 on the two sets) reads and points as its mates.
