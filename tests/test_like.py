@@ -151,19 +151,32 @@ def test_sheet_order_kept():
     assert found["S1"] == found["S2"] == found["S3"] == [] and found["S6"] == []
 
 
-def test_a_mated_sheet_reads_as_the_reference():
+def test_a_mated_sheet_reads_as_the_reference(monkeypatch):
     """2AV5 drawn like 3WZ0 (the held-out pair, TM 0.97 by sequence; plan 13a-12): A's four-strand sheet B C A D is
     seen nearly edge-on, and B's has an extra end strand (C′) A lacks, which alone used to decide B's order: the
     sheet came out D A C B with every strand pointing as its mate, A's mirror image. With A's order carried
     (Like.order) the mated strands read left to right as A's do, each pointing as its mate: no sheet order differs
     (criteria.sheet_orders), and H3 passes."""
+    import foldmap.like as like_mod
     from foldmap.criteria import h3_relations, like_pairs, sheet_orders
 
+    given: dict = {}  # B's sheets as like_from receives them (its track order)
+    like_from = like_mod.like_from
+
+    def kept(*a, **k):
+        given["sheets"] = a[5] if len(a) > 5 else k["sheets_b"]
+        return like_from(*a, **k)
+
+    monkeypatch.setattr(like_mod, "like_from", kept)
     got: dict = {}
     like = {"structure": str(DATA / "like" / "3WZ0.cif.gz"), "chain": "A"}
     lay, _, _ = cli.make_layout(DATA / "like" / "2AV5.cif.gz", chains=["A"], assembly="asu", like=like, like_out=got)
     lay_a, mates, made = got["reference"][0], got["mates"], got["like"]
-    assert made is not None and len(made.order) == 1 and made.order[0] is not None
+    assert made is not None and len(made.order) == 1
+    # the value A implies: A draws the mates of B's first and last mated track strands left to right, or right to left
+    track = [s.id for s in given["sheets"][0].strands if s.id in mates.mate]
+    first, last = (lay_a.placed[mates.mate[track[k]]].cx for k in (0, -1))
+    assert first != last and made.order[0] is (first < last)
     assert mates.extras  # C′: only B has it
     pairs = like_pairs(lay_a, lay, mates)
     assert sheet_orders(lay_a, lay, pairs) == []

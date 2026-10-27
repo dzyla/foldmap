@@ -24,7 +24,11 @@ Each pair is drawn as scripts/homologues.py's `pair` draws it (B like A as `fold
 Each drawing is judged by H1-H5 (criteria.like_checks, as the campaign judges it). For every sheet of B (as
 like.like_from receives it, read by wrapping like_from; nothing else is changed): its strands and mated strands,
 Like.order's entry, why it is None (_why_none: the conditions of like._order, in its order), and, where it is set,
-whether B's drawn mated strands read left to right and point up or down as their mates do in A."""
+whether B's drawn mated strands read left to right and point up or down as their mates do in A.
+
+Withheld is today's code with like._order answering None, judged by today's criteria, not the code before 1a3f9d6:
+that commit also removed H3's pairing excuse and made H1's refusal a flag; withheld reproduces the c099787 counts
+(16 of 30, H2 17, H3 17) all the same."""
 
 from __future__ import annotations
 
@@ -306,6 +310,10 @@ def render(doc: dict) -> str:
         "- Neither set is unseen for this record: hom_tuning is the set the limits were chosen on, and the fix "
         "measured here (Like.order, 1a3f9d6, plan 13a-12) was aimed at 3WZ0-2AV5, a hom_heldout pair, after its "
         "one run. The carried column is a regression measure on both sets, not evidence on unseen structures.",
+        "",
+        "- Withheld is today's code with like._order answering None, judged by today's criteria, not the code "
+        "before 1a3f9d6: that commit also removed H3's pairing excuse and made H1's refusal a flag; withheld "
+        "reproduces the c099787 counts (16 of 30, H2 17, H3 17) all the same.",
         "",
         "## The mechanism (3WZ0-2AV5)",
         "",
