@@ -24,7 +24,9 @@ A new constant is a special case unless its value follows from biology, geometry
 - the other campaigns (`na/`, `domain-uncertainty/`, `homologues/` and so on) cover their own subsystems.
 
 For a change, draw a fresh sample the same way (`scripts/random100.py sample`, a new seed, none of the earlier ids),
-or use one of the above that your change was not tuned on, and say which.
+or use one of the above that your change was not tuned on, and say which. Add `--exclude` for each earlier
+sample, for example `python scripts/random100.py sample --seed N --exclude docs/validation/random100/sample.json
+--exclude docs/validation/random100-heldout/sample.json --exclude docs/validation/random100-third/sample.json`.
 
 **The measurement** must show the campaign keys and checks identical or better than before the change: the same
 entries pass, no check newly fails, the fallback counts and areas do not get worse. Follow `docs/validation/prune/`,
@@ -43,9 +45,16 @@ the code disagree). Run `python scripts/inventory.py` after a change, then fill 
 comment, a record path, a commit) and the check that would see it go wrong.
 
 A row whose origin is `named-entry:...`, `measured` or `unknown` is a special case or a tuned number.
-`docs/validation/inventory/freeze-baseline.json` lists those that existed when the freeze began, and
-`tests/test_freeze.py` fails on any other such row unless its evidence names an existing `docs/validation/...`
-record. That record is your measurement.
+`docs/validation/inventory/freeze-baseline.json` lists those that existed when the freeze began (by the id less its
+line anchor, so reformatting a line does not matter, with how many share each), and `tests/test_freeze.py` fails on
+any other such row unless its evidence names an existing `docs/validation/...` record. That record is your
+measurement. Do not edit the baseline to make a failure pass; an id enters it only with the same record. Removing a
+special case needs no baseline edit beyond regenerating the table; the test will say when the baseline names ids the
+table no longer has.
+
+The test gates only named-entry, measured and unknown. The origin you write for a new row (biology, geometry,
+convention) is checked in review, so give a quoted comment or a citation as evidence; the test fails a new row with
+such an origin and no evidence.
 
 ## Tests and style
 
