@@ -2984,9 +2984,9 @@ def test_joined_pieces_kept_end_to_end_may_join_straight_farther_apart():
 
 
 def test_a_long_straight_joint_keeps_off_names_and_protein_loops():
-    """Random-100 C2b-4 fix round 1 (review I1): beyond _JOINT_NEAR a straight joint is drawn only when it keeps off
-    the stems' and domains' names and the protein loops, as a routed strand does; a name box or a loop across the
-    line refuses it."""
+    """Random-100 C2b-4 fix round 1 (review I1): between pieces that do not touch a straight joint is drawn only when
+    it keeps off the stems' and domains' names and the protein loops, as a routed strand does; a name box or a loop
+    across the line refuses it."""
     from foldmap.na_paths import _face, _Strands
     from foldmap.na_runs import _straight_joint
 
@@ -3003,8 +3003,8 @@ def test_a_long_straight_joint_keeps_off_names_and_protein_loops():
 
 def test_a_long_straight_joint_leaves_its_face_along_its_axis():
     """Random-100 C2b-4 fix round 1 (review I1; 8VWQ P26a -> P26b, 4.41 apart and 76° off its face, had been drawn
-    straight): beyond _JOINT_NEAR the line must leave its face within 60° of its axis (_JOINT_FORWARD); a partner 4.4
-    away and 70° off the axis is refused."""
+    straight): between pieces that do not touch the line must leave its face within 60° of its axis
+    (_JOINT_FORWARD); a partner 4.4 away and 70° off the axis is refused."""
     from foldmap.na_paths import _face
     from foldmap.na_runs import _straight_joint
 

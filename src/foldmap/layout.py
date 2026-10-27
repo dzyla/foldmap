@@ -6139,12 +6139,11 @@ _NAME_STEP = 0.25  # page units between the places tried along the top edge
 _NAME_CLEAR = 0.08  # page units a name keeps from anything else
 _NAME_KEEP = 0.3  # page units loops and nucleic-acid strands keep from a name: room kept round it where there is
 # any, and its routing keep-out (label_boxes) grown by _NAME_ROUTE
-_NAME_ROUTE = 0.15  # (a wider keep-out forces loops over it where room is short)
-_NAME_OPEN = _NAME_ROUTE + 0.1  # page units a name keeps from a loop's way out of an element's end (_ways_out, 0.2
-# either side of it) at the least: its routing keep-out (_NAME_ROUTE out) 0.1 off the way, with a route's clearance
-# (route._INFLATE, 0.15), leaves the cells along the way's middle free, half a cell (route.RES) either side of it, so
-# a route can leave the end (random-100 held-out 7NZ2's domains view: "D1 · B1" 0.08 from A1:1330-1337's way out,
-# with no room to keep, closed it); a leader's keep-out keeps the same 0.1
+_NAME_ROUTE = 0.15  # (a wider keep-out forces loops over it where room is short); also the least a name keeps from
+# a loop's way out of an element's end (_ways_out, 0.2 either side of it), room or not (random-100 held-out 7NZ2's
+# domains view: "D1 · B1" 0.08 from A1:1330-1337's way out, with no room to keep, closed it). Plan 28 Task 9.3
+# (ruling Q46) pruned the 0.1 more it kept (_NAME_OPEN): turned off, the third sample's domains view, its default
+# view, the NA sets, the domain sets, the bench and the suite measured identical (docs/validation/prune/report.md)
 _NAME_NEAR_NT = 0.3  # page units a name keeps from a nucleotide of an unpaired strand, beyond its letter
 _NAME_STUB = 0.8  # page units: the straight run of a loop out of an element's end, kept clear of a name
 _SHORT_LOOP = 6.0  # page units: a loop whose ends are this near takes the short way between them, kept clear too
@@ -6255,8 +6254,8 @@ def _place_domain_names(layout: Layout, sses: list[SSE], font_scale: float = 1.0
     """Each drawn domain's name (Layout.domain_names), in domain order, at the first clear place (_name_obstacles,
     and the unpaired strands' traces) of _name_spots: its panel's top left and top right on the top edge, then
     along that edge, then outside with a short leader (Layout.domain_leaders). Clear: of the obstacles with the room
-    loops keep (_NAME_KEEP), then without it, and in both with room for a route out of every element's end
-    (_NAME_OPEN: by the name and its leader). When nothing is clear, the first place clear of all but the sheet
+    loops keep (_NAME_KEEP), then without it, and in both off every element's way out of its end (_NAME_ROUTE: by
+    the name; its leader off the ways out). When nothing is clear, the first place clear of all but the sheet
     plates (a name reads on a plate; random-100 C2b-2: 7JU4's D2 of chain m lies inside a large sheet's plate, and
     its name took the top left, on four loops' ways out of their ends); else, of the places clear but for that room
     (else of all), the one that leaves the ways out the most (random-100 held-out 7NZ2: a name falling back to the
@@ -6276,10 +6275,10 @@ def _place_domain_names(layout: Layout, sses: list[SSE], font_scale: float = 1.0
     stem_ways = _stem_ways(layout)
 
     def clear(box, foot, margin, solid=solid, room=True) -> bool:
-        """Is the place clear: with `room`, leaving every way out of an end room for a route (_NAME_OPEN)."""
+        """Is the place clear: with `room`, keeping off every way out of an end (_NAME_ROUTE)."""
         if overlaps_any(_grown(box, margin), solid + ways) or _trace_hits(_grown(box, _NAME_NEAR_NT), traces):
             return False
-        if room and overlaps_any(_grown(box, max(margin, _NAME_OPEN)), outs):  # room for a route out of every end
+        if room and overlaps_any(_grown(box, max(margin, _NAME_ROUTE)), outs):  # off the way out of every end
             return False
         if any(_box_meets_body(_grown(box, letters), d) for d in layout.stems):  # a stem, with its letters
             return False
@@ -6293,20 +6292,20 @@ def _place_domain_names(layout: Layout, sses: list[SSE], font_scale: float = 1.0
         if not room:
             return True
         # a leader may cross a loop, not stand on a loop's way out of an element's (or a stem's) end: its routing
-        # keep-out (label_boxes), with the room a name keeps, off the ways out, and room for a route out at the least
-        keep = _grown((x - 0.1, min(ya, yb), x + 0.1, max(ya, yb)), max(margin, _NAME_OPEN - _NAME_ROUTE))
+        # keep-out (label_boxes), with the room a name keeps, off the ways out
+        keep = _grown((x - 0.1, min(ya, yb), x + 0.1, max(ya, yb)), margin)
         return not overlaps_any(keep, outs) and not any(_box_meets_body(keep, w) for w in stem_ways)
 
     def room(box, foot) -> float:
         """The room a place leaves the ways out of the ends: the least gap between its routing keep-outs (the name's,
-        its leader's: label_boxes) and a way out (_ways_out), negative where they overlap; at most what a route
-        needs (_NAME_OPEN - _NAME_ROUTE), so places with enough room tie."""
+        its leader's: label_boxes) and a way out (_ways_out), negative where they overlap; at most 0, so places
+        clear of the ways tie."""
         keep = [_grown(box, _NAME_ROUTE)]
         if foot is not None:
             (x, ya), (_, yb) = foot
             keep.append((x - 0.1, min(ya, yb), x + 0.1, max(ya, yb)))
         gaps = [max(a[0] - b[2], b[0] - a[2], a[1] - b[3], b[1] - a[3]) for a in keep for b in outs]
-        return min([_NAME_OPEN - _NAME_ROUTE, *gaps])
+        return min([0.0, *gaps])
 
     for name, value in fields.values.items():
         size = DOMAIN_NAME_SIZE * em

@@ -323,7 +323,9 @@ def test_perturbations_round_ints_and_skip_what_does_not_change(sens):
 @needs_records
 def test_the_plan_is_the_inventorys_measured_and_named_entry_constants(sens):
     got = sens.plan()
-    assert got["constants"] == 64  # ruling Q28: 67 less the three demoted git rows
+    # ruling Q28: 67 less the three demoted git rows; plan 28 Task 9.3 (Q46) pruned two (layout:_NAME_OPEN,
+    # na_runs:_JOINT_NEAR) after this study measured them
+    assert got["constants"] == 62
     assert {s["id"] for s in got["not_perturbable"]} == {
         "cli:ROSETTE_ORDERS",
         "na_ends:_OFF_TURNS",
@@ -339,7 +341,7 @@ def test_the_plan_is_the_inventorys_measured_and_named_entry_constants(sens):
         ("membrane:JOIN_GAP", 0.75),
     }
     labels = [p["label"] for p in got["perturbations"]]
-    assert len(labels) == len(set(labels)) == 2 * 57 - len(got["skipped"])
+    assert len(labels) == len(set(labels)) == 2 * 55 - len(got["skipped"])
 
 
 def _pairs(*ids):

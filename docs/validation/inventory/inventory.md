@@ -79,16 +79,16 @@ every correction of a rule are by hand.
 
 | kind | items | biology | geometry | measured | named-entry | convention | unknown |
 |---|---|---|---|---|---|---|---|
-| constant | 590 | 62 | 25 | 28 | 36 | 102 | 337 |
+| constant | 588 | 62 | 25 | 28 | 34 | 102 | 337 |
 | default | 33 | 0 | 0 | 0 | 0 | 3 | 30 |
 | local | 1 | 0 | 0 | 0 | 0 | 0 | 1 |
 | comparison | 299 | 0 | 0 | 0 | 0 | 157 | 142 |
 | argument | 672 | 0 | 1 | 0 | 0 | 191 | 480 |
 | fallback | 24 | 0 | 0 | 0 | 4 | 1 | 19 |
 | fallback-marker | 29 | 0 | 0 | 0 | 3 | 0 | 26 |
-| all | 1648 | 62 | 26 | 28 | 43 | 454 | 1035 |
+| all | 1646 | 62 | 26 | 28 | 41 | 454 | 1035 |
 
-Of the 43 named-entry rows, 32 rest on the comment at the item and 11 on git (evidence starting `git:`: a commit whose message ties the value to the entries).
+Of the 41 named-entry rows, 30 rest on the comment at the item and 11 on git (evidence starting `git:`: a commit whose message ties the value to the entries).
 
 ## Named fallbacks (foldmap.fallback.FALLBACKS)
 
@@ -708,7 +708,7 @@ Of the 43 named-entry rows, 32 rest on the comment at the item and 11 on git (ev
 | `layout:NT_STEP` | constant | 0.55 | NT_STEP = 0.55 # spacing of unpaired nucleotides along a drawn single strand (schematic, not to scale) | unknown | earliest in this file: 72ceeed 2026-10-10 Stems placed as layout elements from the 3D structure and drawn as ladders | na_layout | - |
 | `layout:_HAIRPIN_STEP` | constant | 0.4545 | _HAIRPIN_STEP = 0.4545 # page units: the least step between neighbours on a hairpin loop, a bead's width (_TRACE_HALF, | geometry | "a bead's width (_TRACE_HALF" twice; earliest in this file: ed8d7f2 2026-10-17 A hairpin loop's circle grows until its nucleotides stand at least a contact bea… | - | - |
 | `layout:PIECE_GAP` | constant | 0.3 | PIECE_GAP = 0.3 # page units between two pieces of one helix drawn end to end (_bundle_item, _regroup_copies, | unknown | introduced by 4691767 (C2b-3: 6JLN, 9P1X, 7QUP), whose message calls it "the gap _bundle_item already used"; earliest in this file: 4691767 2026-10-16 A copy's sheets are never regrouped to mimic its mate; lone pieces stay with the… | - | - |
-| `layout:_STACK_PAD` | constant | 1.3 | _STACK_PAD = 1.3 # page units between two strands drawn end to end in one column: room for the loops leaving | measured | "swept 1.2-1.6 on the 37 sample entries with accessory strands (5 views) and the 30QM and 4YBB fixtures"; earliest in this file: a2fadd7 2026-10-15 C34 (random-100, batch C2a): a bulged continuation shares its strand's column | layout, sensitivity | - |
+| `layout:_STACK_PAD` | constant | 1.3 | _STACK_PAD = 1.3 # page units between two strands drawn end to end in one column: room for the loops leaving | measured | "swept 1.2-1.6 on the 37 sample entries with accessory strands (5 views) and the 30QM and 4YBB fixtures"; earliest in this file: a2fadd7 2026-10-15 C34 (random-100, batch C2a): a bulged continuation shares its strand's column | layout, prune, sensitivity | - |
 | `layout:_STACK_SHUT` | constant | 0.6 | _STACK_SHUT = 0.6 | named-entry:9P1X,8OZJ | "… either side standing past the gap's ends but for a sliver: 9P1X 0.15, 8OZJ 0.54), the loops leaving its facing ends have no way out, or squeeze thr…"; earliest in this file: 0df3a22 2026-10-16 A stack gap shut on both sides opens: the strand stacked last stands further off… | layout | - |
 | `layout:_STACK_OPEN` | constant | 0.85 | _STACK_OPEN = 0.85 | geometry | "two loops' grid cells, route.RES, each _INFLATE clear of the strands"; earliest in this file: 0df3a22 2026-10-16 A stack gap shut on both sides opens: the strand stacked last stands further off… | - | - |
 | `layout:_STACK_NUDGE` | constant | 1.0 | _STACK_NUDGE = 1.0 | named-entry:9P1X,8OZJ | git: 0df3a22's message: "by at most _STACK_NUDGE 1.0 in 0.05 steps" (9P1X, 8OZJ: slivers of 0.15 and 0.54) | - | - |
@@ -765,8 +765,7 @@ Of the 43 named-entry rows, 32 rest on the comment at the item and 11 on git (ev
 | `layout:_NAME_STEP` | constant | 0.25 | _NAME_STEP = 0.25 # page units between the places tried along the top edge | unknown | earliest in this file: 498a910 2026-10-12 Domain panels follow their elements and keep apart; names on clear plates (4OO8,… | - | - |
 | `layout:_NAME_CLEAR` | constant | 0.08 | _NAME_CLEAR = 0.08 # page units a name keeps from anything else | unknown | earliest in this file: 498a910 2026-10-12 Domain panels follow their elements and keep apart; names on clear plates (4OO8,… | - | - |
 | `layout:_NAME_KEEP` | constant | 0.3 | _NAME_KEEP = 0.3 # page units loops and nucleic-acid strands keep from a name: room kept round it where there is | unknown | earliest in this file: 94ddff9 2026-10-12 Domain names keep room from loops and the nucleic acid (4OO8 RuvC-II) | domains | - |
-| `layout:_NAME_ROUTE` | constant | 0.15 | _NAME_ROUTE = 0.15 # (a wider keep-out forces loops over it where room is short) | unknown | earliest in this file: 94ddff9 2026-10-12 Domain names keep room from loops and the nucleic acid (4OO8 RuvC-II) | domains | - |
-| `layout:_NAME_OPEN` | constant | _NAME_ROUTE + 0.1 | _NAME_OPEN = _NAME_ROUTE + 0.1 # page units a name keeps from a loop's way out of an element's end (_ways_out, 0.2 | named-entry:7NZ2 | "random-100 held-out 7NZ2's domains view: "D1 · B1" 0.08 from A1:1330-1337's way out" (comment carried under it); earliest in this file: bc0e375 2026-10-17 Held-out domain names and loops (plan 15 task 2): names and leaders off the ways… | domains | - |
+| `layout:_NAME_ROUTE` | constant | 0.15 | _NAME_ROUTE = 0.15 # (a wider keep-out forces loops over it where room is short); also the least a name keeps from | unknown | earliest in this file: 94ddff9 2026-10-12 Domain names keep room from loops and the nucleic acid (4OO8 RuvC-II) | domains | - |
 | `layout:_NAME_NEAR_NT` | constant | 0.3 | _NAME_NEAR_NT = 0.3 # page units a name keeps from a nucleotide of an unpaired strand, beyond its letter | unknown | "a leader's keep-out keeps the same 0.1 page units a name keeps from a nucleotide"; earliest in this file: 94ddff9 2026-10-12 Domain names keep room from loops and the nucleic acid (4OO8 RuvC-II) | - | - |
 | `layout:_NAME_STUB` | constant | 0.8 | _NAME_STUB = 0.8 # page units: the straight run of a loop out of an element's end, kept clear of a name | unknown | earliest in this file: 498a910 2026-10-12 Domain panels follow their elements and keep apart; names on clear plates (4OO8,… | domains | - |
 | `layout:_SHORT_LOOP` | constant | 6.0 | _SHORT_LOOP = 6.0 # page units: a loop whose ends are this near takes the short way between them, kept clear too | unknown | earliest in this file: 498a910 2026-10-12 Domain panels follow their elements and keep apart; names on clear plates (4OO8,… | - | - |
@@ -800,8 +799,8 @@ Of the 43 named-entry rows, 32 rest on the comment at the item and 11 on git (ev
 | `layout:_column_heights.way_out:comparison:1e-9@b6c36b98` | comparison | 1e-9 | if min(hi, b) - max(lo, a) < need - 1e-9: | convention | a floating-point tolerance | - | - |
 | `layout:_column_heights.shut:comparison:1e-9@f92b269f` | comparison | 1e-9 | if 0 < (y - half) - top <= room(q, k) + _STACK_NUDGE + 1e-9: | convention | a floating-point tolerance | route | - |
 | `layout:_column_heights.shut:comparison:1e-9@9513ea38` | comparison | 1e-9 | elif 0 < bottom - (y + half) <= room(k, q) + _STACK_NUDGE + 1e-9: | convention | a floating-point tolerance | route | - |
-| `layout:_column_heights.meets:comparison:1e-9@14fab0f5` | comparison | 1e-9 | height[q] - length(q) / 2 - room(k, q) - half + 1e-9 | convention | a floating-point tolerance | app, domains, elstyle, links +7 | - |
-| `layout:_column_heights.meets:comparison:1e-9@31e056c7` | comparison | 1e-9 | < height[q] + length(q) / 2 + room(q, k) + half - 1e-9 | convention | a floating-point tolerance | app, domains, elstyle, links +7 | - |
+| `layout:_column_heights.meets:comparison:1e-9@14fab0f5` | comparison | 1e-9 | height[q] - length(q) / 2 - room(k, q) - half + 1e-9 | convention | a floating-point tolerance | app, domains, elstyle, links +8 | - |
+| `layout:_column_heights.meets:comparison:1e-9@31e056c7` | comparison | 1e-9 | < height[q] + length(q) / 2 + room(q, k) + half - 1e-9 | convention | a floating-point tolerance | app, domains, elstyle, links +8 | - |
 | `layout:_open_at_ends:comparison:3@8f5bc337` | comparison | 3 | if not sheet.closed or n < 3 or len({s.chain for s in sheet.strands}) != 1: | unknown | - | template | - |
 | `layout:can_be_row:comparison:4@66f511f3` | comparison | 4 | return 4 <= len(sheet.strands) <= _BA_MAX and not sheet.ambiguous and all(k == "P" for k in sheet.pair_kinds) | unknown | - | template | - |
 | `layout:_kink_item:comparison:-0.5@5e4070af` | comparison | -0.5 | if turn < -0.5: # turned back: a hairpin beside the last piece, on the side the piece turns to | unknown | - | - | - |
@@ -823,7 +822,7 @@ Of the 43 named-entry rows, 32 rest on the comment at the item and 11 on git (ev
 | `layout:_off_walls:comparison:1e-9@5d0a7078#2` | comparison | 1e-9 | hits = np.argwhere((pen[..., 0] > 1e-9) & (pen[..., 1] > 1e-9) & walls.hard) | convention | a floating-point tolerance | membrane, na_curve | - |
 | `layout:_off_walls:comparison:1e-9@15c144c6` | comparison | 1e-9 | if px <= 1e-9 or py <= 1e-9: | convention | a floating-point tolerance | membrane, na_curve | - |
 | `layout:_off_walls:comparison:1e-9@15c144c6#2` | comparison | 1e-9 | if px <= 1e-9 or py <= 1e-9: | convention | a floating-point tolerance | membrane, na_curve | - |
-| `layout:_slide_clear.meets:comparison:4@05f1e9ad` | comparison | 4 | if len(o) < 4: | unknown | - | app, domains, elstyle, links +7 | - |
+| `layout:_slide_clear.meets:comparison:4@05f1e9ad` | comparison | 4 | if len(o) < 4: | unknown | - | app, domains, elstyle, links +8 | - |
 | `layout:_mass:argument:4@3d2e2b08` | argument | 4 | return sum(len(m.axial) / 4 if isinstance(m, PlacedStem) else 1 for m in it.members) | unknown | - | - | - |
 | `layout:_energy:argument:1e-12@cbf7475b` | argument | 1e-12 | dist = np.maximum(np.sqrt(g[:, 0] * g[:, 0] + g[:, 1] * g[:, 1]), 1e-12) | convention | a floating-point tolerance | optimiser, perf | - |
 | `layout:_energy_dense:argument:1e-12@cbf7475b` | argument | 1e-12 | dist = np.maximum(np.sqrt(g[:, 0] * g[:, 0] + g[:, 1] * g[:, 1]), 1e-12) | convention | a floating-point tolerance | na_layout, optimiser, perf | - |
@@ -885,8 +884,8 @@ Of the 43 named-entry rows, 32 rest on the comment at the item and 11 on git (ev
 | `layout:_name_obstacles:argument:0.2@f8c827df#2` | argument | 0.2 | ways.append((*(ends.min(axis=0) - 0.2), *(ends.max(axis=0) + 0.2))) | unknown | - | domains | - |
 | `layout:_place_domain_names.clear:argument:0.05@3961c6c1` | argument | 0.05 | if overlaps_any((x - 0.05, min(ya, yb), x + 0.05, max(ya, yb)), solid): | unknown | - | - | - |
 | `layout:_place_domain_names.clear:argument:0.05@3961c6c1#2` | argument | 0.05 | if overlaps_any((x - 0.05, min(ya, yb), x + 0.05, max(ya, yb)), solid): | unknown | - | - | - |
-| `layout:_place_domain_names.clear:argument:0.1@a0ebc66f` | argument | 0.1 | keep = _grown((x - 0.1, min(ya, yb), x + 0.1, max(ya, yb)), max(margin, _NAME_OPEN - _NAME_ROUTE)) | unknown | - | - | - |
-| `layout:_place_domain_names.clear:argument:0.1@a0ebc66f#2` | argument | 0.1 | keep = _grown((x - 0.1, min(ya, yb), x + 0.1, max(ya, yb)), max(margin, _NAME_OPEN - _NAME_ROUTE)) | unknown | - | - | - |
+| `layout:_place_domain_names.clear:argument:0.1@884a5dbf` | argument | 0.1 | keep = _grown((x - 0.1, min(ya, yb), x + 0.1, max(ya, yb)), margin) | unknown | - | - | - |
+| `layout:_place_domain_names.clear:argument:0.1@884a5dbf#2` | argument | 0.1 | keep = _grown((x - 0.1, min(ya, yb), x + 0.1, max(ya, yb)), margin) | unknown | - | - | - |
 | `layout:_place_domain_names.room:argument:0.1@c732ebcc` | argument | 0.1 | keep.append((x - 0.1, min(ya, yb), x + 0.1, max(ya, yb))) | unknown | - | - | - |
 | `layout:_place_domain_names.room:argument:0.1@c732ebcc#2` | argument | 0.1 | keep.append((x - 0.1, min(ya, yb), x + 0.1, max(ya, yb))) | unknown | - | - | - |
 | `layout:_place_domain_names:argument:0.1@14901bcb` | argument | 0.1 | spots = list(_name_spots(value > 0, fields.xs, fields.ys, size * _text_width(name) + 0.1, size * _NAME_HEIGHT)) | unknown | - | domains | - |
@@ -1198,7 +1197,6 @@ Of the 43 named-entry rows, 32 rest on the comment at the item and 11 on git (ev
 |---|---|---|---|---|---|---|---|
 | `na_runs:_BOW_MAX` | constant | 8 | _BOW_MAX = 8 # internal-loop sides up to this many nucleotides are drawn as bows, not routed | unknown | earliest in this file: b43695e 2026-10-11 Split route_na.py (1480 lines) into na_paths, na_runs, na_ends and na_labels | - | - |
 | `na_runs:_JOINT_STRAIGHT` | constant | 1.5 | _JOINT_STRAIGHT = 1.5 # a joint between two pieces of a bent duplex shorter than this may be drawn straight | unknown | earliest in this file: b43695e 2026-10-11 Split route_na.py (1480 lines) into na_paths, na_runs, na_ends and na_labels | - | - |
-| `na_runs:_JOINT_NEAR` | constant | 2.5 | _JOINT_NEAR = 2.5 # ... and, when no route reaches it, one shorter than this (9C75 P2b -> P2a, 1.83: random-100 C24), | named-entry:9C75 | "... and, when no route reaches it, one shorter than this (9C75 P2b -> P2a, 1.83: random-100 C24),"; earliest in this file: 0bb8b58 2026-10-17 A straight joint beyond 2.5 page units must leave its face within 60 degrees of … | na_layout | - |
 | `na_runs:_JOINT_REACH` | constant | 5.0 | _JOINT_REACH = 5.0 | named-entry:8VWQ | "…r piece: the duplex reads as carrying on (random-100 C2b-4: 8VWQ's P26a -> P26b, 4.41 apart but 76° off its face, stays a curve)"; earliest in this file: 324f501 2026-10-14 C24 (random-100): a joint no route reaches is drawn straight up to 2.5 units, no… | na_layout | - |
 | `na_runs:_JOINT_FORWARD` | constant | 0.5 | _JOINT_FORWARD = 0.5 | unknown | earliest in this file: 0bb8b58 2026-10-17 A straight joint beyond 2.5 page units must leave its face within 60 degrees of … | na_layout | - |
 | `na_runs:_JOINT_BENDS` | constant | (1.0, 1.5, 2.0, 0.5, 3.0) | _JOINT_BENDS = (1.0, 1.5, 2.0, 0.5, 3.0) | named-entry:8VWQ | "…irst clear taken: the duplex bends round; random-100 C2b-6 (8VWQ's P26a <-> P26b, 73-76° off their faces; P124a's pieces turned back)"; earliest in this file: 1ed1b1b 2026-10-17 A joint between two pieces of a bent duplex that no route or straight line reach… | sensitivity | - |
@@ -1807,7 +1805,7 @@ Of the 43 named-entry rows, 32 rest on the comment at the item and 11 on git (ev
 | `route:route_loops:argument:4@27d70797` | argument | 4 | rects = np.hstack([elements[0], np.array([r for _, r in keep_out], float).reshape(-1, 4).T]) | convention | an array's shape | 310, cli, domains, focus +25 | - |
 | `route:route_loops:comparison:1.5@b669155f` | comparison | 1.5 | if kinked and np.hypot(*gap) < 1.5 and gap @ pa.exit_c > 0: | unknown | line last changed by 63274b1 A copy's elements are grouped as its mate's where DSSP grouped them otherwise (C2b-3, A15: 9P1X, 7QUP, 6JLN) (git blame; evidence only) | 310, cli, domains, focus +25 | - |
 | `route:route_loops:comparison:1e-9@c1d86acf` | comparison | 1e-9 | if pts is None and grid.res > RES + 1e-9: # a page so large its grid is coarse: a fine grid round the ports | convention | a floating-point tolerance | 310, cli, domains, focus +25 | - |
-| `route:route_loops:fallback:loop_curve` | fallback | loop_curve | fallback.note("loop_curve", sum(lp.fallback for lp in out)) # the loops as drawn (A3, the notes) | unknown | - | floor, inventory, sensitivity | A3 "no route fallbacks" (gated); notes: loops_unrouted |
+| `route:route_loops:fallback:loop_curve` | fallback | loop_curve | fallback.note("loop_curve", sum(lp.fallback for lp in out)) # the loops as drawn (A3, the notes) | unknown | - | floor, inventory, prune, sensitivity | A3 "no route fallbacks" (gated); notes: loops_unrouted |
 | `route:route_loops:fallback:loop_over_text` | fallback | loop_over_text | fallback.note("loop_over_text", sum(lp.crosses_labels for lp in out)) # ... (A4, the notes) | unknown | - | - | A4 "no loop over a label" (gated); notes: loops_over_text |
 | `route:_in_box:argument:0.05@a4d098f3` | argument | 0.05 | n = max(1, int(math.dist(p, q) / 0.05)) | unknown | - | - | - |
 | `route:_in_box:comparison:1e-9@48e36be7` | comparison | 1e-9 | if box[0] - 1e-9 <= x <= box[2] + 1e-9 and box[1] - 1e-9 <= y <= box[3] + 1e-9: | convention | a floating-point tolerance | - | - |
@@ -1998,7 +1996,7 @@ Of the 43 named-entry rows, 32 rest on the comment at the item and 11 on git (ev
 | `symmetry:MIN_TURN` | constant | np.radians(10) | MIN_TURN = np.radians(10) # smaller rotations are lattice-like translations, not symmetry | unknown | earliest in this file: 0438931 2026-10-09 Rename to foldmap; add README | - | - |
 | `symmetry:MIN_RISE` | constant | 2.0 | MIN_RISE = 2.0 # Å along the axis per copy for a helical filament | unknown | earliest in this file: 0438931 2026-10-09 Rename to foldmap; add README | - | - |
 | `symmetry:MIN_TWIST` | constant | np.radians(3.0) | MIN_TWIST = np.radians(3.0) # a helical filament turns at least this much per copy (less: a translation) | unknown | earliest in this file: 24e5d40 2026-10-09 Symmetry: a helical filament needs a real twist (CI found pure translations read… | - | - |
-| `symmetry:MIN_HELIX_COPIES` | constant | 4 | MIN_HELIX_COPIES = 4 # copies on a screw before auto calls it helical (three: crystal packing, as in 1URN) | named-entry:1URN | "…before auto calls it helical (three: crystal packing, as in 1URN)"; earliest in this file: 19b1916 2026-10-11 Protein-only ASUs with several copies draw assembly 1; a 3-copy screw is no long… | - | - |
+| `symmetry:MIN_HELIX_COPIES` | constant | 4 | MIN_HELIX_COPIES = 4 # copies on a screw before auto calls it helical (three: crystal packing, as in 1URN) | named-entry:1URN | "…before auto calls it helical (three: crystal packing, as in 1URN)"; earliest in this file: 19b1916 2026-10-11 Protein-only ASUs with several copies draw assembly 1; a 3-copy screw is no long… | prune | - |
 | `symmetry:MIN_HELIX_COPIES_ASKED` | constant | 3 | MIN_HELIX_COPIES_ASKED = 3 # ... and when the user asks for "helical" | unknown | earliest in this file: b1c2790 2026-10-11 Tests at the helical threshold and the kind gate; the explicit-helical copy coun… | - | - |
 | `symmetry:_PSEUDO_21` | constant | 170.0 | _PSEUDO_21 = 170.0 # degrees: a helix turning more than this per copy is a pseudo-2₁ screw, its hand not named | unknown | earliest in this file: d184032 2026-10-09 Symmetry: a pseudo-2₁ screw reports its signed twist without naming a hand | - | - |
 | `symmetry:MAX_ORDER` | constant | 24 | MAX_ORDER = 24 | unknown | earliest in this file: 0438931 2026-10-09 Rename to foldmap; add README | - | - |

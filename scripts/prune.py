@@ -145,6 +145,30 @@ NOT_TRIED = {
 }
 
 
+# Candidates this task removed from the code (their inventory rows as measured, kept so the record still lists them)
+PRUNED = {
+    "layout:_NAME_OPEN": {"kind": "constant", "value": "_NAME_ROUTE + 0.1", "origin": "named-entry:7NZ2",
+                          "tests": "domains"},
+    "na_runs:_JOINT_NEAR": {"kind": "constant", "value": "2.5", "origin": "named-entry:9C75", "tests": "na_layout"},
+}  # fmt: skip
+# Candidates that met the prune condition and were not removed, and why (Q46's condition is necessary, not sufficient)
+HELD = {
+    "route:_MAX_NODES_PAGE": "it bounds the time a page's second route searches take (7QUP's focus view took 158 s of "
+    "its 180), and no measure judges time; identical says these sets never spend the budget. Its named entry 7QUP's "
+    "focus view drew identically without it, but 7NZ2's domains view (the held-out sample, which spends it: 6 "
+    "searches refused) did not: A4 and A6 newly failed, loop_over_text 0 -> 1, helix_name_moved 0 -> 1 (one "
+    "random100 run each way at 46f5ebf, outside Q46's measures). Removing it also removes route_second_search_refused "
+    "and the readability floor's route_budget reason",
+}
+# The named entries of the candidates that met the condition, looked at after the measures (informational, not Q46's)
+NAMED_LOOKS = (
+    "layout:_NAME_OPEN, 7NZ2 (held-out sample) domains view: keys identical (pass, failing A17 only, fallbacks, "
+    "area); its SVG differs (the name's place)",
+    "na_runs:_JOINT_NEAR, 9C75 default view: identical, SVG too (9C75 is also an NA control, measured above)",
+    "route:_MAX_NODES_PAGE, 7QUP focus view: identical, SVG too, 161.7 s both; 7NZ2 domains view: worse (see held)",
+)
+
+
 @functools.cache  # loaded once (the runs' threads share it)
 def _script(name: str):
     spec = importlib.util.spec_from_file_location(f"foldmap_prune_{name}", SCRIPTS / f"{name}.py")
@@ -166,12 +190,15 @@ def _stamp() -> dict:
 
 
 def candidates(md: Path = INVENTORY, sensitivity: Path = SENSITIVITY) -> list[dict]:
-    """Q46's candidates: the inventory's named-entry rows, then the sensitivity study's not-exercised constants not
-    among them: [{"id", "kind", "value", "origin", "tests", "not_exercised"}]."""
+    """Q46's candidates: the inventory's named-entry rows and the sensitivity study's not-exercised constants, with
+    those this task pruned from the code (PRUNED, no longer in the inventory) first:
+    [{"id", "kind", "value", "origin", "tests", "not_exercised"}]."""
     inv = _script("inventory")
     rows = inv.read_table(md.read_text(encoding="utf-8"))
     idle = json.loads(sensitivity.read_text(encoding="utf-8"))["not_exercised"]
-    out = []
+    out = [
+        {"id": i, **r, "not_exercised": i in idle, "pruned_in_code": True} for i, r in PRUNED.items() if i not in rows
+    ]
     for i, r in rows.items():
         if inv.origin_kind(r["origin"]) == "named-entry" or i in idle:
             out.append(
@@ -653,6 +680,9 @@ def build(runs: Path, stamp: dict, the_plan: dict | None = None) -> dict:
                 codes.add(got["code"])
         row = {k: t[k] for k in ("id", "kind", "value", "origin", "tests", "not_exercised", "off", "why", "perturb")}
         row |= {"view": t["view"], "measures": measures, **decide(measures, wanted_measures(t))}
+        if row["decision"] == "prune" and t["id"] in HELD:
+            row |= {"decision": "held", "held": HELD[t["id"]]}
+        row["removed"] = t["id"] in PRUNED
         rows.append(row)
     by_id = {r["id"]: r for r in rows}
     shared = [
@@ -686,6 +716,7 @@ def build(runs: Path, stamp: dict, the_plan: dict | None = None) -> dict:
             "shared": len(shared),
             "kept": decisions.count("keep"),
             "pruned": decisions.count("prune"),
+            "held": decisions.count("held"),
             "incomplete": decisions.count("incomplete"),
             "not_tried": len(not_tried),
             "kept_by_measure": dict(sorted(kept_by.items())),
@@ -696,6 +727,9 @@ def build(runs: Path, stamp: dict, the_plan: dict | None = None) -> dict:
         "shared": shared,
         "not_tried": not_tried,
         "pruned": [r["id"] for r in rows if r["decision"] == "prune"],
+        "removed": sorted(PRUNED),
+        "held": {i: HELD[i] for i in HELD if by_id.get(i, {}).get("decision") == "held"},
+        "named_looks": list(NAMED_LOOKS),
     }
 
 
@@ -757,6 +791,7 @@ def render(doc: dict) -> str:
         f"| tried (one value each, {c['shared']} measured with another's value) | {c['tried']} |",
         f"| kept | {c['kept']} |",
         f"| pruned | {c['pruned']} |",
+        f"| met the condition, held | {c['held']} |",
         f"| incomplete | {c['incomplete']} |",
         f"| not tried: needs code removal | {c['not_tried']} |",
         "",
@@ -795,7 +830,13 @@ def render(doc: dict) -> str:
     secs = doc["seconds"]
     lines += ["", "zl time: " + ", ".join(f"{m} {s / 3600:.2f} h" for m, s in secs.items()) + ".", ""]
     lines += ["## Pruned", ""]
-    lines += [f"- `{i}`" for i in doc["pruned"]] or ["None."]
+    lines += [f"- `{i}`" + (": removed from the code" if i in doc["removed"] else "") for i in doc["pruned"]] or [
+        "None."
+    ]
+    lines += ["", "## Met the condition, held", ""]
+    lines += [f"- `{i}`: {why}" for i, why in doc["held"].items()] or ["None."]
+    lines += ["", "## Named entries looked at (informational, not a measure of Q46)", ""]
+    lines += [f"- {t}" for t in doc["named_looks"]]
     lines += ["", "## Tried", "", "Each cell: the verdict, how many moves, the first.", ""]
     lines += ["| candidate | origin | value -> off | decision | kept by | r100 | view | na | domsets | bench | suite |",
               "|---|---|---|---|---|---|---|---|---|---|---|"]  # fmt: skip

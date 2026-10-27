@@ -30,11 +30,12 @@ from .route import _INFLATE, _clear, _curve, _Router, clip_len
 
 _BOW_MAX = 8  # internal-loop sides up to this many nucleotides are drawn as bows, not routed
 _JOINT_STRAIGHT = 1.5  # a joint between two pieces of a bent duplex shorter than this may be drawn straight
-_JOINT_NEAR = 2.5  # ... and, when no route reaches it, one shorter than this (9C75 P2b -> P2a, 1.83: random-100 C24),
-# or between pieces whose boxes touch
-# ... or, farther apart, one shorter than this that leaves its face at most 60° off its axis (_JOINT_FORWARD), keeps off
-# the stems' and domains' names and the protein loops, and runs into neither piece: the duplex reads as carrying on
-# (random-100 C2b-4: 8VWQ's P26a -> P26b, 4.41 apart but 76° off its face, stays a curve)
+# ... and, when no route reaches it, one between pieces whose boxes touch (plan 28 Task 9.3, ruling Q46, pruned the
+# near joint shorter than 2.5, _JOINT_NEAR, set for 9C75's P2b -> P2a: turned off, 9C75, the NA sets, the third
+# sample, the bench and the suite measured identical: docs/validation/prune/report.md)
+# ... or, between pieces that do not touch, one shorter than this that leaves its face at most 60° off its axis
+# (_JOINT_FORWARD), keeps off the stems' and domains' names and the protein loops, and runs into neither piece: the
+# duplex reads as carrying on (random-100 C2b-4: 8VWQ's P26a -> P26b, 4.41 apart but 76° off its face, stays a curve)
 _JOINT_REACH = 5.0
 _JOINT_FORWARD = 0.5
 # a joint no route reaches and no line or elbow may take is drawn as a smooth curve out of its face along the axis and
@@ -161,10 +162,10 @@ def _straight_joint(
     helix? Only going on forward (along fa's outward direction ea), clear by _INFLATE of every element and stem but its
     own two (a line that runs into one of those beyond a bead's radius is drawn as an _elbow instead where one is
     clear), and crossing no nucleic-acid strand drawn so far (`strands`, a _Strands) other than the partner strand of
-    this same joint (two strands may cross where the duplex carries on, as in a helix). Between pieces that are near
-    (faces closer than _JOINT_NEAR) or whose boxes touch; or farther apart, up to _JOINT_REACH, only when the line
+    this same joint (two strands may cross where the duplex carries on, as in a helix). Between pieces whose boxes
+    touch; or, between pieces that do not, up to _JOINT_REACH, only when the line
     also leaves its face within 60° of its axis (_JOINT_FORWARD), runs into neither piece, and keeps off every name
-    (`names`, as _off_names) and protein loop (`loops`, a _Strands). The near and touching joints keep the old test:
+    (`names`, as _off_names) and protein loop (`loops`, a _Strands). The touching joints keep the old test:
     held to the names and loops too, two more of 4YBB's became plain curves, which cross more than a line does
     (random-100 C2b-4 fix round 1)."""
     a, b = da.rect, db.rect
@@ -173,7 +174,7 @@ def _straight_joint(
     line = _xy([fa, fb])
     if forward <= 0:
         return False
-    if not (gap < _JOINT_NEAR or touching):
+    if not touching:
         if gap >= _JOINT_REACH or forward < _JOINT_FORWARD * gap or _grazes(line, (da, db)):
             return False
         # _off_names judges a route between its faces (it drops the first and last point): doubled, the line itself

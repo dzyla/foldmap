@@ -1116,9 +1116,9 @@ def test_a_leader_keeps_off_the_way_out_of_a_helix_on_end():
     its middle, and over a panel round one helix on end (a piece narrower than the name: the name centred over it)
     that leader stood on the helix's way out of its top end: its loop could leave only over the leader (A4), and took
     the names' room on the way (A6). A leader keeps its routing keep-out (x +- 0.1) off every way out of an end
-    (_ways_out), by the name's room (_NAME_KEEP) where it can and by the room a route out needs at the least
-    (_NAME_OPEN); a name over a narrow piece tries its leader at either end of the edge under it (_name_spots), and
-    the loop leaves its port clear of every label."""
+    (_ways_out), by the name's room (_NAME_KEEP) where it can, else by its keep-out alone; a name over a narrow
+    piece tries its leader at either end of the edge under it (_name_spots), and the loop leaves its port clear of
+    every label."""
     from foldmap import layout as L
     from foldmap.route import route_loops
 
@@ -1130,7 +1130,7 @@ def test_a_leader_keeps_off_the_way_out_of_a_helix_on_end():
     assert abs((box[0] + box[2]) / 2 - a.c_port[0]) < 0.05  # centred over it: a leader from its middle on the way
     L._place_domain_names(lay, sses)
     (x, ya), (_, yb) = lay.domain_leaders[name]  # on its edge the name meets the way out, so it stands above
-    keep = L._grown((x - 0.1, min(ya, yb), x + 0.1, max(ya, yb)), L._NAME_OPEN - L._NAME_ROUTE)
+    keep = (x - 0.1, min(ya, yb), x + 0.1, max(ya, yb))
     assert not L.overlaps_any(keep, L._ways_out(lay)) and abs(x - a.c_port[0]) > 0.3
     (loop,) = route_loops(lay, sses, SimpleNamespace(prev=np.ones(40, bool)))
     assert not loop.fallback and not loop.crosses_labels
@@ -1139,8 +1139,9 @@ def test_a_leader_keeps_off_the_way_out_of_a_helix_on_end():
 def test_a_name_leaves_room_for_a_route_out_of_an_end(monkeypatch):
     """Random-100 held-out 7NZ2's domains view (A1:1330-1337>A1:1341-1343): with no place with room (_NAME_KEEP)
     clear, "D1 · B1" took one 0.08 from a helix's way out of its end; its routing keep-out with the routes'
-    clearance closed the way and the loop ran over two names. A name keeps _NAME_OPEN from every way out of an end,
-    room or not (here _NAME_KEEP is 0, so the first place clear is taken without room)."""
+    clearance closed the way and the loop ran over two names. A name keeps _NAME_ROUTE from every way out of an end,
+    room or not (here _NAME_KEEP is 0, so the first place clear is taken without room; plan 28 Task 9.3 pruned the
+    0.1 more it kept, _NAME_OPEN, on evidence)."""
     from foldmap import layout as L
     from foldmap.layout import PITCH, Placed
     from helpers import fake_sse
@@ -1155,11 +1156,11 @@ def test_a_name_leaves_room_for_a_route_out_of_an_end(monkeypatch):
     first, _ = _first_spot(lay)  # the strand's panel margin dents the edge: the first place may sink a little
     outs = L._ways_out(lay)
     assert np.allclose(s.c_port, port) and not L.overlaps_any(first, outs)
-    assert L.overlaps_any(L._grown(first, L._NAME_OPEN), outs)  # 0.1 from the way
+    assert L.overlaps_any(L._grown(first, L._NAME_ROUTE), outs)  # 0.1 from the way
     L._place_domain_names(lay, sses)
     got = lay.domain_names["D1"]
-    assert got != first and not L.overlaps_any(L._grown(got, L._NAME_OPEN), outs)
-    monkeypatch.setattr(L, "_NAME_OPEN", 0.0)
+    assert got != first and not L.overlaps_any(L._grown(got, L._NAME_ROUTE), outs)
+    monkeypatch.setattr(L, "_NAME_ROUTE", 0.0)
     L._place_domain_names(lay, sses)
     assert lay.domain_names["D1"] == first  # without it, the first place, closing the way
 

@@ -45,6 +45,18 @@ def test_the_tables_are_disjoint_and_a_shared_value_is_tried(prune):
     tables = [set(prune.DISABLE), set(prune.SHARED), set(prune.NOT_TRIED)]
     assert all(not (a & b) for i, a in enumerate(tables) for b in tables[i + 1 :])
     assert set(prune.SHARED.values()) <= set(prune.DISABLE)
+    assert set(prune.PRUNED) <= set(prune.DISABLE) and set(prune.HELD) <= set(prune.DISABLE)
+    assert not set(prune.PRUNED) & set(prune.HELD)
+
+
+def test_what_was_pruned_is_gone_from_the_code(prune, perturb):
+    """Q46: a pruned special case is removed by a code commit: its module no longer binds the name."""
+    import ast
+
+    for cid in prune.PRUNED:
+        module, name = cid.split(":", 1)
+        tree = ast.parse((ROOT / "src" / "foldmap" / f"{module}.py").read_text(encoding="utf-8"))
+        assert perturb.rewrite(tree, name, 0) == 0, cid
 
 
 def test_every_disabling_value_is_a_number_the_hook_sets_on_a_name_its_module_binds(prune, perturb):
@@ -52,7 +64,7 @@ def test_every_disabling_value_is_a_number_the_hook_sets_on_a_name_its_module_bi
     (perturb.rewrite inserts the value after that binding)."""
     import ast
 
-    for cid in prune.DISABLE:
+    for cid in set(prune.DISABLE) - set(prune.PRUNED):
         module, name, value = perturb.parse(prune.perturb_text(cid))
         assert value == prune.DISABLE[cid][0] and isinstance(value, (int, float)) and not isinstance(value, bool)
         tree = ast.parse((ROOT / "src" / "foldmap" / f"{module}.py").read_text(encoding="utf-8"))
@@ -171,13 +183,15 @@ def test_the_committed_record_is_stamped_and_adds_up():
     rows = doc["candidates"] + doc["shared"]
     assert c["candidates"] == len(rows) + len(doc["not_tried"])
     assert c["tried"] == len(rows) and c["not_tried"] == len(doc["not_tried"])
-    assert c["kept"] + c["pruned"] + c["incomplete"] == c["tried"]
+    assert c["kept"] + c["pruned"] + c["held"] + c["incomplete"] == c["tried"]
     assert c["incomplete"] == 0
     assert sorted(doc["pruned"]) == sorted(r["id"] for r in doc["candidates"] if r["decision"] == "prune")
     for r in doc["candidates"]:
         if r["decision"] == "keep":
             assert r["kept_by"], r["id"]
-        if r["decision"] == "prune":
+        if r["decision"] in ("prune", "held"):
             assert all(v and v["verdict"] in ("identical", "better") for v in r["measures"].values()), r["id"]
     assert doc["baselines"]["r100_deterministic"]["identical"]
+    assert doc["removed"] == sorted(doc["pruned"])  # every special case that met the condition and was not held
+    assert set(doc["held"]) == {r["id"] for r in doc["candidates"] if r["decision"] == "held"}
     assert (VALIDATION / "prune" / "report.md").read_text(encoding="utf-8").startswith("# Pruning on evidence")
