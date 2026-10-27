@@ -66,6 +66,11 @@
    "what": "tests/data/domains/cath_fresh.json: 11 chains of superfamilies none of the 33 has",
    "reason": "never tuned on (domain_score.held_out docstring), but gated in CI while the code changed: tests/test_domain_score.py fails if its mean overlap drops below .70"
   },
+  "hom_tuning": {
+   "tag": "tuning",
+   "what": "plan 13a's homologue tuning pairs (docs/validation/homologues/tuning.json: 11 positive, 4 negative)",
+   "reason": "the H1-H5 limits (criteria.LIMITS like_*) were frozen at 76fd936 while looking at this set's results (docs/validation/homologues/tuning-report.md)"
+  },
   "hom_heldout": {
    "tag": "unseen at c099787, historical",
    "what": "plan 13a's held-out homologue pairs (docs/validation/homologues/heldout.json: 30 positive, 10 negative)",
