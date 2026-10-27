@@ -122,6 +122,24 @@ def recorded_commits(name: str, data, repo=REPO) -> tuple[dict, str, list[str]]:
     return rec, how, problems
 
 
+def record_runs(data: dict, recorded: dict) -> dict:
+    """What a plan-28 record says of the code its runs measured, when that is not the code its stamp names (the
+    sensitivity record is re-rendered from runs made earlier): {"runs_code_fingerprint", "runs_code_since"} (the
+    record's own list of the src commits since its runs), {} when the record says nothing of it."""
+    out = {}
+    runs = data.get("code_fingerprint")
+    if runs and runs != recorded.get("code_fingerprint"):
+        out["runs_code_fingerprint"] = runs
+    since = data.get("code_since") or {}
+    if since.get("commits"):
+        out["runs_code_since"] = {
+            "measured_at": since.get("measured_at"),
+            "commits": [c["commit"] for c in since["commits"]],
+            "pruned": since.get("pruned", []),
+        }
+    return out
+
+
 def release_problems(head: str, release: str | None, fourth: dict | None, sample: dict | None) -> list[str]:
     """Why the harness commit `head` may not stand for the release (both full SHAs; `release` None: no --release) with
     the fourth sample's report and its sample.json as recorded_commits read them (`fourth`, `sample`; None when absent):
@@ -206,6 +224,8 @@ def main() -> int:
         problems += stop
         rec["measured_at"] = recorded
         rec["measured_at_from"] = how
+        if name.endswith("_record"):  # a record rendered from runs made by other code says which (sensitivity: F1)
+            rec.update(record_runs(data, recorded))
         if "sample" in recorded:  # a sample is a draw, not a measurement: code after it changes nothing in it
             continue
         commits = {r["commit"] for r in recorded.get("verified", []) if r["verified"]}

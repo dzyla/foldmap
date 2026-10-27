@@ -342,6 +342,16 @@ def test_run_all_needs_the_tag():
     assert not hasattr(_load("common"), "DEFAULT_COMMIT")
 
 
+def test_a_record_rendered_from_older_runs_says_so():
+    """F1/F2: the sensitivity record's stamp is its re-render's; extract also carries the code its runs measured."""
+    extract = _load("extract")
+    data = {"code_fingerprint": "4" * 16, "code_since": {"measured_at": "5f09684", "commits": [{"commit": "c0ffee0"}]}}
+    got = extract.record_runs(data, {"code_fingerprint": "d" * 16})
+    assert got == {"runs_code_fingerprint": "4" * 16,
+                   "runs_code_since": {"measured_at": "5f09684", "commits": ["c0ffee0"], "pruned": []}}  # fmt: skip
+    assert extract.record_runs({"code_fingerprint": "d" * 16}, {"code_fingerprint": "d" * 16}) == {}
+
+
 def test_extract_verifies_every_json_source():
     """Final review F7: no JSON campaign output (hom_summary included) escapes the stamp check."""
     extract, common = _load("extract"), _load("common")

@@ -65,7 +65,10 @@ transfer) are sources too (`common.CAMPAIGN`, the `_record` names): each is copi
 verified, and the code commits since it was made listed in `provenance.json`. No number is read from them yet, as the
 claims table quotes none; a number the paper takes from one gets a reader in `make_numbers.py` first, never a number
 typed by hand. A record is made at one commit from runs made at others (the sensitivity record's runs, the prune
-record's equivalence runs), so its several commits are listed, not refused.
+record's equivalence runs), so its several commits are listed, not refused. Where a record says its runs measured
+other code than its stamp names (its `code_fingerprint`; the sensitivity record's "Code since this run"), the
+provenance carries that too (`runs_code_fingerprint`, `runs_code_since`): the stamp of a re-rendered record is the
+re-render's, not the measurement's.
 
 ## Inputs outside git
 
