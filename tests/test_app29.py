@@ -4,6 +4,7 @@ sample taken and reported per stratum. No network: pools are stubbed, the figure
 
 import importlib.util
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -260,7 +261,7 @@ def test_ids_of_the_check_half_need_unseal(app29, monkeypatch, tmp_path, capsys)
     assert "Task N+1" in " ".join(capsys.readouterr().out.split())  # --help says --unseal is Task N+1's
 
 
-def test_entry_writes_its_record_and_run_ui_waits_for_task_2(app29, monkeypatch, tmp_path):
+def test_entry_writes_its_record(app29, monkeypatch, tmp_path):
     r100 = app29.random100()
     monkeypatch.setattr(r100, "resolve", lambda i: DATA / "1UBQ.cif")
     monkeypatch.setattr(
@@ -271,8 +272,73 @@ def test_entry_writes_its_record_and_run_ui_waits_for_task_2(app29, monkeypatch,
     assert rec["id"] == "1UBQ" and rec["source_stamp"] == app29.SOURCE_STAMP
     assert rec["app"]["keep"] == str(tmp_path / "1UBQ") and rec["file"]["name"] == "1UBQ.cif"
     assert rec["app"]["judge"] is True  # app29 judges; the campaign's view does not
-    with pytest.raises(NotImplementedError, match="Task 2"):
-        app29.main(["run", "--ui", "--out", str(tmp_path), "--ids", "1UBQ"])
+
+
+def test_run_ui_drives_the_page_for_the_tune_half_only(app29, monkeypatch, tmp_path, capsys):
+    """Plan 29 Task 2: --ui runs the page session (the `ui` child) for each tune-half id and never for a check-half
+    one; the report's `ui` is its record ("not run" for the check half, in report-check.json only), its totals count
+    the sessions that failed, and each row lists the sha256 of the files its folder kept."""
+    sample, tune, check = _planted_sample(app29, tmp_path)
+    r100 = app29.random100()
+    paged = []
+
+    def child(cmd, *, env, timeout, out, err):
+        what, i = cmd[cmd.index(str(app29.SCRIPT)) + 1 :][:2]
+        keep = Path(out).parent
+        if what == "entry":
+            rec = {"source_stamp": app29.SOURCE_STAMP, "app": {"refused": None, "error": None}}
+            (keep / "app.svg").write_text("<svg/>", encoding="utf-8")
+            (keep / "app.json").write_text(json.dumps(rec), encoding="utf-8")
+        else:
+            assert what == "ui" and env["FOLDMAP_APP_LOCAL_FILES"] == "0" and timeout == app29.UI_TIMEOUT
+            paged.append(i)
+            downs = {"dl_svg": {"bytes": 6, "sha256": "x", "ok": i != tune[0]}}
+            ui = {"exception": None, "harness_error": None, "errors": [], "stage": "edit", "downloads": downs}
+            ui["steps"] = ["load", "theme trace", "downloads"]
+            (keep / "ui.svg").write_text("<svg/>", encoding="utf-8")
+            (keep / "ui.json").write_text(json.dumps({"source_stamp": app29.SOURCE_STAMP, "ui": ui}), "utf-8")
+        return {"exit": 0, "seconds": 1.0, "max_rss_mb": 50.0, "timed_out": False}
+
+    monkeypatch.setattr(r100, "run_child", child)
+    record, run = tmp_path / "record", tmp_path / "run"
+    app29.main(["run", "--ui", "--out", str(run), "--sample", str(sample), "--record", str(record)])
+    assert sorted(paged) == sorted(tune)
+    rep = json.loads((record / "report.json").read_text(encoding="utf-8"))
+    assert rep["mixed_code"] is False
+    rows = {r["id"]: r for r in rep["entries"]}
+    assert sorted(rows) == sorted(tune) and all(rows[i]["ui"]["stage"] == "edit" for i in tune)
+    assert set(rows[tune[1]]["files"]) == {"app.svg", "ui.svg"}  # ui.json and the child's streams are not files kept
+    assert rep["totals"]["tune"]["ui_run"] == 3 and rep["totals"]["tune"]["ui_failed"] == 1  # a download not whole
+    assert rep["totals"]["check"]["ui_run"] == 0
+    sealed = json.loads((record / "report-check.json").read_text(encoding="utf-8"))
+    assert all(r["ui"] == "not run" for r in sealed["entries"])
+    md = (record / "report.md").read_text(encoding="utf-8")
+    assert "## The page (run --ui)" in md and f"| {tune[0]} | edit |" in md and all(i not in md for i in check)
+    said = capsys.readouterr().out
+    assert f"{tune[0]}: drawn; page failed" in said and all(i not in said for i in check)
+    with pytest.raises(SystemExit, match="check half"):
+        app29.main(["ui", check[0], "--out", str(run), "--sample", str(sample)])
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="isolated jobs need forkserver")
+def test_the_page_session_draws_changes_the_theme_and_presses_every_download(app29, monkeypatch, tmp_path):
+    """ui_session on 1UBQ (from the cache, no network), hosted: drawn, the theme changed, six files, each whole."""
+    from app_helpers import fresh_caches, seed_cache
+
+    before = os.environ.get("FOLDMAP_APP_LOCAL_FILES")
+    (tmp_path / "pdb").mkdir()
+    seed_cache(monkeypatch, tmp_path / "pdb", "1UBQ")
+    fresh_caches()
+    keep = tmp_path / "keep"
+    keep.mkdir()
+    ui = app29.ui_session("1UBQ", keep)
+    assert ui["exception"] is None and ui["harness_error"] is None and ui["errors"] == [], ui
+    assert ui["stage"] == "edit" and ui["steps"][0] == "load" and ui["steps"][1].startswith("theme ")
+    assert ui["steps"][-1] == "downloads" and set(ui["downloads"]) == set(app29.UI_FILES)
+    assert all(d["ok"] and d["bytes"] > 0 for d in ui["downloads"].values()), ui["downloads"]
+    assert sorted(f.name for f in keep.iterdir()) == sorted(app29.UI_FILES.values())
+    assert os.environ.get("FOLDMAP_APP_LOCAL_FILES") == before  # hosted for the session only
+    fresh_caches()
 
 
 def test_a_failed_app_draw_fails_the_view(random100, monkeypatch, tmp_path, capsys):

@@ -6,6 +6,7 @@ the draw and for downloads; not run in CI). A thin driver over scripts/random100
     python scripts/app29.py draw
     python scripts/app29.py split [--sample docs/validation/app29/sample.json]
     python scripts/app29.py run --out DIR [--ids A,B] [--sample ...] [--jobs 1] [--record RECORD_DIR] [--ui]
+    python scripts/app29.py ui ID --out DIR   (run --ui's child: one tune-half id through the app's page)
 
 draw runs random100's sampler with plan 29's call (DRAW: seed 20261027, entries released after 2026-10-13 and on or
 before 2026-10-27, the three earlier samples' ids excluded, no AlphaFold DB model: ruling Q61) into
@@ -25,7 +26,13 @@ settings, the PNG download (app_jobs.figure_file, files_job) and judges the figu
 does (A1-A20 and R1, the readability floor). Each entry writes DIR/<id>/app.json, app.svg, app.png and its child's
 stdout.txt and stderr.txt; run writes DIR/report.json and DIR/report-check.json. With --record RECORD_DIR it also
 writes report.json, report-check.json and report.md there, stamped with the code that ran (foldmap.source_stamp).
---ui adds the headless AppTest session (plan 29 Task 2).
+--ui adds, for each tune-half id, the visitor's session (plan 29 Task 2, `ui`, a child process per entry, killed
+after UI_TIMEOUT seconds): the app's own page driven headless (streamlit AppTest, through tests/app_helpers.py, as the
+app's tests drive it), hosted (FOLDMAP_APP_LOCAL_FILES=0): the id typed and Draw pressed, the theme changed once, then
+every download button pressed (the callable a click runs on the server: app_helpers.press). It writes DIR/<id>/ui.json
+and the files the buttons gave (ui.svg, ui.png, ui.pdf, ui-layout.yaml, ui-data.json, ui-data.zip); the report's
+`ui` per entry is that record, "not run" without --ui and always for the check half (never driven through the page).
+Each entry's row lists the sha256 of every figure and file kept in its folder ("files").
 
 The check half is sealed (rulings P29-4, P29-5): report.json, report.md and the console name no check-half id (it is
 in the totals only); its rows are in report-check.json alone, read only by load_both (Task N+1's before/after;
@@ -63,6 +70,17 @@ SAMPLE = OUT / "sample.json"
 SEED = 20261027
 CHECK_SHARE = 0.4  # of the sample measured on, never tuned on: the plan's 60/40 (ruling P29-2)
 ENTRY_TIMEOUT = 900.0  # s: one entry's process (the draw job's 90 s, the PNG, the redraw and the checks)
+UI_TIMEOUT = 1800.0  # s: one entry's page session (two draws and six downloads, each job under the hosted 90 s)
+UI_STEP = 600.0  # s: AppTest's wait for one run of the page (a draw job is killed at 90 s)
+UI_FILES = {  # download button key -> the file kept of what it gave
+    "dl_svg": "ui.svg",
+    "dl_png": "ui.png",
+    "dl_pdf": "ui.pdf",
+    "dl_layout": "ui-layout.yaml",
+    "dl_data_json": "ui-data.json",
+    "dl_data_zip": "ui-data.zip",
+}
+UI_MAGIC = {"dl_svg": b"<svg", "dl_png": b"\x89PNG", "dl_pdf": b"%PDF", "dl_data_zip": b"PK"}  # how each file starts
 DRAW = [  # plan 29 Task 1 Step 1, as given; --no-alphafold: ruling Q61
     "sample",
     "--seed",
@@ -233,6 +251,120 @@ def run_one(i: str, out: Path, key: str | None = None) -> dict:
     return rec
 
 
+def _app_helpers():
+    """tests/app_helpers.py as a module: the page driven as the app's tests drive it."""
+    spec = importlib.util.spec_from_file_location("app_helpers_app29", ROOT / "tests" / "app_helpers.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def ui_session(i: str, keep: Path) -> dict:
+    """One visitor's session on the app's page (hosted): type `i`, press Draw; change the theme once; press every
+    download button. {"exception": the page's uncaught exception (str) or None, "errors": [{"step", "text"}] (the
+    page's st.error), "warnings": the same of st.warning, "steps": what was done, "stage": the page's last,
+    "downloads": {key: {"bytes", "sha256", "ok"} or {"error"}}, "harness_error": what stopped the session outside
+    the page (an AppTest timeout), else None}. Each download's file is kept in `keep` (UI_FILES)."""
+    import pytest
+
+    helpers = _app_helpers()
+    rec: dict = {"exception": None, "errors": [], "warnings": [], "steps": [], "stage": None, "downloads": {}}
+    rec["harness_error"] = None
+
+    def seen(at, step: str) -> bool:
+        """The page after `step`: its errors and warnings kept; False when it raised (nothing more is done)."""
+        rec["steps"].append(step)
+        rec["stage"] = at.session_state["stage"] if "stage" in at.session_state else None
+        rec["errors"] += [{"step": step, "text": str(e.value)} for e in at.error]
+        rec["warnings"] += [{"step": step, "text": str(w.value)} for w in at.warning]
+        if at.exception:
+            rec["exception"] = "\n".join(str(e.value) for e in at.exception)[:4000]
+            return False
+        return True
+
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setenv("FOLDMAP_APP_LOCAL_FILES", "0")  # the public app's mode: hosted limits, jobs in their own process
+        kept = helpers.keep_downloads(mp)
+        try:
+            at = helpers.load(helpers.app_test(UI_STEP), i)
+            if not seen(at, "load") or rec["stage"] != "edit":
+                return rec  # not drawn: what the page said is the record
+            box = at.selectbox(key="theme")
+            other = next(t for t in box.options if t != box.value)
+            box.select(other).run()
+            if not seen(at, f"theme {other}"):
+                return rec
+            for button in at.download_button:
+                key = button.key
+                try:
+                    data = helpers.press(at, key, kept)
+                except Exception as err:  # the button gave no file: said, the others still pressed
+                    rec["downloads"][key] = {"error": f"{type(err).__name__}: {err}"[:2000]}
+                    continue
+                name = UI_FILES.get(key, f"ui-{key}")
+                (keep / name).write_bytes(data)
+                ok = bool(data) and data.startswith(UI_MAGIC.get(key, b""))
+                rec["downloads"][key] = {"bytes": len(data), "sha256": hashlib.sha256(data).hexdigest(), "ok": ok}
+            rec["steps"].append("downloads")
+        except Exception as err:  # outside the page: AppTest's own timeout, a widget not found
+            rec["harness_error"] = f"{type(err).__name__}: {err}"[:2000]
+    return rec
+
+
+def cmd_ui(args) -> int:
+    """One tune-half id through the app's page (run --ui's child): OUT/<id>/ui.json and the files it downloaded. Never
+    a check-half id (its entries are never driven through the page: ruling P29-5)."""
+    sample = Path(args.sample)
+    doc = json.loads(sample.read_text(encoding="utf-8")) if sample.is_file() else {}
+    if args.id in ((doc.get("split") or {}).get("check") or []):
+        raise SystemExit("ui: that id is in the check half, which is never driven through the page")
+    keep = Path(args.out) / args.id
+    keep.mkdir(parents=True, exist_ok=True)
+    rec = {"id": args.id, "source_stamp": SOURCE_STAMP, "ui": ui_session(args.id, keep)}
+    text = json.dumps(rec, indent=1, default=str) + "\n"
+    (keep / "ui.json").write_text(text, encoding="utf-8", newline="\n")
+    return 0
+
+
+def run_ui(i: str, out: Path, sample: Path) -> tuple[dict, dict | None]:
+    """The entry's page session in its own process (cmd_ui): (its ui record, the stamp it ran under, or None when
+    run wrote the verdict itself)."""
+    r100 = random100()
+    keep = out / i
+    keep.mkdir(parents=True, exist_ok=True)
+    cmd = [sys.executable, "-I", "-W", "default", str(SCRIPT), "ui", i, "--out", str(out), "--sample", str(sample)]
+    env = {**os.environ, "OPENBLAS_NUM_THREADS": "1", "PYTHONHASHSEED": "0", "FOLDMAP_APP_LOCAL_FILES": "0"}
+    got = keep / "ui.json"
+    got.unlink(missing_ok=True)
+    proc = r100.run_child(cmd, env=env, timeout=UI_TIMEOUT, out=keep / "ui-stdout.txt", err=keep / "ui-stderr.txt")
+    if got.is_file():
+        rec = json.loads(got.read_text(encoding="utf-8"))
+        return {**rec["ui"], "process": proc}, rec.get("source_stamp")
+    err = keep / "ui-stderr.txt"
+    text = err.read_text(encoding="utf-8", errors="replace") if err.is_file() else ""
+    tail = text.strip().splitlines()[-1:] or [""]
+    why = "timed out" if proc["timed_out"] else f"exit {proc['exit']}: {tail[0][:300]}"
+    return {"exception": None, "harness_error": f"no result ({why})", "process": proc}, None
+
+
+def kept_files(folder: Path) -> dict[str, str]:
+    """name -> sha256 of the figures and files an entry kept (app.svg, app.png, the page session's ui files)."""
+    if not folder.is_dir():
+        return {}
+    names = sorted(f.name for f in folder.iterdir() if f.is_file() and f.name.startswith(("app.", "ui")))
+    skip = {"app.json", "ui.json", "ui-stdout.txt", "ui-stderr.txt"}
+    return {n: hashlib.sha256((folder / n).read_bytes()).hexdigest() for n in names if n not in skip}
+
+
+def ui_failed(ui) -> bool:
+    """A page session that raised, stopped, or whose download gave no whole file (an error shown is not a failure
+    by itself: a refusal is said with one)."""
+    if not isinstance(ui, dict):
+        return False
+    bad = any(not d.get("ok") for d in (ui.get("downloads") or {}).values())
+    return bool(ui.get("exception") or ui.get("harness_error") or bad)
+
+
 def _last_line(text: str | None) -> str | None:
     """A traceback's last line (what was raised), None without one."""
     lines = (text or "").strip().splitlines()
@@ -264,6 +396,8 @@ def row(rec: dict, half: str, stratum: str) -> dict:
         "svg_bytes": a.get("svg_bytes"),
         "png_bytes": a.get("png_bytes"),
         "process": rec.get("process"),
+        "files": rec.get("files", {}),
+        "ui": rec.get("ui", "not run"),
     }
 
 
@@ -295,10 +429,12 @@ def build_report(recs: list[dict], doc: dict | None, sample_path: Path | None) -
             "png_error": sum(1 for r in mine if r["png_error"]),
             "criteria_failed": sum(1 for r in drawn if r["criteria_failed"]),
             "floor_failed": sum(1 for r in drawn if r["floor_ok"] is False),
+            "ui_run": sum(1 for r in mine if isinstance(r["ui"], dict)),
+            "ui_failed": sum(1 for r in mine if ui_failed(r["ui"])),
         }
     out = {
         "source_stamp": SOURCE_STAMP,
-        **code_mix(r.get("source_stamp") for r in recs),
+        **code_mix([r.get("source_stamp") for r in recs] + [r["ui_stamp"] for r in recs if r.get("ui_stamp")]),
         "sample": None,
         "totals": totals,
         "entries": rows,
@@ -352,13 +488,15 @@ def render(rep: dict) -> str:
     lines += [
         "## Totals",
         "",
-        "| half | entries | drawn | refused | error | not measured | PNG error | criteria failed | floor failed |",
-        "|---|---|---|---|---|---|---|---|---|",
+        "| half | entries | drawn | refused | error | not measured | PNG error | criteria failed | floor failed "
+        "| page run | page failed |",
+        "|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     for half, n in t.items():
         lines.append(
             f"| {half} | {n['entries']} | {n['drawn']} | {n['refused']} | {n['error']} | {n['not_measured']} | "
-            f"{n['png_error']} | {n['criteria_failed']} | {n['floor_failed']} |"
+            f"{n['png_error']} | {n['criteria_failed']} | {n['floor_failed']} | {n.get('ui_run', 0)} | "
+            f"{n.get('ui_failed', 0)} |"
         )
     lines += [
         "",
@@ -386,6 +524,28 @@ def render(rep: dict) -> str:
         for r in said:
             what = r["error"] or r["measure_error"] or r["png_error"] or f"refused: {r['refused']}"
             lines.append(f"- {r['id']}: {str(what).splitlines()[0][:300]}")
+    ran = [r for r in shown if isinstance(r["ui"], dict)]
+    if ran:
+        lines += [
+            "",
+            "## The page (run --ui)",
+            "",
+            "Each tune-half id typed into the hosted app's page, Draw pressed, the theme changed once and every "
+            "download button pressed (AppTest; the check half is never driven through the page). Page failed: it "
+            "raised, the session stopped, or a download gave no whole file.",
+            "",
+            "| id | stage | steps | exception | errors shown | downloads whole | failed |",
+            "|---|---|---|---|---|---|---|",
+        ]
+        for r in ran:
+            u = r["ui"]
+            downs = u.get("downloads") or {}
+            whole = f"{sum(1 for d in downs.values() if d.get('ok'))}/{len(downs)}"
+            exc = _last_line(u.get("exception")) or _last_line(u.get("harness_error")) or "-"
+            lines.append(
+                f"| {r['id']} | {u.get('stage')} | {', '.join(u.get('steps') or []) or '-'} | {exc[:200]} | "
+                f"{len(u.get('errors') or [])} | {whole} | {'yes' if ui_failed(u) else '-'} |"
+            )
     return "\n".join(lines) + "\n"
 
 
@@ -428,8 +588,6 @@ def load_both(record_dir, out=None) -> dict:
 
 
 def cmd_run(args) -> int:
-    if args.ui:
-        raise NotImplementedError("Task 2")
     out = Path(args.out)
     sample_path = Path(args.sample)
     doc = json.loads(sample_path.read_text(encoding="utf-8")) if sample_path.is_file() else None
@@ -451,9 +609,14 @@ def cmd_run(args) -> int:
         )
 
     def one(i: str) -> dict:
-        rec = run_one(i, out, sealed_key(i, seed) if halves.get(i) == "check" else None)
-        if halves.get(i) != "check":  # the check half is counted, never named beside an outcome
-            print(f"{i}: {verdict(row(rec, '-', '-'))}", flush=True)
+        check = halves.get(i) == "check"
+        rec = run_one(i, out, sealed_key(i, seed) if check else None)
+        if args.ui and not check:  # the page session: the tune half only (P29-5: the check half never)
+            rec["ui"], rec["ui_stamp"] = run_ui(i, out, sample_path)
+        rec["files"] = kept_files(out / rec["dir"]) if rec.get("dir") else {}
+        if not check:  # the check half is counted, never named beside an outcome
+            ui = f"; page {'failed' if ui_failed(rec['ui']) else 'ok'}" if isinstance(rec.get("ui"), dict) else ""
+            print(f"{i}: {verdict(row(rec, '-', '-'))}{ui}", flush=True)
         return rec
 
     with ThreadPoolExecutor(max_workers=max(1, args.jobs)) as pool:
@@ -489,12 +652,16 @@ def main(argv=None) -> int:
         action="store_true",
         help="let --ids name check-half ids: for Task N+1 (the before/after measure) only, never while tuning a fix",
     )
+    u = sub.add_parser("ui", help="one tune-half id through the app's page, headless (run --ui's child)")
+    u.add_argument("id")
+    u.add_argument("--out", required=True)
+    u.add_argument("--sample", default=str(SAMPLE))
     e = sub.add_parser("entry", help="one id drawn the app's way (run's child)")
     e.add_argument("id")
     e.add_argument("--out", required=True)
     e.add_argument("--sealed", metavar="KEY", help="a check-half entry: write under OUT/sealed/KEY, naming no id")
     args = parser.parse_args(argv)
-    return {"draw": cmd_draw, "split": cmd_split, "run": cmd_run, "entry": cmd_entry}[args.cmd](args)
+    return {"draw": cmd_draw, "split": cmd_split, "run": cmd_run, "entry": cmd_entry, "ui": cmd_ui}[args.cmd](args)
 
 
 if __name__ == "__main__":

@@ -216,8 +216,8 @@ def fetch(
         pdb = text.upper()
         url = f"https://files.rcsb.org/download/{pdb}.cif"
         return _download(url, CACHE / f"{pdb}.cif", f"{pdb} from the PDB", pdb, max_bytes)
-    what = "a structure file, a PDB ID" if local else "a PDB ID"
-    raise ValueError(f"{text!r} is not {what} (e.g. 1LMB) or a UniProt accession (e.g. P04637)")
+    what = "a structure file, a PDB ID" if local else "a PDB ID"  # said as not found, as a 404 is (Review focus 1)
+    raise ValueError(f"{text!r} not found: it is not {what} (e.g. 1LMB) or a UniProt accession (e.g. P04637)")
 
 
 def source_id(text: str) -> str | None:
