@@ -35,6 +35,8 @@ from common import BUILD, CAMPAIGN, DEFAULT_COMMIT, REPO, SOURCES, TREE, TREE_PA
 from verify_stamp import verify_report
 
 CODE = ("src", "scripts")  # what can change a measurement
+# the sources whose stamps are verified: every JSON campaign output (hom_summary included: plan 28 final review F7)
+MEASURED = ("_report", "_sample", "_summary", "_record")
 
 
 def is_ancestor(a: str, b: str) -> bool:
@@ -148,7 +150,7 @@ def main() -> int:
         }
 
     for name, rec in sources.items():
-        if not name.endswith(("_report", "_sample")):
+        if not name.endswith(MEASURED):
             continue
         data = load_json(SOURCES / (CAMPAIGN[name][1] or "HEAD") / rec["path"])
         recorded, how, stop = recorded_commits(name, data)

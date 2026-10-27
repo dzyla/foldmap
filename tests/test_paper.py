@@ -274,6 +274,16 @@ def test_a_stamp_is_verified_against_the_commit_it_names(tmp_path, monkeypatch):
     out.write_text(json.dumps({"source_stamp": st}), encoding="utf-8")
     monkeypatch.setattr(verify, "REPO", tmp_path)
     assert verify.verify_report(verify.load(out), repo=tmp_path)[0]["verified"] is True
+    # final review F5: --commit (a short SHA included) never skips the dirty or the script check of a checkout's stamp
+    for commit in (head2, head2[:7]):
+        got = verify.verify_report({"source_stamp": dirty}, commit, repo=tmp_path)[0]
+        assert got["verified"] is False and "dirty" in got["why"], commit
+    for commit in (head, head[:7]):
+        got = verify.verify_report({"source_stamp": other_script}, commit, repo=tmp_path)[0]
+        assert got["verified"] is False and "differs" in got["why"], commit
+        assert verify.verify_report({"source_stamp": st}, commit, repo=tmp_path)[0]["verified"] is True
+    # a run stamp keeps its exemption: it is read from where the stamp sits
+    assert verify.verify_report(run, head[:7], repo=tmp_path)[0]["verified"] is True
 
 
 @needs_git
@@ -298,6 +308,36 @@ def test_extract_reads_commits_from_stamps_only_and_refuses_mixed_or_unquotable_
     forged = doc | {"source_stamp": st | {"code_fingerprint": "0" * 16}}
     assert any("not verified" in p for p in extract.recorded_commits("na_report", forged, repo=tmp_path)[2])
     assert rec["dirty"] is False and rec["source"] == "git" and rec["commits"] == [head]
+
+
+def test_extract_verifies_every_json_source():
+    """Final review F7: no JSON campaign output (hom_summary included) escapes the stamp check."""
+    extract, common = _load("extract"), _load("common")
+    json_sources = [n for n, (path, _) in common.CAMPAIGN.items() if path.endswith((".json", ".json.gz"))]
+    assert json_sources and all(n.endswith(extract.MEASURED) for n in json_sources)
+    assert "hom_summary" in json_sources
+
+
+@needs_git
+def test_m2_reads_the_na_rerun_as_extract_reads_a_source(tmp_path, monkeypatch):
+    """Final review F7: m2 stops on an NA rerun whose stamp does not verify, or that mixes code, as extract does; it
+    never labels such a file and uses it."""
+    from types import SimpleNamespace
+
+    from foldmap.source_stamp import code_mix, source_stamp
+
+    m2, extract = _load("m2"), _load("extract")
+    git, pkg, script, head = _repo_with_foldmap(tmp_path)
+    here = SimpleNamespace(recorded_commits=lambda name, data: extract.recorded_commits(name, data, repo=tmp_path))
+    monkeypatch.setitem(sys.modules, "extract", here)  # m2 imports extract's checker; here against this repository
+    st = source_stamp(script, package=pkg)
+    doc = {"source_stamp": st, **code_mix([st]), "entries": [{"entry": "1EHZ", "source_stamp": st}]}
+    assert m2._na_code(doc).endswith(", verified")
+    assert "no source stamp" in m2._na_code([{"entry": "1EHZ", "failed": []}])
+    with pytest.raises(SystemExit, match="not verified"):
+        m2._na_code(doc | {"source_stamp": st | {"code_fingerprint": "0" * 16}})
+    with pytest.raises(SystemExit, match="mixed_code"):
+        m2._na_code(doc | code_mix([st, st | {"code_fingerprint": "0" * 16}]))
     # ruling Q17: verified stamps at two commits (scripts/ is outside the code key) are a mixed report
     git("commit", "-q", "--allow-empty", "-m", "two")
     later = st | {"git": st["git"] | {"commit": git("rev-parse", "HEAD")}}

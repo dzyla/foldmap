@@ -479,16 +479,18 @@ def write_membrane_table(rows: list[dict]) -> None:
 
 
 def _na_code(raw) -> str:
-    """The NA rerun's code, as a source label: its own stamp, checked by verify_stamp (ruling Q11; Q18). A stamp that
-    does not verify (or a file from before the stamps) is labelled "no source stamp ...", never quoted at a commit."""
+    """The NA rerun's code, as a source label: its own stamp, checked as extract.py checks every source
+    (extract.recorded_commits: each stamp verified against its commit by verify_stamp, one commit only (Q17), no
+    mixed code, not marked not for the paper; rulings Q11, Q18). A problem stops the run (plan 28 final review F7);
+    a file from before the stamps is labelled "no source stamp ...", never quoted at a commit."""
     if not (isinstance(raw, dict) and raw.get("source_stamp")):
         return stamped_commit(raw)
-    from verify_stamp import verify_report
+    from extract import recorded_commits
 
-    checked = verify_report(raw)
-    if checked and all(r["verified"] for r in checked):
-        return f"{stamped_commit(raw)}, verified"
-    return "no source stamp verified (" + "; ".join(r["why"] for r in checked if not r["verified"]) + ")"
+    _, _, problems = recorded_commits("data/m2/na/report.json", raw)
+    if problems:
+        raise SystemExit("data/m2/na/report.json: " + "; ".join(problems))
+    return f"{stamped_commit(raw)}, verified"
 
 
 def build_pk(nb, committed_na: list[dict]) -> None:
