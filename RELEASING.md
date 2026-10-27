@@ -26,6 +26,9 @@ and tag the fixed commit with a new version. No release exists yet at that point
 
 The paper describes one frozen release. After its tag's workflow has passed:
 
-- regenerate the paper's numbers, tables and figures from that tag (`scripts/paper/README.md`; the environment is
-  `scripts/paper/requirements.lock`);
-- draw and run the fourth random sample once, in a clean checkout of that tag (`docs/validation/fourth-sample-protocol.md`).
+- draw and run the fourth random sample once, in a clean checkout of that tag (`docs/validation/fourth-sample-protocol.md`),
+  and commit it;
+- regenerate the records `docs/validation/freeze-checklist.md` lists;
+- regenerate the paper's numbers, tables and figures with `scripts/paper/run_all.sh TAG HARNESS`, HARNESS the commit
+  that adds the fourth sample (`scripts/paper/README.md`, "The tag and the harness commit"; the environment is
+  `scripts/paper/requirements.lock`).

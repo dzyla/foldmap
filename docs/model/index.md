@@ -66,6 +66,8 @@ The anti-drift test `tests/test_model_docs.py` reads every backticked name on th
   `docs/validation/random100-third/review.md`: the three random samples. Only the third was unseen when it ran (at
   7696947); none is unseen now. `docs/validation/fourth-sample-protocol.md` fixes the unseen fourth sample.
 - `docs/validation/na/report.md`: the nucleic-acid campaign (older code).
+- `docs/validation/freeze-checklist.md`: the records regenerated at the release, and the gaps accepted and written
+  down.
 
 ## Freeze rule
 
