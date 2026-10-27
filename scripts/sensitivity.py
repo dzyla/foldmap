@@ -2,9 +2,9 @@
 # Copyright (C) 2026 Dawid Zyla. Additional terms (AGPL-3.0 section 7(b)): see NOTICE.
 """How fragile foldmap's tuned constants are (plan 28 Task 9.2, rulings Q29, Q30): each module constant the inventory
 (docs/validation/inventory/inventory.md) gives the origin "measured" or "named-entry" is perturbed to x0.75 and x1.25,
-one at a time, and the random-100 campaign keys are measured on the third random sample. That sample is not among the
-samples and entries named in the inventory as tuning ones, but it has been run and looked at since plan 15: two of its
-entries are named by constants measured here (9FZL for route._MAX_NODES_WINDOWS, 6UW4 for membrane.JOIN_GAP; the
+one at a time, and the random-100 campaign keys are measured on the third random sample. That sample is not the
+tuning set (the first), but it has been run and looked at since plan 15: two of its entries are named by constants
+measured here (9FZL for route._MAX_NODES_WINDOWS, 6UW4 for membrane.JOIN_GAP; the
 report computes this from the origins that name entries, a lower bound), and the membrane constants were tuned in
 plan 26 with 6DQN, 6BO8, 6UW4 and 6QUE among the entries looked at. Never the fourth sample, whose protocol any look
 voids.
@@ -15,7 +15,8 @@ voids.
     python scripts/sensitivity.py run --stage B --out DIR           # the whole sample, every perturbation (Q30)
     python scripts/sensitivity.py run --stage X --out DIR           # which view reads each constant (one traced run)
     python scripts/sensitivity.py run --stage V --view membrane --survey X --default-stage B --out DIR
-    python scripts/sensitivity.py report --a A --b B [--survey X] [--view V ...]   # docs/validation/sensitivity/
+    python scripts/sensitivity.py report --a A --b B [--survey X] [--view V ...] [--plan-from REPORT]
+                                                                    # docs/validation/sensitivity/
 
 A perturbation is the value times the factor, an int rounded half away from zero; it is skipped and listed when that
 gives the same value or one that cannot be meant (an int count of 1 or more falling under 1). A tuple, a bool or any
@@ -46,7 +47,12 @@ entry passes here when no other A-criterion fails). A perturbation is stable whe
 sensitive when any does, fragile when the pass count moves by FRAGILE_PASS or more or a criterion that fails in no
 baseline entry fails in some entry; a constant takes the worse of its two perturbations, from stage B where it ran
 there (its stage V for one the default view does not read). Fragile constants are the limitations list for the
-paper."""
+paper.
+
+The report says which code changed after its runs (CODE_SINCE, with the prune record's pruned constants and default
+baseline: plan 28 final review F1); its classes describe the runs' code until stages B, V and X are rerun at the
+release (docs/validation/freeze-checklist.md). `report --plan-from` re-renders it from the kept runs with the plan as
+the record holds it (constants the code no longer has, pruned since, included), so nothing is run again."""
 
 from __future__ import annotations
 
@@ -78,6 +84,7 @@ SOURCE_STAMP = source_stamp(__file__)  # the code as this process starts (plan 2
 SCRIPTS = ROOT / "scripts"
 THIRD = ROOT / "docs" / "validation" / "random100-third"
 INVENTORY = ROOT / "docs" / "validation" / "inventory" / "inventory.md"
+PRUNE = ROOT / "docs" / "validation" / "prune" / "report.json"
 OUT = ROOT / "docs" / "validation" / "sensitivity"
 ENV = "FOLDMAP_PERTURB"  # scripts/perturb.py's
 FACTORS = (0.75, 1.25)  # ruling Q29: +-25 %
@@ -94,6 +101,27 @@ CLASSES = ("stable", "sensitive", "fragile")  # by worsening
 NOT_EXERCISED = "not exercised"  # ruling Q30: stable, and no view measured here read it: no evidence
 # the entries plan 26 tuned the membrane constants on (docs/superpowers/plans/2026-10-24-26-membrane-panel.md, Task 2)
 PLAN26_MEMBRANE = ("6DQN", "6BO8", "6UW4", "6QUE")
+# Plan 28 final review F1: the src commits after the runs' code (the src of MEASURED_AT, its fingerprint in the report)
+# up to the record's re-render, each with what it changed; the runs are not made again until the freeze
+MEASURED_AT = "5f09684"
+CODE_SINCE = (
+    ("ee5f34d", "deep checks (foldmap check --deep, --json): said, never drawn"),
+    ("ddc408c", "deep checks' fix round"),
+    ("24676d3", "NA fix F7 (nacheck: stems_nearer_frac only where an element can be nearer)"),
+    ("36adc3b", "NA fix F2 (layout, frame, cli, nacheck: each nucleic acid unrolled with the protomer holding it)"),
+    ("3380435", "NA fix F4 (na_ends, route_na: a gap meets a free end from the side it comes from)"),
+    ("218f4bb", "NA fix F6 (na_labels: where runs meet, the other run slides)"),
+    ("4aec81a", "NA fix round 1 (the unrolled judgement)"),
+    ("e060370", "NA fix round 1 (F4's straight chord limited to its reach)"),
+    ("17ddbbc", "NA fix round 1 (F6's slide loop)"),
+    ("eac6756", "the readability floor: said, never drawn"),
+    ("e6fcf36", "the readability floor's fix round"),
+    ("ba724ad", "the domain split confidence: said, never drawn"),
+    ("42e3fe8", "the domain split confidence's fix round"),
+    ("c64ea7a", "the prune: two special cases measured here removed"),
+    ("b730a05", "the prune's fix round (comments and docstrings)"),
+    ("702b4de", "the final review: --strict-floor fails closed, check's help text"),
+)
 
 
 def _squash(text: str, most: int = 80) -> str:
@@ -696,6 +724,7 @@ def build(
     survey: Path | None = None,
     the_plan: dict | None = None,
     sample: dict | None = None,
+    prune: Path | None = PRUNE,
 ) -> dict:
     """The report of stage A (folder `a`), B (`b`, or None before it runs) and the view stages (`views`), with stage
     X's survey (`survey`) of the views that read each constant, stamped with `stamp`. A constant's class is from
@@ -790,6 +819,59 @@ def build(
         "no_perturbation": sorted({s["id"] for s in the_plan["skipped"]} - set(rows)),
         "skipped": [{k: s[k] for k in ("id", "value", "factor", "why")} for s in the_plan["skipped"]],
         "not_perturbable": [{k: s[k] for k in ("id", "value", "why")} for s in the_plan["not_perturbable"]],
+        "code_since": code_since(rows, stage_b, prune),
+    }
+
+
+def code_since(rows: dict, stage_b: dict | None, prune: Path | None = PRUNE) -> dict:
+    """What changed in the code after the runs (plan 28 final review F1): CODE_SINCE, the measured constants the prune
+    record removed since, and its default baseline beside stage B's (the same sample, view and convention: A2 not
+    judged)."""
+    out: dict = {"measured_at": MEASURED_AT, "commits": [{"commit": c, "what": w} for c, w in CODE_SINCE]}
+    if prune is not None and prune.is_file():
+        rec = json.loads(prune.read_text(encoding="utf-8"))
+        out["pruned"] = [c for c in rec.get("pruned", []) if c in rows]
+        out["prune_commit"] = ((rec.get("source_stamp") or {}).get("git") or {}).get("commit")
+        out["prune_baseline"] = (rec.get("baselines") or {}).get("r100_passed")
+        out["prune_entries"] = (rec.get("baselines") or {}).get("r100_entries")
+    if stage_b:
+        out["baseline"], out["entries"] = stage_b["baseline_passed"], len(stage_b["entries"])
+    return out
+
+
+def plan_of_record(old: dict, items: list[dict] | None = None) -> dict:
+    """The plan as a committed report holds it (its constants' perturbations, the skipped and the not perturbable),
+    to re-render it from the kept runs when the code no longer has every constant it measured (a pruned one): the
+    values and perturbed values are the record's, never the code's now. Origins are the record's rows', else the
+    inventory's (`items`, constants() by default) for a skipped or not perturbable one; one in neither stops it."""
+    origins = {c["id"]: c["origin"] for c in (constants() if items is None else items)}
+    origins |= {r["id"]: r["origin"] for r in old["constants"]}
+    runs = []
+    for r in old["constants"]:
+        module, name = r["id"].split(":", 1)
+        for key, run in r["runs"].items():
+            f = float(key[1:])
+            runs.append(
+                {
+                    "id": r["id"],
+                    "module": module,
+                    "name": name,
+                    "origin": r["origin"],
+                    "value": r["value"],
+                    "factor": f,
+                    "new": run["new"],
+                    "label": label(r["id"], f),
+                    "perturb": f"{module}:{name}={run['new']!r}",
+                }  # fmt: skip
+            )
+    missing = sorted({s["id"] for s in [*old["skipped"], *old["not_perturbable"]]} - set(origins))
+    if missing:
+        raise SystemExit(f"no origin for {missing}: neither the record nor the inventory has them")
+    return {
+        "constants": len({*(r["id"] for r in old["constants"]), *old["no_perturbation"]}) + len(old["not_perturbable"]),
+        "perturbations": runs,
+        "skipped": [{**s, "origin": origins[s["id"]]} for s in old["skipped"]],
+        "not_perturbable": [{**s, "origin": origins[s["id"]]} for s in old["not_perturbable"]],
     }
 
 
@@ -850,6 +932,51 @@ def _stage_line(name: str, st: dict) -> str:
     )
 
 
+def _since_lines(doc: dict) -> list[str]:
+    """The "code since this run" section (plan 28 final review F1): [] for a report without code_since."""
+    since = doc.get("code_since")
+    if not since:
+        return []
+    by = ", ".join(f"{c['commit']} ({c['what']})" for c in since["commits"])
+    pruned = since.get("pruned") or []
+    lines = [
+        "## Code since this run",
+        "",
+        f"These runs measured foldmap code {doc['code_fingerprint']}, the src of {since['measured_at']}. The record "
+        "was re-rendered from the kept runs after the code changed, and nothing was run again. Commits to src since: "
+        f"{by}.",
+        "",
+    ]
+    if pruned:
+        lines += [
+            f"Measured here, pruned since: {', '.join(f'`{c}`' for c in pruned)} (removed from the code by the prune "
+            f"record, docs/validation/prune/report.md, at {str(since.get('prune_commit'))[:7]}); their rows below say "
+            "so.",
+            "",
+        ]
+    fragile = [r["id"] for r in doc["constants"] if r["class"] == "fragile"]
+    if "layout:_SIDE_CLEAR" in fragile:
+        lines += [
+            "The fragile constant `layout:_SIDE_CLEAR` places nucleic-acid stems, and what moved under it is mostly "
+            "nucleic-acid fallbacks (na_gap_unclear, na_tail_straight, na_run_unclear): the NA fixes F4 and F6 above "
+            "changed exactly those paths, so its class is this code's, not the release's.",
+            "",
+        ]
+    if since.get("prune_baseline") is not None and since.get("baseline") is not None:
+        lines += [
+            f"The default baseline moved: stage B here passes {since['baseline']} of {since['entries']} (A2 not "
+            f"judged); the prune record's baseline, the same sample, view and convention on later code, passes "
+            f"{since['prune_baseline']} of {since['prune_entries']}.",
+            "",
+        ]
+    lines += [
+        "The classes below describe the runs' code. Stages B, V and X are rerun at the release commit before the paper "
+        "quotes any class (docs/validation/freeze-checklist.md).",
+        "",
+    ]
+    return lines
+
+
 def render(doc: dict) -> str:
     a, b, vs = doc["stage_a"], doc["stage_b"], doc["view_stages"]
     stages = [("A", a), ("B", b), *((f"V ({v})", s) for v, s in vs.items())]
@@ -867,9 +994,8 @@ def render(doc: dict) -> str:
         "Every module constant the inventory gives the origin `measured` or `named-entry` was set to x0.75 and x1.25 "
         "of its value, one at a time, and the random-100 campaign keys were measured on the third random sample, in "
         "the default view, against an unperturbed baseline run the same way: stage A on a subset, stage B on the "
-        "whole sample for every constant. The third sample is not among the samples and entries named in the inventory "
-        "as tuning ones, but it has been "
-        "run and looked at since plan 15, and some constants were set with its entries among those looked at (below: "
+        "whole sample for every constant. The third sample is not the tuning set (the first), but it has been run "
+        "and looked at since plan 15, and some constants were set with its entries among those looked at (below: "
         "`named in the sample`, and the membrane constants); it is no unseen sample. The perturbation reaches every "
         "reader "
         "(scripts/perturb.py: the module is rewritten as it is imported, so `from ... import` binders, defaults and "
@@ -929,6 +1055,7 @@ def render(doc: dict) -> str:
             else ""
         ),
         "",
+        *_since_lines(doc),
         "## Counts",
         "",
         "| class | constants |",
@@ -1009,6 +1136,7 @@ def render(doc: dict) -> str:
         "| constant | origin | value | read in | x0.75 | x1.25 | class (stage) |",
         "|---|---|---|---|---|---|---|",
     ]
+    pruned = set((doc.get("code_since") or {}).get("pruned", []))
     for r in doc["constants"]:
         cells = []
         for f in ("x0.75", "x1.25"):
@@ -1020,8 +1148,9 @@ def render(doc: dict) -> str:
             cells.append(said.replace("|", "\\|"))
         st = {"A": a, "B": b}.get(r["stage"]) or vs.get(r["stage"])
         read = "-" if r["read_in"] is None else f"{r['read_in']}/{len(st['entries'])}" + "+" * r["read_judging"]
+        gone = " (pruned after this study: prune record)" if r["id"] in pruned else ""
         lines.append(
-            f"| `{r['id']}` | {r['origin']} | {r['value']} | {read} | {cells[0]} | {cells[1]} | "
+            f"| `{r['id']}`{gone} | {r['origin']} | {r['value']} | {read} | {cells[0]} | {cells[1]} | "
             f"{r['class'] or 'incomplete'} ({r['stage']}) |"
         )
     lines += ["", "## Skipped perturbations", ""]
@@ -1033,9 +1162,18 @@ def render(doc: dict) -> str:
 
 def cmd_report(args) -> int:
     views = [Path(v) for v in args.view or []]
+    old = json.loads(Path(args.plan_from).read_text(encoding="utf-8")) if args.plan_from else None
     doc = build(
-        Path(args.a), Path(args.b) if args.b else None, SOURCE_STAMP, views, Path(args.survey) if args.survey else None
+        Path(args.a),
+        Path(args.b) if args.b else None,
+        SOURCE_STAMP,
+        views,
+        Path(args.survey) if args.survey else None,
+        the_plan=plan_of_record(old) if old else None,
     )
+    if old:  # the plan, and so the inventory it was made from, is the record's
+        doc["plan_from"] = {"report": str(args.plan_from), "inventory_sha256": old.get("inventory_sha256")}
+        doc["inventory_sha256"] = old.get("inventory_sha256")
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     (out / "report.json").write_text(json.dumps(doc, indent=1) + "\n", encoding="utf-8", newline="\n")
@@ -1067,6 +1205,12 @@ def main(argv=None) -> int:
     w.add_argument("--view", action="append", help="a stage V folder (may be given more than once)")
     w.add_argument("--survey", help="stage X's folder")
     w.add_argument("--out", default=str(OUT))
+    w.add_argument(
+        "--plan-from",
+        metavar="REPORT",
+        help="a committed report.json whose plan (constants, values, perturbations) the runs were made with: "
+        "re-render from the kept runs when the code no longer has every constant measured (a pruned one)",
+    )
     w.set_defaults(func=cmd_report)
     args = ap.parse_args(argv)
     for var in (ENV, TRACE_ENV):  # this process runs unperturbed and untraced; it sets them for each run's child

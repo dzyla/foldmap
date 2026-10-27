@@ -417,6 +417,21 @@ def test_sensitivity_never_writes_into_the_third_sample():
 
 
 @needs_report
+def test_the_plan_of_the_record_is_the_plan_it_was_measured_with(sens):
+    """F1: the record re-renders from its kept runs with its own plan, the pruned constants included."""
+    doc = json.loads((VALIDATION / "sensitivity" / "report.json").read_text(encoding="utf-8"))
+    got = sens.plan_of_record(doc)
+    assert len(got["perturbations"]) == sum(len(r["runs"]) for r in doc["constants"])
+    assert {p["id"] for p in got["perturbations"]} == {r["id"] for r in doc["constants"]}
+    assert {"layout:_NAME_OPEN", "na_runs:_JOINT_NEAR"} <= {p["id"] for p in got["perturbations"]}
+    assert all(p["label"] == sens.label(p["id"], p["factor"]) for p in got["perturbations"])
+    assert [(s["id"], s["factor"]) for s in got["skipped"]] == [(s["id"], s["factor"]) for s in doc["skipped"]]
+    assert all(s["origin"] for s in [*got["skipped"], *got["not_perturbable"]])
+    with pytest.raises(SystemExit, match="no origin"):
+        sens.plan_of_record({**doc, "skipped": [{"id": "x:GONE", "value": 1, "factor": 0.75, "why": "-"}]}, items=[])
+
+
+@needs_report
 def test_the_committed_report_is_stamped_and_its_classes_add_up():
     doc = json.loads((VALIDATION / "sensitivity" / "report.json").read_text(encoding="utf-8"))
     assert doc["source_stamp"]["script"]["name"] == "scripts/sensitivity.py"
@@ -508,6 +523,19 @@ def test_build_classes_each_constant_from_its_deciding_stage(sens, tmp_path):
     md = sens.render(doc)
     assert "`m:MOVEB` (1ABC)" in md and "**Limits of the method.**" in md and "incomplete" in md
     assert doc["code_fingerprint"] == "f" * 16 and doc["run_commits"] == ["c" * 40]
+    assert "## Code since this run" in md and doc["code_since"]["measured_at"] == sens.MEASURED_AT
+    # final review F1: a measured constant the prune record removed since is said so, with its default baseline
+    prune = tmp_path / "prune.json"
+    prune.write_text(
+        json.dumps({"pruned": ["m:MOVEB", "x:OTHER"], "baselines": {"r100_passed": 2, "r100_entries": 2},
+                    "source_stamp": {"git": {"commit": "d" * 40}}}),
+        encoding="utf-8",
+    )  # fmt: skip
+    since = sens.build(a, b, sens.SOURCE_STAMP, the_plan=the_plan, sample=sample, prune=prune)["code_since"]
+    assert since["pruned"] == ["m:MOVEB"] and since["prune_baseline"] == 2 and since["baseline"] == 2
+    md = sens.render(sens.build(a, b, sens.SOURCE_STAMP, the_plan=the_plan, sample=sample, prune=prune))
+    assert "`m:MOVEB` (pruned after this study: prune record)" in md and "Measured here, pruned since" in md
+    assert "passes 2 of 2" in md
     # Q32: runs whose reports measured another foldmap are refused, never re-keyed into one report
     (tmp_path / "B").rename(tmp_path / "B-ok")
     b = _stage_folder(sens, tmp_path / "B", moved, reads, foreign=(sens.label("m:SKIP", 1.25),))
