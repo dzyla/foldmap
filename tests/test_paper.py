@@ -352,6 +352,18 @@ def test_a_record_rendered_from_older_runs_says_so():
     assert extract.record_runs({"code_fingerprint": "d" * 16}, {"code_fingerprint": "d" * 16}) == {}
 
 
+def test_the_release_tag_is_read_from_the_release_not_the_harness_commit(numbers):
+    """Re-review N1: at the release the harness commit adds the fourth sample after the tag, so no tag points at it;
+    release_tag comes from extract's --release, and only when that names a tag (not a bare commit)."""
+    tag = "v1.0.0"
+    after = {"tags_at_commit": [], "release": {"tag": tag, "commit": "a" * 40, "tags_at_commit": [tag]}}
+    assert numbers.release_tag(after)[0] == tag
+    dry = {"tags_at_commit": [], "release": {"tag": "HEAD", "commit": "a" * 40, "tags_at_commit": []}}
+    assert numbers.release_tag(dry) == (None, "")
+    at = {"tags_at_commit": [tag], "release": None}
+    assert numbers.release_tag(at)[0] == tag  # a harness commit the tag points at, with no --release
+
+
 def test_extract_verifies_every_json_source():
     """Final review F7: no JSON campaign output (hom_summary included) escapes the stamp check."""
     extract, common = _load("extract"), _load("common")

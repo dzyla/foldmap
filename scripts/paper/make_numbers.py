@@ -452,6 +452,18 @@ def write_r100_tables(summ: dict, reports: dict, first: dict):
                 )
 
 
+def release_tag(prov: dict) -> tuple[str | None, str]:
+    """The release's tag and how it was found: extract.py's --release (provenance.json "release"), when that names a
+    tag pointing at the release commit; else a tag pointing at the harness commit. At the release the harness commit
+    is the one adding the fourth sample, after the tag, so the tag is read from the release, not the harness commit
+    (plan 28 final re-review N1). (None, "") when neither names a tag (a dry run with --release COMMIT)."""
+    release = prov.get("release") or {}
+    if release.get("tag") and release["tag"] in (release.get("tags_at_commit") or []):
+        return release["tag"], f"git tag of the release (extract.py --release), commit {release['commit'][:7]}"
+    tags = prov.get("tags_at_commit") or []
+    return (tags[0], "git tag pointing at the harness commit") if tags else (None, "")
+
+
 def build_fourth(nb: Numbers) -> None:
     """The fourth sample's seed, cutoff and pass count with its Wilson interval (plan 28 final review F2), when
     extract.py found it at the harness commit (it checked its stamps name the release's commit); else its keys stay
@@ -932,9 +944,10 @@ def main() -> int:
     m2.build_pk(nb, na_rows(load_source("na_report")))
     m2.build_determinism(nb)
     tags = nb.prov.get("tags_at_commit") or []
+    tag, how = release_tag(nb.prov)
     for key, (stage, why) in PENDING.items():
-        if key == "release_tag" and tags:
-            nb.put(key, tags[0], tags[0], [], "git tag pointing at the harness commit")
+        if key == "release_tag" and tag:
+            nb.put(key, tag, tag, [], how)
             continue
         nb.keys.setdefault(key, {"value": None, "pending": stage, "why": why})
     sets = load_sets()
