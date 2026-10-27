@@ -1,18 +1,18 @@
 {
  "source_stamp": {
   "foldmap": "0.1.0",
-  "code_fingerprint": "e79936f0b9edb832",
+  "code_fingerprint": "d3481a10e388ea51",
   "package": "checkout",
-  "checkout_fingerprint": "e79936f0b9edb832",
+  "checkout_fingerprint": "d3481a10e388ea51",
   "installed_matches_checkout": true,
   "git": {
-   "commit": "6ca884c56b611d6bd94d61d2a9a6985458bc6681",
+   "commit": "aaee6de35d8ff08e260a777025804e12077e4c59",
    "dirty": false,
    "source": "asserted by runner"
   },
   "script": {
    "name": "scripts/metamorphic_record.py",
-   "sha256": "0c8095a92b40f92df0b432bc84deae8f1f5aaf70f55a874f4d2a12d2a74dce19"
+   "sha256": "bd909813405fc6ff2c250c61890ec999b50525a790175a8d119bb6f9c3426174"
   },
   "python": {
    "version": "3.13.13",
@@ -32,10 +32,10 @@
   }
  },
  "findings": {
-  "F1": "Chain names choose protomer 0: symmetry._orbits walks the chains in name order (symmetry.py:234), symmetry._protomers sorts the orbits by their first chain's name (symmetry.py:255) and breaks its ties by name (symmetry.py:259); protomer 0 is drawn on the left (cli._dyad_frame) or is the copy the others mirror (cli._mirror_frame); on an unrolled frame its nucleic-acid stems are the template its copies' stems are tied to (layout._stem_ties, plan 28 F2), and when protomer 0 holds no nucleic acid no stem is tied at all, so a renaming can change that figure in kind. A renaming that reverses the chains' name order moves the figure of an assembly of several deposited chains; its structure facts and check verdicts stay equal.",
-  "F2": "Base-pair H-bond window: foldmap calls a canonical pair whose Watson-Crick-edge H-bonds reach 3.8 \u00c5 (nucleic.HBOND_MAX, nucleic.py:16, applied at :147), one stretched to 4.0 \u00c5 (HBOND_STRETCH, :17, applied at :149); the kernel holds two of them to 3.5 \u00c5.",
-  "F3": "C1'-C1' window: foldmap accepts 9.0-12.0 \u00c5 (nucleic.C1_PAIR, nucleic.py:18, applied at :127 and :131); the kernel 9.5-11.5 \u00c5.",
-  "F4": "Planarity: foldmap drops a pair whose base planes are more than 45 degrees apart (nucleic.PLANE_MAX, nucleic.py:19, applied at :156); the kernel has no planarity bound."
+  "MF1": "Chain names choose protomer 0: symmetry._orbits walks the chains in name order (symmetry.py:234), symmetry._protomers sorts the orbits by their first chain's name (symmetry.py:255) and breaks its ties by name (symmetry.py:259); protomer 0 is drawn on the left (cli._dyad_frame) or is the copy the others mirror (cli._mirror_frame); on an unrolled frame its nucleic-acid stems are the template its copies' stems are tied to (layout._stem_ties, plan 28's NA fix F2), and when protomer 0 holds no nucleic acid no stem is tied at all, so a renaming can change that figure in kind. A renaming that reverses the chains' name order moves the figure of an assembly of several deposited chains; its structure facts and check verdicts stay equal.",
+  "MF2": "Base-pair H-bond window: foldmap calls a canonical pair whose Watson-Crick-edge H-bonds reach 3.8 \u00c5 (nucleic.HBOND_MAX, nucleic.py:16, applied at :147), one stretched to 4.0 \u00c5 (HBOND_STRETCH, :17, applied at :149); the kernel holds two of them to 3.5 \u00c5.",
+  "MF3": "C1'-C1' window: foldmap accepts 9.0-12.0 \u00c5 (nucleic.C1_PAIR, nucleic.py:18, applied at :127 and :131); the kernel 9.5-11.5 \u00c5.",
+  "MF4": "Planarity: foldmap drops a pair whose base planes are more than 45 degrees apart (nucleic.PLANE_MAX, nucleic.py:19, applied at :156); the kernel has no planarity bound."
  },
  "na_fixtures": [
   "1AOI.cif.gz",
@@ -499,8 +499,8 @@
      "recall": 1.0,
      "f1": 1.0
     },
-    "f2_pairs": 0,
-    "f2_not_in_rnapolis": []
+    "mf2_pairs": 0,
+    "mf2_not_in_rnapolis": []
    },
    "2OEU": {
     "mmcif": {
@@ -517,8 +517,8 @@
      "recall": 1.0,
      "f1": 1.0
     },
-    "f2_pairs": 0,
-    "f2_not_in_rnapolis": []
+    "mf2_pairs": 0,
+    "mf2_not_in_rnapolis": []
    },
    "4OO8": {
     "mmcif": {
@@ -535,8 +535,8 @@
      "recall": 0.9767,
      "f1": 0.9882
     },
-    "f2_pairs": 1,
-    "f2_not_in_rnapolis": []
+    "mf2_pairs": 1,
+    "mf2_not_in_rnapolis": []
    },
    "1KX5": {
     "mmcif": {
@@ -553,8 +553,8 @@
      "recall": 1.0,
      "f1": 1.0
     },
-    "f2_pairs": 8,
-    "f2_not_in_rnapolis": []
+    "mf2_pairs": 8,
+    "mf2_not_in_rnapolis": []
    },
    "1AOI": {
     "mmcif": {
@@ -571,8 +571,8 @@
      "recall": 0.9789,
      "f1": 0.9858
     },
-    "f2_pairs": 16,
-    "f2_not_in_rnapolis": [
+    "mf2_pairs": 16,
+    "mf2_not_in_rnapolis": [
      "I:28/J:265"
     ]
    }

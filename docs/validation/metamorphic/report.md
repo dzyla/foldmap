@@ -1,17 +1,19 @@
 # Metamorphic tests and independent kernels
 
-Plan 28 Task 7 (rulings Q34, Q35). Written by: foldmap 0.1.0, git 6ca884c56b61 (asserted by runner, dirty False), code fingerprint e79936f0b9edb832, scripts/metamorphic_record.py sha256 0c8095a92b40; Python 3.13.13 on Linux-7.0.0-38-generic-x86_64-with-glibc2.43; gemmi 0.7.5, numpy 2.5.4, scipy 1.18.1, networkx 3.7, matplotlib 3.11.2, PyYAML 6.0.3
+Plan 28 Task 7 (rulings Q34, Q35). Written by: foldmap 0.1.0, git aaee6de35d8f (asserted by runner, dirty False), code fingerprint d3481a10e388ea51, scripts/metamorphic_record.py sha256 bd909813405f; Python 3.13.13 on Linux-7.0.0-38-generic-x86_64-with-glibc2.43; gemmi 0.7.5, numpy 2.5.4, scipy 1.18.1, networkx 3.7, matplotlib 3.11.2, PyYAML 6.0.3
 
 What tests/test_metamorphic.py, tests/test_independent_kernels.py and tests/test_deep_check.py assert, measured on committed fixtures; the findings they pin with xfail(strict). The deep-check runs below are recorded runs (they need mkdssp and RNApolis), not tests.
 
 ## Findings
 
-- **F1.** Chain names choose protomer 0: symmetry._orbits walks the chains in name order (symmetry.py:234), symmetry._protomers sorts the orbits by their first chain's name (symmetry.py:255) and breaks its ties by name (symmetry.py:259); protomer 0 is drawn on the left (cli._dyad_frame) or is the copy the others mirror (cli._mirror_frame); on an unrolled frame its nucleic-acid stems are the template its copies' stems are tied to (layout._stem_ties, plan 28 F2), and when protomer 0 holds no nucleic acid no stem is tied at all, so a renaming can change that figure in kind. A renaming that reverses the chains' name order moves the figure of an assembly of several deposited chains; its structure facts and check verdicts stay equal.
-- **F2.** Base-pair H-bond window: foldmap calls a canonical pair whose Watson-Crick-edge H-bonds reach 3.8 Å (nucleic.HBOND_MAX, nucleic.py:16, applied at :147), one stretched to 4.0 Å (HBOND_STRETCH, :17, applied at :149); the kernel holds two of them to 3.5 Å.
-- **F3.** C1'-C1' window: foldmap accepts 9.0-12.0 Å (nucleic.C1_PAIR, nucleic.py:18, applied at :127 and :131); the kernel 9.5-11.5 Å.
-- **F4.** Planarity: foldmap drops a pair whose base planes are more than 45 degrees apart (nucleic.PLANE_MAX, nucleic.py:19, applied at :156); the kernel has no planarity bound.
+Named MF1-MF4 (metamorphic findings), apart from plan 28's NA fixes F1-F7 (docs/validation/na-fixes).
 
-F1, the order-reversing renaming (largest geometry gap, page units):
+- **MF1.** Chain names choose protomer 0: symmetry._orbits walks the chains in name order (symmetry.py:234), symmetry._protomers sorts the orbits by their first chain's name (symmetry.py:255) and breaks its ties by name (symmetry.py:259); protomer 0 is drawn on the left (cli._dyad_frame) or is the copy the others mirror (cli._mirror_frame); on an unrolled frame its nucleic-acid stems are the template its copies' stems are tied to (layout._stem_ties, plan 28's NA fix F2), and when protomer 0 holds no nucleic acid no stem is tied at all, so a renaming can change that figure in kind. A renaming that reverses the chains' name order moves the figure of an assembly of several deposited chains; its structure facts and check verdicts stay equal.
+- **MF2.** Base-pair H-bond window: foldmap calls a canonical pair whose Watson-Crick-edge H-bonds reach 3.8 Å (nucleic.HBOND_MAX, nucleic.py:16, applied at :147), one stretched to 4.0 Å (HBOND_STRETCH, :17, applied at :149); the kernel holds two of them to 3.5 Å.
+- **MF3.** C1'-C1' window: foldmap accepts 9.0-12.0 Å (nucleic.C1_PAIR, nucleic.py:18, applied at :127 and :131); the kernel 9.5-11.5 Å.
+- **MF4.** Planarity: foldmap drops a pair whose base planes are more than 45 degrees apart (nucleic.PLANE_MAX, nucleic.py:19, applied at :156); the kernel has no planarity bound.
+
+MF1, the order-reversing renaming (largest geometry gap, page units):
 
 | Fixture | gap | facts equal | verdicts equal |
 |---|---|---|---|
@@ -19,7 +21,7 @@ F1, the order-reversing renaming (largest geometry gap, page units):
 | 1LMB.cif | 0.75 | True | True |
 | 1BL8.cif | 15.8 | True | True |
 
-F2-F4, base pairs over 19 fixtures: both 820, only foldmap 54, only the kernel 5. By why: F2 (hbond) 44, F3 (c1) 6, F4 (plane) 5, glycosidic angle 1 (never alone), modified nucleotides 7 (outside the kernel's scope; not a finding).
+MF2-MF4, base pairs over 19 fixtures: both 820, only foldmap 54, only the kernel 5. By why: MF2 (hbond) 44, MF3 (c1) 6, MF4 (plane) 5, glycosidic angle 1 (never alone), modified nucleotides 7 (outside the kernel's scope; not a finding).
 
 - c1: 1AOI.cif.gz: I:11/J:282, 1AOI.cif.gz: I:28/J:265, 1HYS.cif.gz: E:867/F:887, 4LD0.cif.gz: D:12/F:22, 4YBB.cif.gz: AA:112/AA:330, 4YBB.cif.gz: AA:582/AA:760
 - plane: 1IHF.cif.gz: C:-37/E:37, 4YBB.cif.gz: AA:456/AA:476, 4YBB.cif.gz: AA:457/AA:475, 4YBB.cif.gz: AA:80/AA:89, 4YBB.cif.gz: AA:82/AA:87
@@ -75,10 +77,10 @@ Kernel only: the peptide neighbour's CO(i-1)...NH(i), which the energy formula p
 - D2 2LZM: pass (1.0000 of 164 residues agree (limit 0.99))
 - D2 1C3W: pass (1.0000 of 222 residues agree (limit 0.99))
 - D2 6ZS5: pass (1.0000 of 257 residues agree (limit 0.99))
-- D3 1EHZ: as committed unavailable (RNApolis could not read it: IndexError: string index out of range); as PDB pass (F1 1.000 (21 of 21 pairs, 21 in RNApolis; limit 0.95)); F2 pairs 0, not in RNApolis: none
-- D3 2OEU: as committed unavailable (RNApolis could not read it: IndexError: string index out of range); as PDB pass (F1 1.000 (20 of 20 pairs, 20 in RNApolis; limit 0.95)); F2 pairs 0, not in RNApolis: none
-- D3 4OO8: as committed unavailable (RNApolis could not read it: IndexError: string index out of range); as PDB pass (F1 0.988 (42 of 42 pairs, 43 in RNApolis; limit 0.95)); F2 pairs 1, not in RNApolis: none
-- D3 1KX5: as committed unavailable (RNApolis could not read it: IndexError: string index out of range); as PDB pass (F1 1.000 (146 of 146 pairs, 146 in RNApolis; limit 0.95)); F2 pairs 8, not in RNApolis: none
-- D3 1AOI: as committed unavailable (RNApolis could not read it: IndexError: string index out of range); as PDB pass (F1 0.986 (139 of 140 pairs, 142 in RNApolis; limit 0.95)); F2 pairs 16, not in RNApolis: I:28/J:265
+- D3 1EHZ: as committed unavailable (RNApolis could not read it: IndexError: string index out of range); as PDB pass (F1 1.000 (21 of 21 pairs, 21 in RNApolis; limit 0.95)); MF2 pairs 0, not in RNApolis: none
+- D3 2OEU: as committed unavailable (RNApolis could not read it: IndexError: string index out of range); as PDB pass (F1 1.000 (20 of 20 pairs, 20 in RNApolis; limit 0.95)); MF2 pairs 0, not in RNApolis: none
+- D3 4OO8: as committed unavailable (RNApolis could not read it: IndexError: string index out of range); as PDB pass (F1 0.988 (42 of 42 pairs, 43 in RNApolis; limit 0.95)); MF2 pairs 1, not in RNApolis: none
+- D3 1KX5: as committed unavailable (RNApolis could not read it: IndexError: string index out of range); as PDB pass (F1 1.000 (146 of 146 pairs, 146 in RNApolis; limit 0.95)); MF2 pairs 8, not in RNApolis: none
+- D3 1AOI: as committed unavailable (RNApolis could not read it: IndexError: string index out of range); as PDB pass (F1 0.986 (139 of 140 pairs, 142 in RNApolis; limit 0.95)); MF2 pairs 16, not in RNApolis: I:28/J:265
 
 Earlier RNApolis runs on whole downloaded entries, from older code: docs/validation/na/report.md.
