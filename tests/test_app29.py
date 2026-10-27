@@ -182,8 +182,16 @@ def test_the_report_states_the_shortfall_per_stratum(app29, monkeypatch, tmp_pat
     assert "Written by:" in md and f"{tune[0]}: refused: time" in md and f"| {tune[1]} |" in md
     said = capsys.readouterr().out
     assert f"{tune[0]}: refused" in said
-    for i in check:  # ... never named
-        assert i not in md and i not in said
+    for folder in (record, tmp_path / "run"):  # ruling P29-4: sealed in report-check.json, and nowhere else
+        shown = (folder / "report.json").read_text(encoding="utf-8")
+        for i in check:  # ... never named
+            assert i not in md and i not in said and i not in shown
+        sealed = json.loads((folder / "report-check.json").read_text(encoding="utf-8"))
+        assert sorted(r["id"] for r in sealed["entries"]) == sorted(check)
+        assert sealed["source_stamp"] == app29.SOURCE_STAMP
+    assert sorted(r["id"] for r in app29.load_tune(record)["entries"]) == sorted(tune)
+    both = app29.load_both(record)
+    assert sorted(r["id"] for r in both["entries"]) == sorted(tune + check) and both["totals"] == rep["totals"]
 
 
 def test_entry_writes_its_record_and_run_ui_waits_for_task_2(app29, monkeypatch, tmp_path):

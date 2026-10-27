@@ -23,10 +23,11 @@ python -I, killed after ENTRY_TIMEOUT seconds; its wall time, exit and max RSS f
 random100.app_view, which takes the size check, app_jobs.draw_job under the hosted limits with the app's default
 settings, the PNG download (app_jobs.figure_file, files_job) and judges the figure the app drew as `foldmap check`
 does (A1-A20 and R1, the readability floor). Each entry writes DIR/<id>/app.json, app.svg and app.png; run writes
-DIR/report.json. With --record RECORD_DIR it also writes report.json and report.md there, stamped with the code that
-ran (foldmap.source_stamp). --ui adds the headless AppTest session (plan 29 Task 2). report.md and the console name
-no check-half id beside an outcome (the check half is in the totals only); report.json keeps every entry's row, for
-the paired before/after measure.
+DIR/report.json and DIR/report-check.json. With --record RECORD_DIR it also writes report.json, report-check.json and
+report.md there, stamped with the code that ran (foldmap.source_stamp). --ui adds the headless AppTest session (plan
+29 Task 2). report.json, report.md and the console name no check-half id (the check half is in the totals only); its
+rows are sealed in report-check.json, read only by load_both, for the before/after measure (ruling P29-4); load_tune
+reads report.json alone.
 """
 
 from __future__ import annotations
@@ -350,12 +351,37 @@ def render(rep: dict) -> str:
     return "\n".join(lines) + "\n"
 
 
+CHECK_FILE = "report-check.json"  # the check half's rows, sealed apart from report.json (ruling P29-4)
+
+
 def write_report(rep: dict, folder: Path, md: bool) -> None:
+    """report.json (and with `md` report.md): the tune half per id, the check half in the totals only; the check
+    half's rows go to report-check.json alone (ruling P29-4), read back only by load_both."""
     folder.mkdir(parents=True, exist_ok=True)
-    rep = {**rep, "source_stamp": SOURCE_STAMP}
-    (folder / "report.json").write_text(json.dumps(rep, indent=1) + "\n", encoding="utf-8", newline="\n")
+    shown = {**rep, "source_stamp": SOURCE_STAMP, "entries": [r for r in rep["entries"] if r["half"] != "check"]}
+    sealed = {
+        "source_stamp": SOURCE_STAMP,
+        "what": "the check half's rows of report.json: for plan 29's before/after measure only (load_both)",
+        "entries": [r for r in rep["entries"] if r["half"] == "check"],
+    }
+    (folder / "report.json").write_text(json.dumps(shown, indent=1) + "\n", encoding="utf-8", newline="\n")
+    (folder / CHECK_FILE).write_text(json.dumps(sealed, indent=1) + "\n", encoding="utf-8", newline="\n")
     if md:
-        (folder / "report.md").write_text(render(rep), encoding="utf-8", newline="\n")
+        (folder / "report.md").write_text(render(shown), encoding="utf-8", newline="\n")
+
+
+def load_tune(record_dir) -> dict:
+    """A run's report as it may be read while fixing: report.json only (the tune half per id, the check half in the
+    totals)."""
+    return json.loads((Path(record_dir) / "report.json").read_text(encoding="utf-8"))
+
+
+def load_both(record_dir) -> dict:
+    """For Task N+1 only (plan 29's before/after measure, once the fixes are done): report.json joined with the check
+    half's rows from report-check.json. Never read while a fix is being tuned."""
+    rep = load_tune(record_dir)
+    sealed = json.loads((Path(record_dir) / CHECK_FILE).read_text(encoding="utf-8"))
+    return {**rep, "entries": rep["entries"] + sealed["entries"], "check_source_stamp": sealed["source_stamp"]}
 
 
 def cmd_run(args) -> int:
