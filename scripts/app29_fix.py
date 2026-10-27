@@ -473,12 +473,55 @@ def build(args) -> dict:
             for i in LOOK_CONCERNS
             if i in marks or i in marks_elsewhere
         ],
+        "since": since_last(args, after, third_a, na_a, ma, prune),
         "pngs": pngs,
         "worse": worse,
         "better": better,
         "verdict": "worse" if any(worse.values()) else "better" if any(better.values()) else "identical",
         "patch": patch,
     }
+
+
+def since_last(args, after: dict, third_a: dict, na_a: dict, ma: dict, prune) -> dict | None:
+    """The figures that changed since the fix's last record (`--since-*`: that record's tune run, its third-sample and
+    NA runs, and the marks its code drew for the figures that moved), each with its cause, read from its marks: which
+    mark moved, on or off a loop line, its tethers crossing text and its C9, then -> now."""
+    if not args.since_runs:
+        return None
+    prev = {e["id"]: e for e in json.loads(Path(args.since_record).read_text(encoding="utf-8"))["entries"]}
+    ids = {
+        e["id"]
+        for e in after["entries"]
+        if (e.get("files") or {}).get("app.svg") != (prev.get(e["id"], {}).get("files") or {}).get("app.svg")
+    }
+    for m, now in (("r100", third_a), ("na", na_a)):
+        ids |= set(prune.svg_moved(prune._campaign_keys(Path(args.since_runs) / m, "baseline", m)["svg"], now["svg"]))
+    mp = json.loads(Path(args.since_marks).read_text(encoding="utf-8"))["entries"]
+    rows = []
+    for i in sorted(ids):
+        was, now = mp.get(i), ma["entries"].get(i)
+        if was is None or now is None:
+            rows.append({"id": i, "cause": ["not measured"], "text_crossings": None, "c9": None})
+            continue
+        c = mark_changes(was, now)
+        why = []
+        for a, b in zip(was, now):
+            if a["centre"] == b["centre"]:
+                continue
+            off, on = a["on_loop"] > LINE_EPS and b["on_loop"] <= LINE_EPS, a["on_loop"] <= LINE_EPS < b["on_loop"]
+            fewer = (b.get("text_crossings") or 0) < (a.get("text_crossings") or 0)
+            if off and fewer:
+                why.append(f"{b['mark']}: its spot on the line was _mark_spot's fallback (a tether crossed text); the "
+                           "ranked spot off the line wins (fix round 1, I1)")  # fmt: skip
+            elif on and fewer:
+                why.append(
+                    f"{b['mark']}: the spot off the line it took at {args.since_label} was _mark_spot's fallback (a "
+                    "tether crossed text); the ranked spot on the line wins, as before the fix (fix round 1, I1)"
+                )
+            else:
+                why.append(f"{b['mark']}: moved with the marks above (their boxes and tethers keep it off)")
+        rows.append({"id": i, "cause": why, "text_crossings": c["text_crossings"], "c9": c["c9"]})
+    return {"label": args.since_label, "figures": rows}
 
 
 def _pair(x) -> str:
@@ -609,6 +652,22 @@ def render(doc: dict) -> str:
             f"{m['mark']} moved {m['moved']}, tethers {m['tethers'][0]} -> {m['tethers'][1]}" for m in x["moves"]
         )
         lines.append(f"- `{x['id']}`: {x['seen']}. {moves}")
+    if doc.get("since"):
+        lines += ["", f"## Changed since {doc['since']['label']} (the last record), and why", ""]
+        lines.append(
+            "Each figure that moved since that record, with its tethers crossing text and its C9 then -> now. C9 can "
+            "rise while the verdict stays better: _mark_spot's own order puts the text gate (a spot whose tethers "
+            "cross no text is ranked) before C9, and these marks lost a tether crossing text."
+        )
+        lines.append("")
+        for x in doc["since"]["figures"]:
+            nums = (
+                ""
+                if x["c9"] is None
+                else f" Tethers crossing text {_pair(x['text_crossings'])}; C9 {_pair(x['c9'])}"
+                + (" (C9 rises: the text gate comes first)." if x["c9"][1] > x["c9"][0] + C9_EPS else ".")
+            )
+            lines.append(f"- `{x['id']}`: {'; '.join(x['cause'])}.{nums}")
     lines += ["", "## Pictures (gitignored, for looking)", ""]
     for i, p in doc["pngs"].items():
         lines.append(f"- `{i}`: " + ", ".join(f"{k} {v}" for k, v in p.items()))
@@ -639,6 +698,10 @@ def main(argv=None) -> int:
     for k in ("before", "after", "runs-before", "runs-after", "marks-before", "marks-after", "pngs", "out"):
         r.add_argument(f"--{k}", required=True)
     r.add_argument("--patch", help="the fix as a patch, kept when the fix is reverted")
+    r.add_argument("--since-label", help="the fix's last record, by its commit (a fix round's record)")
+    r.add_argument("--since-record", help="that record's tune run report.json")
+    r.add_argument("--since-runs", help="that record's runs folder (r100, na)")
+    r.add_argument("--since-marks", help="the marks that record's code drew (marks --src) for the figures that moved")
     args = parser.parse_args(argv)
     return {"marks": cmd_marks, "report": cmd_report}[args.cmd](args)
 
