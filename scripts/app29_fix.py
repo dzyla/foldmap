@@ -98,8 +98,8 @@ def marks_of(i: str) -> dict:
         out that _place_mark weighed it against (None: there is none), keyed by the mark's place."""
         spot = place(anchor, half, targets, taken, lines, texts, tethers, bodies, runs, na, retarget, bound)
         ts = targets if retarget is None else retarget(spot)
-        crossings[(round(float(spot[0]), 3), round(float(spot[1]), 3))] = sum(
-            render.clip_len(spot, t, b) > 1e-9 for t in ts for b in texts
+        crossings[(round(float(spot[0]), 3), round(float(spot[1]), 3))] = int(
+            sum(render.clip_len(spot, t, b) > 1e-9 for t in ts for b in texts)
         )
         box = (spot[0] - half[0], spot[1] - half[1], spot[0] + half[0], spot[1] + half[1])
         if any(box[0] < t[2] and t[0] < box[2] and box[1] < t[3] and t[1] < box[3] for t in lines):
