@@ -66,11 +66,10 @@ def _beyond(ids: list[str], known: dict[str, int]) -> list[str]:
 
 
 def new_special(rows: dict[str, dict], baseline: dict, origin_kind, root: Path = ROOT) -> list[str]:
-    """Special-case rows (named-entry, measured, unknown) past the baseline's count for their key, whose evidence
-    names no existing record."""
+    """Special-case rows (named-entry, measured, unknown) past the baseline's count for their key (the count first,
+    then the record: a twin of a baseline row needs its own record), whose evidence names no existing record."""
     special = [i for i, r in rows.items() if origin_kind(r["origin"]) in SPECIAL]
-    plain = [i for i in special if not names_record(rows[i].get("evidence", ""), root)]
-    return _beyond(plain, baseline["special"])
+    return [i for i in _beyond(special, baseline["special"]) if not names_record(rows[i].get("evidence", ""), root)]
 
 
 def unevidenced(rows: dict[str, dict], baseline: dict, origin_kind) -> list[str]:
@@ -82,6 +81,13 @@ def unevidenced(rows: dict[str, dict], baseline: dict, origin_kind) -> list[str]
         for i in new
         if origin_kind(rows[i]["origin"]) not in SPECIAL and rows[i].get("evidence", "-").strip() in ("-", "")
     ]
+
+
+def _freeze_script():
+    spec = importlib.util.spec_from_file_location("foldmap_freeze_baseline", ROOT / "scripts" / "freeze_baseline.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
 
 
 def failure(bad: list[str], unevid: list[str] = ()) -> str:
@@ -124,7 +130,10 @@ def test_the_baseline_is_not_padded(rows, baseline):
     have = keys(rows)
     for part in ("special", "all"):
         over = {k: n for k, n in baseline[part].items() if have.get(k, 0) < n}
-        assert not over, f"baseline {part} keys the table no longer has (regenerate the baseline): {list(over)[:20]}"
+        assert not over, (
+            f"baseline {part} keys the table no longer has (shrink it: python scripts/freeze_baseline.py): "
+            f"{list(over)[:20]}"
+        )
 
 
 ROW = {"origin": "named-entry:1ABC", "evidence": "-", "check": "-"}
@@ -183,3 +192,32 @@ def test_a_hand_set_origin_needs_evidence(inv, rows, baseline):
 def test_the_failure_points_to_contributing(inv, rows, baseline):
     assert (ROOT / "CONTRIBUTING.md").is_file()
     assert "CONTRIBUTING.md" in failure(["layout:_P"]) and "CONTRIBUTING.md" in failure([], ["layout:_P"])
+
+
+def test_a_baseline_with_a_record_does_not_excuse_a_twin_without_one(inv, rows, baseline, tmp_path):
+    """A new row whose key matches a baseline row, with no record, still fails even when the baseline row itself
+    names a record (the count is applied before the record filter)."""
+    ident = next(i for i, r in rows.items() if inv.origin_kind(r["origin"]) in SPECIAL and ANCHOR.search(i))
+    made = tmp_path / "docs" / "validation" / "mine"
+    made.mkdir(parents=True)
+    (made / "report.md").write_text("x", encoding="utf-8")
+    twin = ANCHOR.sub("@ffffffff", ident)  # sorts after any real anchor: the later id is the one past the count
+    assert ANCHOR.search(ident).group(0) < ANCHOR.search(twin).group(0)
+    planted = {**rows, ident: {**rows[ident], "evidence": "docs/validation/mine/report.md"}, twin: dict(rows[ident])}
+    assert new_special(planted, baseline, inv.origin_kind, tmp_path) == [twin]
+
+
+def test_regenerating_the_baseline_only_shrinks_it(inv, rows, baseline):
+    """Q55: scripts/freeze_baseline.py lowers counts and drops entries; a new special case is never admitted."""
+    fb = _freeze_script()
+    assert fb.shrunk_baseline(baseline, rows, inv.origin_kind)["special"] == baseline["special"]  # as committed
+    ident = next(i for i, r in rows.items() if inv.origin_kind(r["origin"]) in SPECIAL and ANCHOR.search(i))
+    # a special case removed: the baseline shrinks by one
+    gone = {i: r for i, r in rows.items() if i != ident}
+    new = fb.shrunk_baseline(baseline, gone, inv.origin_kind)
+    assert sum(new["special"].values()) == sum(baseline["special"].values()) - 1
+    assert all(n <= baseline["special"].get(k, 0) for k, n in new["special"].items())
+    # a new special case and a new key: not admitted
+    planted = {**rows, ANCHOR.sub("@deadbeef", ident): dict(rows[ident]), "layout:_PLANTED": dict(ROW)}
+    new = fb.shrunk_baseline(baseline, planted, inv.origin_kind)
+    assert new["special"] == baseline["special"] and new["all"] == baseline["all"]

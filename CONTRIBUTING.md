@@ -48,9 +48,10 @@ A row whose origin is `named-entry:...`, `measured` or `unknown` is a special ca
 `docs/validation/inventory/freeze-baseline.json` lists those that existed when the freeze began (by the id less its
 line anchor, so reformatting a line does not matter, with how many share each), and `tests/test_freeze.py` fails on
 any other such row unless its evidence names an existing `docs/validation/...` record. That record is your
-measurement. Do not edit the baseline to make a failure pass; an id enters it only with the same record. Removing a
-special case needs no baseline edit beyond regenerating the table; the test will say when the baseline names ids the
-table no longer has.
+measurement. Do not edit the baseline to make a failure pass; an id enters it only with the same record. When a special case is removed, shrink the baseline after the table: run `python scripts/freeze_baseline.py`, which
+only lowers counts and drops entries and never adds one. A regeneration that adds an id is the edit the rule forbids;
+the test asks for the shrink when the baseline names ids the table no longer has. Within a key the count is applied
+first, by id order, and then the record: give a new row its own record.
 
 The test gates only named-entry, measured and unknown. The origin you write for a new row (biology, geometry,
 convention) is checked in review, so give a quoted comment or a citation as evidence; the test fails a new row with
