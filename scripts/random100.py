@@ -1327,15 +1327,17 @@ def app_settings() -> str:
     return json.dumps({**app.LAYOUT_DEFAULTS, "theme": "publication"}, sort_keys=True)
 
 
-def app_view(path: Path, name: str, keep: Path | None = None) -> dict:
+def app_view(path: Path, name: str, keep: Path | None = None, judge: bool = False) -> dict:
     """The app's way: the size check, then app_jobs.draw_job in a job process under the hosted limits, with the
-    app's default settings. What it drew is judged as `foldmap check` judges a figure (app_judge): "criteria" {code:
-    pass, fail or not measured} with "criteria_detail" for the codes not passed, and "floor" {ok, reasons}, R1; both
-    {} / None when nothing was drawn or the figure was not measured (measure_error). "seconds": the draw job's wall
-    time; "peak_mb": the job's own peak memory when app_jobs hands it back, else "not measured". "error": the draw
-    failed other than by a limit (its type and text), None otherwise. With `keep`, the figure is kept there as app.svg
-    (the job's SVG) and app.png, the app's PNG download (app_jobs.figure_file: files_job, or the job's own files when
-    it was slow); a PNG that fails says so in "png_error"."""
+    app's default settings. With `judge` (scripts/app29.py; never the campaign's app view, which stays as it was),
+    what it drew is judged as `foldmap check` judges a figure (app_judge): "criteria" {code: pass, fail or not
+    measured} with "criteria_detail" for the codes not passed, and "floor" {ok, reasons}, R1; both {} / None when
+    nothing was drawn, it was not judged or the figure was not measured (measure_error). "seconds": the draw job's
+    wall time (its process's start and queue included), "draw_seconds": the time draw_job says it drew for;
+    "peak_mb": the job's own peak memory when app_jobs hands it back, else "not measured". "error": the draw failed
+    other than by a limit (its type and text), None otherwise. With `keep`, the figure is kept there as app.svg (the
+    job's SVG) and app.png, the app's PNG download (app_jobs.figure_file: files_job, or the job's own files when it
+    was slow); a PNG that fails says so in "png_error"."""
     from foldmap import app_jobs
 
     lim = app_jobs.limits(hosted=True)
@@ -1361,6 +1363,7 @@ def app_view(path: Path, name: str, keep: Path | None = None) -> dict:
         out["seconds"] = round(time.perf_counter() - t0, 2)
         return {**out, "error": f"{type(err).__name__}: {err}"[:2000]}
     out.update(seconds=round(time.perf_counter() - t0, 2), svg_bytes=len(got["svg"]))
+    out["draw_seconds"] = round(got["seconds"], 2)
     out["peak_mb"] = got.get("peak_mb", "not measured")
     if keep is not None:
         keep = Path(keep)
@@ -1375,7 +1378,8 @@ def app_view(path: Path, name: str, keep: Path | None = None) -> dict:
             out["png_error"] = f"{type(err).__name__}: {err}"[:2000]
     try:
         out["science"], out["science_judged"] = app_science(path, got["svg"])
-        out["criteria"], out["criteria_detail"], out["floor"] = app_judge(path, got["svg"])
+        if judge:
+            out["criteria"], out["criteria_detail"], out["floor"] = app_judge(path, got["svg"])
     except Exception:  # not measured, which fails the view (fail closed, as measure_view's errors)
         import traceback
 
@@ -1472,13 +1476,17 @@ def cmd_view(args) -> int:
     with warnings.catch_warnings(record=True) as said:
         warnings.simplefilter("default")
         if args.view == "app":
-            result: dict = {"app": app_view(path, args.name)}
-            for key in ("science", "science_judged", "measure_error"):  # judged with the other views' (science, A1)
-                if key in result["app"]:
-                    result[key] = result["app"].pop(key)
-            code = 1 if result["app"]["error"] else 0  # a draw that failed fails A1, as a crash did
-            if code:
-                print(f"app: {result['app']['error']}", file=sys.stderr)  # A1's detail reads the stderr tail
+            drew = app_view(path, args.name)  # not judged: the campaign judges the app view by A1, A2b and science
+            if drew["error"]:  # a draw that failed: no answer, as when it crashed (A2b fails), exit 1 (A1 fails)
+                result: dict = {"app": None, "app_error": drew}
+                print(f"app: {drew['error']}", file=sys.stderr)  # A1's detail reads the stderr tail
+                code = 1
+            else:
+                result = {"app": drew}
+                for key in ("science", "science_judged", "measure_error"):  # judged with the other views' (science, A1)
+                    if key in result["app"]:
+                        result[key] = result["app"].pop(key)
+                code = 0
         else:
             result = {}
             try:

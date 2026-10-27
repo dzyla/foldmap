@@ -47,14 +47,44 @@ def test_the_default_split_is_60_40_of_the_sample(app29):
 
 
 def test_app_view_judges_the_apps_own_figure(random100, tmp_path):
-    got = random100.app_view(DATA / "1UBQ.cif", "1UBQ", keep=tmp_path)
+    got = random100.app_view(DATA / "1UBQ.cif", "1UBQ", keep=tmp_path, judge=True)
     assert got["refused"] is None and got["error"] is None
     assert set(got["criteria"]) >= {"A1", "A4", "A6"} and got["floor"]["ok"] in (True, False)
     assert set(got["criteria"].values()) <= {"pass", "fail", "not measured"}
     assert (tmp_path / "app.svg").stat().st_size > 0 and (tmp_path / "app.png").stat().st_size > 0
     assert (tmp_path / "app.png").read_bytes()[:8] == b"\x89PNG\r\n\x1a\n"
     assert got["seconds"] > 0 and got["peak_mb"] == "not measured"  # app_jobs hands back no peak memory
+    assert 0 <= got["draw_seconds"] <= got["seconds"]  # draw_job's own time, inside the job's wall time
     assert "<svg" in (tmp_path / "app.svg").read_text(encoding="utf-8")
+
+
+def test_the_campaigns_app_view_is_not_judged(random100, monkeypatch):
+    """Review finding 2 (ruling P29-3): random100's own app view draws and measures as before plan 29: no
+    check_figure, no floor (judge defaults to False; only app29 asks for it)."""
+    from foldmap import criteria, floor
+
+    def never(*a, **k):
+        raise AssertionError("the campaign's app view judged the figure")
+
+    monkeypatch.setattr(criteria, "check_figure", never)
+    monkeypatch.setattr(floor, "check", never)
+    got = random100.app_view(DATA / "1UBQ.cif", "1UBQ")
+    assert "measure_error" not in got and got["science"]["S1"] == []
+    assert got["criteria"] == {} and got["floor"] is None
+
+
+def test_a_judging_error_fails_closed(app29, random100, monkeypatch):
+    """Review finding 5: a judge that raises leaves the figure not measured (measure_error, no criteria, no floor),
+    never drawn and passed."""
+    from foldmap import criteria
+
+    def broken(*a, **k):
+        raise RuntimeError("judge broke")
+
+    monkeypatch.setattr(criteria, "check_figure", broken)
+    got = random100.app_view(DATA / "1UBQ.cif", "1UBQ", judge=True)
+    assert "judge broke" in got["measure_error"] and got["criteria"] == {} and got["floor"] is None
+    assert app29.verdict(app29.row({"id": "1UBQ", "app": got}, "tune", "S1")) == "not measured"
 
 
 def test_the_draw_is_plan_29s_call(app29):
@@ -107,9 +137,10 @@ def test_no_alphafold_draws_no_alphafold_model_and_a_short_sample_is_written(ran
     assert any(e["id"] == "AF_AFP00001F1" for e in with_af["entries"])
 
 
-def test_the_report_states_the_shortfall_per_stratum(app29, monkeypatch, tmp_path):
+def test_the_report_states_the_shortfall_per_stratum(app29, monkeypatch, tmp_path, capsys):
     """run --record writes a stamped report.json and report.md; the sample's shortfall is said per stratum, and the
-    entries are counted per half of the split."""
+    entries are counted per half of the split. The check half is in the totals only: a failing check id is never
+    named in report.md or on the console (review finding 3)."""
     strata = [{"name": "S1", "title": "X-ray, 1 protein chain", "n": 12}, {"name": "S6", "title": "Membrane", "n": 8}]
     strata.append({"name": "S12", "title": "AlphaFold DB models", "n": 3, "not_drawn": "not drawn (--no-alphafold)"})
     entries = [{"id": f"{k}AB{k}", "stratum": "S1"} for k in range(1, 6)]
@@ -120,12 +151,16 @@ def test_the_report_states_the_shortfall_per_stratum(app29, monkeypatch, tmp_pat
     split = app29.add_split(sample, n_check=2)["split"]
     assert len(split["check"]) == 2 and len(split["tune"]) == 3
 
+    tune, check = split["tune"], split["check"]
+
     def one(i, out):
-        crit = {"A1": "pass", "A4": "fail" if i == "1AB1" else "pass"}
+        crit = {"A1": "pass", "A4": "fail" if i == check[0] else "pass"}  # a check id that fails a criterion
         app = {"refused": None, "error": None, "residues": 76, "criteria": crit, "criteria_detail": {"A4": "x"}}
-        app.update(floor={"ok": i != "2AB2", "reasons": []}, seconds=1.0, peak_mb="not measured", svg_bytes=10)
-        if i == "3AB3":
+        app.update(floor={"ok": i != tune[1], "reasons": []}, seconds=1.0, peak_mb="not measured", svg_bytes=10)
+        if i == tune[0]:
             app = {"refused": "time", "error": None, "residues": 9000, "criteria": {}, "floor": None}
+        if i == check[1]:  # ... and one whose draw failed
+            app = {"refused": None, "error": "ValueError: boom", "residues": 76, "criteria": {}, "floor": None}
         return {"id": i, "source_stamp": app29.SOURCE_STAMP, "app": app, "process": {"exit": 0}}
 
     monkeypatch.setattr(app29, "run_one", one)
@@ -138,32 +173,80 @@ def test_the_report_states_the_shortfall_per_stratum(app29, monkeypatch, tmp_pat
     assert short == {"S1": 7, "S6": 8, "S12": 3}
     assert rep["sample"]["split"] == {"tune": 3, "check": 2}
     t = rep["totals"]["all"]
-    assert (t["entries"], t["drawn"], t["refused"], t["criteria_failed"], t["floor_failed"]) == (5, 4, 1, 1, 1)
-    assert rep["totals"]["tune"]["entries"] + rep["totals"]["check"]["entries"] == 5
+    assert (t["entries"], t["drawn"], t["refused"], t["error"]) == (5, 3, 1, 1)
+    assert (t["criteria_failed"], t["floor_failed"]) == (1, 1)
+    c = rep["totals"]["check"]
+    assert (c["entries"], c["error"], c["criteria_failed"]) == (2, 1, 1)  # counted ...
     md = (record / "report.md").read_text(encoding="utf-8")
     assert "| S6 | Membrane | 8 | 0 | 8 |" in md and "| S12 | AlphaFold DB models | 3 | 0 | 3 (not drawn" in md
-    assert "Written by:" in md and "3AB3: refused: time" in md
+    assert "Written by:" in md and f"{tune[0]}: refused: time" in md and f"| {tune[1]} |" in md
+    said = capsys.readouterr().out
+    assert f"{tune[0]}: refused" in said
+    for i in check:  # ... never named
+        assert i not in md and i not in said
 
 
 def test_entry_writes_its_record_and_run_ui_waits_for_task_2(app29, monkeypatch, tmp_path):
     r100 = app29.random100()
     monkeypatch.setattr(r100, "resolve", lambda i: DATA / "1UBQ.cif")
-    monkeypatch.setattr(r100, "app_view", lambda path, name, keep=None: {"refused": None, "error": None, "keep": keep})
+    monkeypatch.setattr(
+        r100, "app_view", lambda path, name, keep=None, judge=False: {"refused": None, "keep": keep, "judge": judge}
+    )
     assert app29.main(["entry", "1UBQ", "--out", str(tmp_path)]) == 0
     rec = json.loads((tmp_path / "1UBQ" / "app.json").read_text(encoding="utf-8"))
     assert rec["id"] == "1UBQ" and rec["source_stamp"] == app29.SOURCE_STAMP
     assert rec["app"]["keep"] == str(tmp_path / "1UBQ") and rec["file"]["name"] == "1UBQ.cif"
+    assert rec["app"]["judge"] is True  # app29 judges; the campaign's view does not
     with pytest.raises(NotImplementedError, match="Task 2"):
         app29.main(["run", "--ui", "--out", str(tmp_path), "--ids", "1UBQ"])
 
 
 def test_a_failed_app_draw_fails_the_view(random100, monkeypatch, tmp_path, capsys):
-    """app_view now catches a failed draw ("error"); random100's app view still exits 1 on it, so A1 fails as it did
-    when the failure was a crash, and says why on stderr (A1's detail reads its tail)."""
+    """app_view now catches a failed draw ("error"); random100's app view gives no answer for it, as when it crashed:
+    A2b fails ("gave no answer", review finding 1), it exits 1 so A1 fails, and says why on stderr (A1's detail reads
+    its tail); the error is kept under app_error."""
     from foldmap import cli
 
     monkeypatch.setattr(cli, "draw_spec", cli.draw_spec)  # cmd_view wraps it: restored after the test
     monkeypatch.setattr(random100, "app_view", lambda path, name: {"refused": None, "error": "ValueError: no protein"})
     code = random100.main(["view", "--name", "X", "--work", str(tmp_path), "app", str(DATA / "1UBQ.cif")])
     assert code == 1 and "app: ValueError: no protein" in capsys.readouterr().err
-    assert json.loads((tmp_path / "X-app.json").read_text(encoding="utf-8"))["exit"] == 1
+    rec = json.loads((tmp_path / "X-app.json").read_text(encoding="utf-8"))
+    assert rec["exit"] == 1 and rec["app"] is None and rec["app_error"]["error"] == "ValueError: no protein"
+    view = {"result": rec, "timed_out": False, "exit": 1, "traceback": None, "stderr_tail": ["app: ValueError"]}
+    judged = random100.criteria({"views": {"app": {**view, "written": {}}}})
+    assert judged["A2b"]["pass"] is False and "gave no answer" in judged["A2b"]["detail"]
+    assert judged["A1"]["pass"] is False
+
+
+def test_a_child_that_timed_out_keeps_the_report_quotable(app29, monkeypatch, tmp_path):
+    """Review finding 4: an entry whose process was killed is recorded by run, under run's own stamp, so one timeout
+    does not make the report mixed_code (never quoted)."""
+    r100 = app29.random100()
+
+    def child(cmd, *, env, timeout, out, err):
+        i = cmd[cmd.index("entry") + 1]
+        if i == "2BBB":
+            return {"exit": -9, "seconds": timeout, "max_rss_mb": None, "timed_out": True}
+        rec = {"id": i, "source_stamp": app29.SOURCE_STAMP, "app": {"refused": None, "error": None}}
+        (Path(cmd[cmd.index("--out") + 1]) / i / "app.json").write_text(json.dumps(rec), encoding="utf-8")
+        return {"exit": 0, "seconds": 1.0, "max_rss_mb": 100.0, "timed_out": False}
+
+    monkeypatch.setattr(r100, "run_child", child)
+    run = tmp_path / "run"
+    app29.main(["run", "--out", str(run), "--ids", "1AAA,2BBB", "--sample", str(tmp_path / "none.json")])
+    rep = json.loads((run / "report.json").read_text(encoding="utf-8"))
+    assert rep["mixed_code"] is False
+    late = next(r for r in rep["entries"] if r["id"] == "2BBB")
+    assert late["error"] == "no result (timed out)" and late["process"]["timed_out"] is True
+
+
+def test_the_committed_split_is_the_seeded_split():
+    """Review finding 8: docs/validation/app29/sample.json holds split(its entries), 47 tune / 32 check (P29-2)."""
+    path = ROOT / "docs" / "validation" / "app29" / "sample.json"
+    if not path.is_file():
+        pytest.skip("docs/validation is not part of the sdist")
+    app29 = _load("app29")
+    doc = json.loads(path.read_text(encoding="utf-8"))
+    assert doc["split"] == app29.split([e["id"] for e in doc["entries"]], seed=doc["seed"])
+    assert (len(doc["split"]["tune"]), len(doc["split"]["check"])) == (47, 32)

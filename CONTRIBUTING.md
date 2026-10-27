@@ -40,9 +40,9 @@ Development samples draw no AlphaFold models (`--no-alphafold`, ruling Q61), bec
 window: it could hold the fourth sample's models.
 
 Such a sample skews to recent entries, and its pools are small for some time: on 2026-10-27 the window held no
-membrane (S6) or AlphaFold-model (S12) entry, so a draw then comes up short of those quotas; report the shortfall, do
-not widen the window back past the cutoff. Once the fourth sample has run, add `--exclude
-docs/validation/random100-fourth/sample.json` as well.
+membrane (S6) entry, so a draw then comes up short of that quota; S12 (AlphaFold models) is not drawn at all, so it is
+short by rule. Report the shortfall per stratum; do not widen the window back past the cutoff. Once the fourth
+sample has run, add `--exclude docs/validation/random100-fourth/sample.json` as well.
 
 **The measurement** must show the campaign keys and checks identical or better than before the change: the same
 entries pass, no check newly fails, the fallback counts and areas do not get worse. Follow `docs/validation/prune/`,

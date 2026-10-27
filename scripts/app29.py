@@ -24,7 +24,9 @@ random100.app_view, which takes the size check, app_jobs.draw_job under the host
 settings, the PNG download (app_jobs.figure_file, files_job) and judges the figure the app drew as `foldmap check`
 does (A1-A20 and R1, the readability floor). Each entry writes DIR/<id>/app.json, app.svg and app.png; run writes
 DIR/report.json. With --record RECORD_DIR it also writes report.json and report.md there, stamped with the code that
-ran (foldmap.source_stamp). --ui adds the headless AppTest session (plan 29 Task 2).
+ran (foldmap.source_stamp). --ui adds the headless AppTest session (plan 29 Task 2). report.md and the console name
+no check-half id beside an outcome (the check half is in the totals only); report.json keeps every entry's row, for
+the paired before/after measure.
 """
 
 from __future__ import annotations
@@ -165,7 +167,7 @@ def cmd_entry(args) -> int:
         rec["app"] = {"refused": None, "error": f"download failed: {type(err).__name__}: {err}"[:2000]}
     else:
         rec["file"] = {"name": path.name, "sha256": r100._sha256(path.read_bytes())}
-        rec["app"] = r100.app_view(path, args.id, keep=keep)
+        rec["app"] = r100.app_view(path, args.id, keep=keep, judge=True)
     text = json.dumps(r100._jsonable(rec), indent=1, default=str) + "\n"
     (keep / "app.json").write_text(text, encoding="utf-8", newline="\n")
     return 0
@@ -183,10 +185,12 @@ def run_one(i: str, out: Path) -> dict:
     got = keep / "app.json"
     if got.is_file():
         rec = json.loads(got.read_text(encoding="utf-8"))
-    else:
-        tail = (keep / "stderr.txt").read_text(encoding="utf-8", errors="replace").strip().splitlines()[-1:] or [""]
+    else:  # killed or crashed: this process says so, under its own stamp (it wrote this verdict)
+        err = keep / "stderr.txt"
+        text = err.read_text(encoding="utf-8", errors="replace") if err.is_file() else ""
+        tail = text.strip().splitlines()[-1:] or [""]
         why = "timed out" if proc["timed_out"] else f"exit {proc['exit']}: {tail[0][:300]}"
-        rec = {"id": i, "source_stamp": None, "app": {"refused": None, "error": f"no result ({why})"}}
+        rec = {"id": i, "source_stamp": SOURCE_STAMP, "app": {"refused": None, "error": f"no result ({why})"}}
     rec["process"] = proc
     return rec
 
@@ -216,6 +220,7 @@ def row(rec: dict, half: str, stratum: str) -> dict:
         "floor_ok": None if floor is None else floor["ok"],
         "floor_reasons": [] if floor is None else floor["reasons"],
         "seconds": a.get("seconds"),
+        "draw_seconds": a.get("draw_seconds"),
         "peak_mb": a.get("peak_mb", "not measured"),
         "svg_bytes": a.get("svg_bytes"),
         "png_bytes": a.get("png_bytes"),
@@ -323,16 +328,20 @@ def render(rep: dict) -> str:
         "",
         "## Entries",
         "",
-        "| id | stratum | half | residues | outcome | criteria failed | floor | seconds |",
-        "|---|---|---|---|---|---|---|---|",
+        "The check half is reported in the totals only: its ids are never shown beside an outcome here, nor on the "
+        "console, so no fix is tuned on them.",
+        "",
+        "| id | stratum | half | residues | outcome | criteria failed | floor | seconds | draw s |",
+        "|---|---|---|---|---|---|---|---|---|",
     ]
-    for r in rep["entries"]:
+    shown = [r for r in rep["entries"] if r["half"] != "check"]
+    for r in shown:
         floor = "-" if r["floor_ok"] is None else "pass" if r["floor_ok"] else "fail"
         lines.append(
             f"| {r['id']} | {r['stratum']} | {r['half']} | {r['residues']} | {verdict(r)} | "
-            f"{', '.join(r['criteria_failed']) or '-'} | {floor} | {r['seconds']} |"
+            f"{', '.join(r['criteria_failed']) or '-'} | {floor} | {r['seconds']} | {r.get('draw_seconds')} |"
         )
-    said = [r for r in rep["entries"] if r["error"] or r["refused"] or r["measure_error"] or r["png_error"]]
+    said = [r for r in shown if r["error"] or r["refused"] or r["measure_error"] or r["png_error"]]
     if said:
         lines += ["", "## Refusals and errors", ""]
         for r in said:
@@ -363,9 +372,12 @@ def cmd_run(args) -> int:
         raise SystemExit(f"no sample at {sample_path}; give --ids")
     out.mkdir(parents=True, exist_ok=True)
 
+    halves = {i: h for h, part in ((doc or {}).get("split") or {}).items() for i in part}
+
     def one(i: str) -> dict:
         rec = run_one(i, out)
-        print(f"{i}: {verdict(row(rec, '-', '-'))}", flush=True)
+        if halves.get(i) != "check":  # the check half is counted, never named beside an outcome
+            print(f"{i}: {verdict(row(rec, '-', '-'))}", flush=True)
         return rec
 
     with ThreadPoolExecutor(max_workers=max(1, args.jobs)) as pool:
