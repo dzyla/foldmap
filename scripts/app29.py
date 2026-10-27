@@ -50,6 +50,7 @@ import json
 import os
 import subprocess
 import sys
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -100,15 +101,20 @@ DRAW = [  # plan 29 Task 1 Step 1, as given; --no-alphafold: ruling Q61
     "docs/validation/app29/sample.json",
 ]
 _R100 = None
+_R100_LOCK = threading.Lock()
 
 
 def random100():
-    """scripts/random100.py as a module (loaded once, without putting scripts/ on sys.path)."""
+    """scripts/random100.py as a module (loaded once, without putting scripts/ on sys.path). Thread-safe: run --jobs
+    calls it from several threads at once, and the module is published only once it has run (a thread never sees it
+    half loaded, without run_child)."""
     global _R100
-    if _R100 is None:
-        spec = importlib.util.spec_from_file_location("random100", RANDOM100)
-        _R100 = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(_R100)
+    with _R100_LOCK:
+        if _R100 is None:
+            spec = importlib.util.spec_from_file_location("random100", RANDOM100)
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            _R100 = mod
     return _R100
 
 

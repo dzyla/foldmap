@@ -390,3 +390,42 @@ def test_the_committed_split_is_the_seeded_split():
     doc = json.loads(path.read_text(encoding="utf-8"))
     assert doc["split"] == app29.split([e["id"] for e in doc["entries"]], seed=doc["seed"])
     assert (len(doc["split"]["tune"]), len(doc["split"]["check"])) == (47, 32)
+
+
+def test_random100_is_loaded_once_and_whole_from_many_threads():
+    """run --jobs N calls app29.random100() from N threads at once: each gets the one module, fully run (the
+    before measurement's first run died on 'random100 has no attribute run_child': the module was published before
+    it ran). Its global stays unset until the module has run."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    fresh = _load("app29")
+    seen_while_loading = []
+    real = importlib.util.module_from_spec
+
+    def watched(spec):
+        mod = real(spec)
+        loader_exec = spec.loader.exec_module
+
+        def exec_module(m):
+            seen_while_loading.append(fresh._R100)
+            loader_exec(m)
+
+        spec.loader.exec_module = exec_module
+        return mod
+
+    import threading
+
+    gate = threading.Barrier(8)
+
+    def one(_):
+        gate.wait()
+        return fresh.random100()
+
+    try:
+        importlib.util.module_from_spec = watched
+        with ThreadPoolExecutor(8) as pool:
+            got = list(pool.map(one, range(8)))
+    finally:
+        importlib.util.module_from_spec = real
+    assert seen_while_loading == [None]  # loaded once, and not published while it ran
+    assert all(m is got[0] for m in got) and hasattr(got[0], "run_child")
