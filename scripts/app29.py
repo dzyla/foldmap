@@ -22,12 +22,16 @@ run draws each id (default: every entry of the sample) the app's way, one child 
 python -I, killed after ENTRY_TIMEOUT seconds; its wall time, exit and max RSS from random100.run_child):
 random100.app_view, which takes the size check, app_jobs.draw_job under the hosted limits with the app's default
 settings, the PNG download (app_jobs.figure_file, files_job) and judges the figure the app drew as `foldmap check`
-does (A1-A20 and R1, the readability floor). Each entry writes DIR/<id>/app.json, app.svg and app.png; run writes
-DIR/report.json and DIR/report-check.json. With --record RECORD_DIR it also writes report.json, report-check.json and
-report.md there, stamped with the code that ran (foldmap.source_stamp). --ui adds the headless AppTest session (plan
-29 Task 2). report.json, report.md and the console name no check-half id (the check half is in the totals only); its
-rows are sealed in report-check.json, read only by load_both, for the before/after measure (ruling P29-4); load_tune
-reads report.json alone.
+does (A1-A20 and R1, the readability floor). Each entry writes DIR/<id>/app.json, app.svg, app.png and its child's
+stdout.txt and stderr.txt; run writes DIR/report.json and DIR/report-check.json. With --record RECORD_DIR it also
+writes report.json, report-check.json and report.md there, stamped with the code that ran (foldmap.source_stamp).
+--ui adds the headless AppTest session (plan 29 Task 2).
+
+The check half is sealed (rulings P29-4, P29-5): report.json, report.md and the console name no check-half id (it is
+in the totals only); its rows are in report-check.json alone, read only by load_both (Task N+1's before/after;
+load_tune reads report.json alone); a check-half entry's own files go to DIR/sealed/<sha256(f"{seed}:{id}")[:12]>/,
+whose app.json names no id (report-check.json is the only map back); and --ids refuses check-half ids unless
+--unseal (Task N+1 only).
 """
 
 from __future__ import annotations
@@ -156,30 +160,61 @@ def _print_draw(doc: dict) -> None:
 # --------------------------------------------------------------------------------------------------- run
 
 
+SEALED = "sealed"  # out/sealed/<key>/: a check-half entry's own files, named by no id (ruling P29-5)
+
+
+def sealed_key(i: str, seed: int = SEED) -> str:
+    """The name of a check-half entry's folder: sha256(f"{seed}:{id}")[:12]. Only report-check.json maps it back."""
+    return hashlib.sha256(f"{seed}:{i}".encode()).hexdigest()[:12]
+
+
+def _scrub(x, words: list[str], to: str):
+    """x with every string's `words` replaced by `to` (a sealed entry's id, its file's path and name)."""
+    if isinstance(x, dict):
+        return {k: _scrub(v, words, to) for k, v in x.items()}
+    if isinstance(x, list):
+        return [_scrub(v, words, to) for v in x]
+    if isinstance(x, str):
+        for w in words:
+            x = x.replace(w, to)
+    return x
+
+
 def cmd_entry(args) -> int:
-    """One id drawn the app's way (run's child): DIR/<id>/app.json, app.svg, app.png."""
+    """One id drawn the app's way (run's child): OUT/<id>/app.json, app.svg, app.png; with --sealed KEY (a check-half
+    entry) OUT/sealed/KEY/, where nothing it writes names the id: not the folder, not app.json (the id, the file's
+    name and path in a message are replaced), and the app's messages name the entry by KEY."""
     r100 = random100()
-    keep = Path(args.out) / args.id
+    keep = Path(args.out) / SEALED / args.sealed if args.sealed else Path(args.out) / args.id
     keep.mkdir(parents=True, exist_ok=True)
-    rec: dict = {"id": args.id, "source_stamp": SOURCE_STAMP}
+    name = args.sealed or args.id
+    rec: dict = {"sealed": args.sealed} if args.sealed else {"id": args.id}
+    rec["source_stamp"] = SOURCE_STAMP
+    words = [args.id]
     try:
         path = r100.resolve(args.id)
     except Exception as err:  # obsolete or unreachable: no figure, said
         rec["app"] = {"refused": None, "error": f"download failed: {type(err).__name__}: {err}"[:2000]}
     else:
-        rec["file"] = {"name": path.name, "sha256": r100._sha256(path.read_bytes())}
-        rec["app"] = r100.app_view(path, args.id, keep=keep, judge=True)
-    text = json.dumps(r100._jsonable(rec), indent=1, default=str) + "\n"
+        words = [str(path), path.name, args.id]
+        rec["file"] = {"sha256": r100._sha256(path.read_bytes())} | ({} if args.sealed else {"name": path.name})
+        rec["app"] = r100.app_view(path, name, keep=keep, judge=True)
+    rec = r100._jsonable(rec)
+    if args.sealed:
+        rec = _scrub(json.loads(json.dumps(rec, default=str)), words, f"<{args.sealed}>")
+    text = json.dumps(rec, indent=1, default=str) + "\n"
     (keep / "app.json").write_text(text, encoding="utf-8", newline="\n")
     return 0
 
 
-def run_one(i: str, out: Path) -> dict:
-    """The entry's child process, then what it wrote (or why it wrote nothing)."""
+def run_one(i: str, out: Path, key: str | None = None) -> dict:
+    """The entry's child process, then what it wrote (or why it wrote nothing). key: a check-half entry's sealed
+    name; its folder, app.json and the child's stdout.txt and stderr.txt are under out/sealed/<key>/."""
     r100 = random100()
-    keep = out / i
+    keep = out / SEALED / key if key else out / i
     keep.mkdir(parents=True, exist_ok=True)
     cmd = [sys.executable, "-I", "-W", "default", str(SCRIPT), "entry", i, "--out", str(out)]
+    cmd += ["--sealed", key] if key else []
     env = {**os.environ, "OPENBLAS_NUM_THREADS": "1", "PYTHONHASHSEED": "0"}
     (keep / "app.json").unlink(missing_ok=True)
     proc = r100.run_child(cmd, env=env, timeout=ENTRY_TIMEOUT, out=keep / "stdout.txt", err=keep / "stderr.txt")
@@ -191,7 +226,9 @@ def run_one(i: str, out: Path) -> dict:
         text = err.read_text(encoding="utf-8", errors="replace") if err.is_file() else ""
         tail = text.strip().splitlines()[-1:] or [""]
         why = "timed out" if proc["timed_out"] else f"exit {proc['exit']}: {tail[0][:300]}"
-        rec = {"id": i, "source_stamp": SOURCE_STAMP, "app": {"refused": None, "error": f"no result ({why})"}}
+        rec = {"source_stamp": SOURCE_STAMP, "app": {"refused": None, "error": f"no result ({why})"}}
+    rec["id"] = i  # in this process only: a sealed row reaches report-check.json alone
+    rec["dir"] = f"{SEALED}/{key}" if key else i  # the entry's folder under out
     rec["process"] = proc
     return rec
 
@@ -209,6 +246,7 @@ def row(rec: dict, half: str, stratum: str) -> dict:
     floor = a.get("floor")
     return {
         "id": rec["id"],
+        "dir": rec.get("dir"),
         "stratum": stratum,
         "half": half,
         "residues": a.get("residues"),
@@ -376,12 +414,17 @@ def load_tune(record_dir) -> dict:
     return json.loads((Path(record_dir) / "report.json").read_text(encoding="utf-8"))
 
 
-def load_both(record_dir) -> dict:
+def load_both(record_dir, out=None) -> dict:
     """For Task N+1 only (plan 29's before/after measure, once the fixes are done): report.json joined with the check
-    half's rows from report-check.json. Never read while a fix is being tuned."""
+    half's rows from report-check.json. Never read while a fix is being tuned. Each row's "dir" is its folder under
+    the run's out folder (a check row's is sealed/<key>: report-check.json is the only map from key to id); with
+    `out`, "folder" is that path."""
     rep = load_tune(record_dir)
     sealed = json.loads((Path(record_dir) / CHECK_FILE).read_text(encoding="utf-8"))
-    return {**rep, "entries": rep["entries"] + sealed["entries"], "check_source_stamp": sealed["source_stamp"]}
+    entries = rep["entries"] + sealed["entries"]
+    if out is not None:
+        entries = [{**r, "folder": str(Path(out) / r["dir"]) if r.get("dir") else None} for r in entries]
+    return {**rep, "entries": entries, "check_source_stamp": sealed["source_stamp"]}
 
 
 def cmd_run(args) -> int:
@@ -399,9 +442,16 @@ def cmd_run(args) -> int:
     out.mkdir(parents=True, exist_ok=True)
 
     halves = {i: h for h, part in ((doc or {}).get("split") or {}).items() for i in part}
+    seed = (doc or {}).get("seed", SEED)
+    asked = sum(1 for i in ids if halves.get(i) == "check")
+    if args.ids and asked and not args.unseal:  # the check half is run whole, sealed; never picked by id (P29-5)
+        raise SystemExit(
+            f"--ids names {asked} id(s) of the check half; they are measured only in a whole run, sealed, or with "
+            "--unseal (Task N+1 only)"
+        )
 
     def one(i: str) -> dict:
-        rec = run_one(i, out)
+        rec = run_one(i, out, sealed_key(i, seed) if halves.get(i) == "check" else None)
         if halves.get(i) != "check":  # the check half is counted, never named beside an outcome
             print(f"{i}: {verdict(row(rec, '-', '-'))}", flush=True)
         return rec
@@ -434,9 +484,15 @@ def main(argv=None) -> int:
     r.add_argument("--jobs", type=int, default=1, help="entries drawn at once")
     r.add_argument("--record", help="also write a stamped report.json and report.md into this folder")
     r.add_argument("--ui", action="store_true", help="also drive the app headless (AppTest; plan 29 Task 2)")
+    r.add_argument(
+        "--unseal",
+        action="store_true",
+        help="let --ids name check-half ids: for Task N+1 (the before/after measure) only, never while tuning a fix",
+    )
     e = sub.add_parser("entry", help="one id drawn the app's way (run's child)")
     e.add_argument("id")
     e.add_argument("--out", required=True)
+    e.add_argument("--sealed", metavar="KEY", help="a check-half entry: write under OUT/sealed/KEY, naming no id")
     args = parser.parse_args(argv)
     return {"draw": cmd_draw, "split": cmd_split, "run": cmd_run, "entry": cmd_entry}[args.cmd](args)
 

@@ -4,6 +4,7 @@ sample taken and reported per stratum. No network: pools are stubbed, the figure
 
 import importlib.util
 import json
+import sys
 from pathlib import Path
 
 import pytest
@@ -137,10 +138,8 @@ def test_no_alphafold_draws_no_alphafold_model_and_a_short_sample_is_written(ran
     assert any(e["id"] == "AF_AFP00001F1" for e in with_af["entries"])
 
 
-def test_the_report_states_the_shortfall_per_stratum(app29, monkeypatch, tmp_path, capsys):
-    """run --record writes a stamped report.json and report.md; the sample's shortfall is said per stratum, and the
-    entries are counted per half of the split. The check half is in the totals only: a failing check id is never
-    named in report.md or on the console (review finding 3)."""
+def _planted_sample(app29, tmp_path) -> tuple[Path, list, list]:
+    """A five-entry sample split 3 tune / 2 check, with a short S6 and an S12 not drawn."""
     strata = [{"name": "S1", "title": "X-ray, 1 protein chain", "n": 12}, {"name": "S6", "title": "Membrane", "n": 8}]
     strata.append({"name": "S12", "title": "AlphaFold DB models", "n": 3, "not_drawn": "not drawn (--no-alphafold)"})
     entries = [{"id": f"{k}AB{k}", "stratum": "S1"} for k in range(1, 6)]
@@ -150,25 +149,57 @@ def test_the_report_states_the_shortfall_per_stratum(app29, monkeypatch, tmp_pat
     sample.write_text(json.dumps(doc), encoding="utf-8")
     split = app29.add_split(sample, n_check=2)["split"]
     assert len(split["check"]) == 2 and len(split["tune"]) == 3
+    return sample, split["tune"], split["check"]
 
-    tune, check = split["tune"], split["check"]
 
-    def one(i, out):
+def test_the_report_states_the_shortfall_per_stratum(app29, monkeypatch, tmp_path, capsys):
+    """run --record writes a stamped report.json and report.md; the sample's shortfall is said per stratum, and the
+    entries are counted per half of the split. The check half is sealed (rulings P29-4, P29-5): run's real per-entry
+    writer runs (each child in-process here; only the drawing is stubbed), and no check id is named in any path or
+    file under the run folder or the record but report-check.json, nor on the console. A child's stdout.txt and
+    stderr.txt go to the entry's own folder: out/sealed/<key>/ for a check entry, where they may name it (a warning
+    can carry the file's path), and nowhere else."""
+    import contextlib
+
+    sample, tune, check = _planted_sample(app29, tmp_path)
+    r100 = app29.random100()
+    cache = tmp_path / "cache"  # where resolve finds the files: outside the run folder
+    cache.mkdir()
+    streams = {}
+
+    def resolve(i):
+        (cache / f"{i}.cif").write_text(f"data_{i}\n", encoding="utf-8")
+        return cache / f"{i}.cif"
+
+    def app_view(path, name, keep=None, judge=False):  # the drawing, stubbed; it names its file as a warning would
+        i = path.stem
+        print(f"reading {path} as {name}", file=sys.stderr)
+        (keep / "app.svg").write_text("<svg/>", encoding="utf-8")
+        (keep / "app.png").write_bytes(b"\x89PNG\r\n\x1a\n")
         crit = {"A1": "pass", "A4": "fail" if i == check[0] else "pass"}  # a check id that fails a criterion
-        app = {"refused": None, "error": None, "residues": 76, "criteria": crit, "criteria_detail": {"A4": "x"}}
-        app.update(floor={"ok": i != tune[1], "reasons": []}, seconds=1.0, peak_mb="not measured", svg_bytes=10)
+        got = {"refused": None, "error": None, "residues": 76, "criteria": crit}
+        got.update(criteria_detail={"A4": f"{name} at {path}"}, seconds=1.0, peak_mb="not measured", svg_bytes=6)
+        got.update(floor={"ok": i != tune[1], "reasons": []}, draw_seconds=0.5)
         if i == tune[0]:
-            app = {"refused": "time", "error": None, "residues": 9000, "criteria": {}, "floor": None}
-        if i == check[1]:  # ... and one whose draw failed
-            app = {"refused": None, "error": "ValueError: boom", "residues": 76, "criteria": {}, "floor": None}
-        return {"id": i, "source_stamp": app29.SOURCE_STAMP, "app": app, "process": {"exit": 0}}
+            got.update(refused="time", message=f"{name} took longer than 90 s", criteria={}, floor=None)
+        if i == check[1]:  # ... and one whose draw failed, saying the file's name
+            got.update(error=f"ValueError: cannot read {path} ({path.name})", criteria={}, floor=None)
+        return got
 
-    monkeypatch.setattr(app29, "run_one", one)
-    record = tmp_path / "record"
-    app29.main(["run", "--out", str(tmp_path / "run"), "--sample", str(sample), "--record", str(record)])
+    def child(cmd, *, env, timeout, out, err):  # the real `entry`, in this process, its streams to run's files
+        streams[cmd[cmd.index("entry") + 1]] = (out, err)
+        with open(out, "w", encoding="utf-8") as fo, open(err, "w", encoding="utf-8") as fe:
+            with contextlib.redirect_stdout(fo), contextlib.redirect_stderr(fe):
+                code = app29.main(cmd[cmd.index("entry") :])
+        return {"exit": code, "seconds": 1.0, "max_rss_mb": 50.0, "timed_out": False}
+
+    monkeypatch.setattr(r100, "resolve", resolve)
+    monkeypatch.setattr(r100, "app_view", app_view)
+    monkeypatch.setattr(r100, "run_child", child)
+    record, run = tmp_path / "record", tmp_path / "run"
+    app29.main(["run", "--out", str(run), "--sample", str(sample), "--record", str(record)])
     rep = json.loads((record / "report.json").read_text(encoding="utf-8"))
     assert rep["source_stamp"] == app29.SOURCE_STAMP and rep["mixed_code"] is False
-    assert (tmp_path / "run" / "report.json").is_file()
     short = {r["stratum"]: r["short"] for r in rep["sample"]["strata"]}
     assert short == {"S1": 7, "S6": 8, "S12": 3}
     assert rep["sample"]["split"] == {"tune": 3, "check": 2}
@@ -181,17 +212,52 @@ def test_the_report_states_the_shortfall_per_stratum(app29, monkeypatch, tmp_pat
     assert "| S6 | Membrane | 8 | 0 | 8 |" in md and "| S12 | AlphaFold DB models | 3 | 0 | 3 (not drawn" in md
     assert "Written by:" in md and f"{tune[0]}: refused: time" in md and f"| {tune[1]} |" in md
     said = capsys.readouterr().out
-    assert f"{tune[0]}: refused" in said
-    for folder in (record, tmp_path / "run"):  # ruling P29-4: sealed in report-check.json, and nowhere else
-        shown = (folder / "report.json").read_text(encoding="utf-8")
-        for i in check:  # ... never named
-            assert i not in md and i not in said and i not in shown
+    assert f"{tune[0]}: refused" in said and all(i not in said for i in check)
+    keys = {i: app29.sealed_key(i, 20261027) for i in check}
+    for i in check:  # the child's streams: in the entry's sealed folder
+        assert streams[i] == (run / "sealed" / keys[i] / "stdout.txt", run / "sealed" / keys[i] / "stderr.txt")
+    for i in tune:
+        assert streams[i] == (run / i / "stdout.txt", run / i / "stderr.txt") and (run / i / "app.png").is_file()
+    for folder in (record, run):
+        for f in folder.rglob("*"):
+            assert all(i not in str(f.relative_to(folder)) for i in check), f  # ... never named in a path
+            if not f.is_file() or f.name == "report-check.json":
+                continue
+            text = f.read_bytes().decode("utf-8", errors="replace")
+            named = [i for i in check if i in text]
+            if named:  # only a child's own streams, in its sealed folder, may name it
+                assert f.name in ("stdout.txt", "stderr.txt") and f.parent == run / "sealed" / keys[named[0]], f
         sealed = json.loads((folder / "report-check.json").read_text(encoding="utf-8"))
         assert sorted(r["id"] for r in sealed["entries"]) == sorted(check)
-        assert sealed["source_stamp"] == app29.SOURCE_STAMP
+        assert {r["id"]: r["dir"] for r in sealed["entries"]} == {i: f"sealed/{keys[i]}" for i in check}
+    assert (run / "sealed" / keys[check[0]] / "app.svg").is_file()
+    assert "stderr.txt" in {f.name for f in (run / "sealed" / keys[check[1]]).iterdir()}
+    assert check[1] in (run / "sealed" / keys[check[1]] / "stderr.txt").read_text(encoding="utf-8")  # pinned
     assert sorted(r["id"] for r in app29.load_tune(record)["entries"]) == sorted(tune)
-    both = app29.load_both(record)
+    both = app29.load_both(record, out=run)
     assert sorted(r["id"] for r in both["entries"]) == sorted(tune + check) and both["totals"] == rep["totals"]
+    folders = {r["id"]: r["folder"] for r in both["entries"]}
+    assert folders[check[0]] == str(run / "sealed" / keys[check[0]]) and folders[tune[0]] == str(run / tune[0])
+    late = next(r for r in both["entries"] if r["id"] == check[1])
+    assert late["error"].startswith("ValueError: cannot read <") and check[1] not in late["error"]
+
+
+def test_ids_of_the_check_half_need_unseal(app29, monkeypatch, tmp_path, capsys):
+    """Ruling P29-5 (N3): run --ids refuses an id of the check half, without naming it, unless --unseal (Task N+1)."""
+    sample, tune, check = _planted_sample(app29, tmp_path)
+    ran = []
+    monkeypatch.setattr(app29, "run_one", lambda i, out, key=None: ran.append((i, key)) or {"id": i, "app": {}})
+    argv = ["run", "--out", str(tmp_path / "run"), "--sample", str(sample), "--ids"]
+    with pytest.raises(SystemExit, match="1 id\\(s\\) of the check half") as stop:
+        app29.main(argv + [f"{tune[0]},{check[0]}"])
+    assert check[0] not in str(stop.value) and ran == []
+    app29.main(argv + [tune[0]])  # tune ids run as asked
+    assert ran == [(tune[0], None)]
+    app29.main(argv + [check[0], "--unseal"])  # Task N+1: still written sealed
+    assert ran[-1] == (check[0], app29.sealed_key(check[0], 20261027))
+    with pytest.raises(SystemExit):
+        app29.main(["run", "--help"])
+    assert "Task N+1" in " ".join(capsys.readouterr().out.split())  # --help says --unseal is Task N+1's
 
 
 def test_entry_writes_its_record_and_run_ui_waits_for_task_2(app29, monkeypatch, tmp_path):
