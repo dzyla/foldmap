@@ -80,13 +80,13 @@ LAYOUTS: dict[str, list[tuple]] = {
         ("c", "F3c", 0, 105, 88, 66),
         ("d", "F3d", 90, 105, 88, 42),
     ],
-    # Fig. 4 in 165 mm, so that it and its caption fit one page (plan 28 Task 8, review: the caption ran off the page
+    # Fig. 4 in 168 mm, so that it and its caption fit one page (plan 28 Task 8, review: the caption ran off the page
     # at 234 mm, "Float too large ... by 175 pt"): tRNA over the lambda repressor on the left, the riboswitch on the
     # right. Cas9 left Fig. 4 for a figure of its own (FScas9): its labels need the full page width to print at 6 pt
     "F4": [
-        ("a", "F4a", 0, 0, 78, 79),
-        ("b", "F4b", 80, 0, 98, 165),
-        ("c", "F4c", 0, 79, 78, 86),
+        ("a", "F4a", 0, 0, 72, 79),
+        ("b", "F4b", 74, 0, 104, 168),
+        ("c", "F4c", 0, 79, 72, 89),
     ],
     # Cas9-sgRNA-target DNA (4OO8, --domains auto), a supplementary figure at the full page width (it was Fig. 4c,
     # printed at 0.131 of its drawn size with no text): domain names, element labels, stems and the domain bar at
@@ -162,6 +162,7 @@ FS_MAX_PANEL = {"F2b": 2.4}  # 1C3W: A4 and A6 fail from 2.6 (foldmap check)
 # Cas9 is drawn at the size its text needs: 4OO8's layout changes in jumps with font_scale (a sweep from 5.6 to 7.0,
 # plan 28 Task 8: at 6.25 the page is 1716 x 1857 pt with the smallest text 22.5 pt, 6.6 pt across 178 mm)
 FS_MAX_PANEL["Scas9"] = 7.0
+FS_MAX_PANEL["F3b"] = 3.0  # 1EMA keeps its strand letters (at 2.5 they print 5.87 pt in its box, plan 28 Task 8)
 # bare panels whose fit needs a little more than FS_MAX (9FWZ chain D, the strand coloured: 3.0 prints 5.75 pt)
 FS_MAX_BARE = {"F3a": 3.5}
 # the supplementary gallery's labelled panels may go to 3.5 before they are drawn bare
@@ -680,7 +681,7 @@ def f3() -> dict:
     x_letter = max(xa, xa + (wa - pw) / 2 - 1.0)  # as box_items places it
     _, chain, span = F3A_STRAND.split(":")
     lo, hi = span.split("-")
-    key = f"accessory strand: chain {chain}, residues {lo}\u2013{hi}"
+    key = f"accessory strand (chain {chain}, residues {lo}\u2013{hi})"
     texts.append((key, x_letter + 4.0, ya + 1.2, 6, "l", False, F3A_COLOUR))
     info = box_figure("F3", texts, extra_h=0.0)
     info["hashes"] = hashes
