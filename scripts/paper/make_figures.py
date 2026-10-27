@@ -90,9 +90,9 @@ LAYOUTS: dict[str, list[tuple]] = {
     ],
     # Cas9-sgRNA-target DNA (4OO8, --domains auto), a supplementary figure at the full page width (it was Fig. 4c,
     # printed at 0.131 of its drawn size with no text): domain names, element labels, stems and the domain bar at
-    # 6 pt or more. 198 mm (the panel at font_scale 6.25 is 192.6 mm tall at 178 mm wide) leaves room for a caption
-    # on a page of the supplement
-    "FScas9": [("", "Scas9", 0, 0, 178, 198)],
+    # 6 pt or more. 185 mm (the panel at font_scale 6.25 scaled to 0.276, 6.2 pt) leaves about 40 mm of a supplement
+    # page (2.2 cm margins) for its caption: at 198 mm a seven-line caption was 28 pt too large for the page
+    "FScas9": [("", "Scas9", 0, 0, 178, 185)],
     "F1": [("", "F1x", 0.5, 30.0, 56.6, 34.0)],
 }
 # Panel ids follow the letters: F2a..F2d, S1a..S1e (NOTES.md, 2026-10-21: gallery)
