@@ -937,14 +937,14 @@ def _since_lines(doc: dict) -> list[str]:
     since = doc.get("code_since")
     if not since:
         return []
-    by = ", ".join(f"{c['commit']} ({c['what']})" for c in since["commits"])
+    by = "; ".join(f"{c['commit']}, {c['what']}" for c in since["commits"])
     pruned = since.get("pruned") or []
     lines = [
         "## Code since this run",
         "",
         f"These runs measured foldmap code {doc['code_fingerprint']}, the src of {since['measured_at']}. The record "
-        "was re-rendered from the kept runs after the code changed, and nothing was run again. Commits to src since: "
-        f"{by}.",
+        "was re-rendered from the kept runs after the code changed, and nothing was run again. The commits to src "
+        f"since: {by}.",
         "",
     ]
     if pruned:
