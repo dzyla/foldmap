@@ -58,13 +58,15 @@ OKABE_ITO = ["#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "
 LETTER_ROOM = 4.0
 LAYOUTS: dict[str, list[tuple]] = {
     # Fig. 2, four large labelled panels (the author, 2026-10-21: "for gallery large is fine")
-    # a, b on top, c, d below: every panel at font_scale <= 2.8, where `foldmap check` passes A4-A7 (NOTES.md,
-    # 2026-10-21: gallery, second pass)
+    # a, b on top, c, d below, every panel passing `foldmap check` with its exact options (NOTES.md, 2026-10-21:
+    # gallery, second pass). Plan 28 Task 8 (ruling Q57): with the current code the 2.8 cap left 2HHB A,B at 4.54 pt
+    # (705 x 475 pt at 2.8) and 1C3W at 5.39 pt; re-measured on zl (foldmap check exit 0 to 3.8 for 2HHB A,B, to 3.0
+    # for 1C3W, to 3.4 for 1LMB), the boxes are re-cut for 2HHB A,B at 3.6 (571 x 587 pt) and 1C3W at 2.8
     "F2": [
-        ("a", "F2a", 0, 0, 90, 74),
-        ("b", "F2b", 92, 0, 86, 74),
-        ("c", "F2c", 0, 74, 64, 104),
-        ("d", "F2d", 66, 74, 112, 104),
+        ("a", "F2a", 0, 0, 80, 76),
+        ("b", "F2b", 82, 0, 96, 76),
+        ("c", "F2c", 0, 76, 76, 102),
+        ("d", "F2d", 78, 76, 100, 102),
     ],
     # Supplementary gallery: the other four structures, each panel half or full page width
     "FSgallery": [
@@ -158,7 +160,9 @@ FS_MAX_LABELS = 2.5  # other panels, labels on: past this, labels outgrow narrow
 # cannot reach the floor is kept at its best try and flagged under_floor
 GALLERY_LABELS = {"F2a", "F2b", "F2c", "F2d"}
 FS_MAX_GALLERY = 2.8  # past this the labels collide with elements (foldmap check A4/A6 fail)
-FS_MAX_PANEL = {"F2b": 2.4}  # 1C3W: A4 and A6 fail from 2.6 (foldmap check)
+# 1C3W (F2b) and 2HHB A,B (F2d): foldmap check passes to 3.0 and to 3.8 (A6 fails at 4.0) with the current code
+# (plan 28 Task 8; on 2026-10-21 1C3W failed A4/A6 from 2.6)
+FS_MAX_PANEL = {"F2b": 3.0, "F2d": 3.8}
 # Cas9 is drawn at the size its text needs: 4OO8's layout changes in jumps with font_scale (a sweep from 5.6 to 7.0,
 # plan 28 Task 8: at 6.25 the page is 1716 x 1857 pt with the smallest text 22.5 pt, 6.6 pt across 178 mm)
 FS_MAX_PANEL["Scas9"] = 7.0
@@ -169,7 +173,7 @@ FS_MAX_BARE = {"F3a": 3.5}
 FS_MAX_SUPP = {"S1a": 3.5, "S1b": 3.5, "S1c": 3.5, "S1d": 3.5, "S1e": 3.5}
 # where the fit starts (labels mode): font_scale read off a sweep of each panel at 1..4 for its box (the layouts
 # change with the text, not smoothly, so a start near the answer avoids a jump to a worse layout)
-FS_START = {"F2a": 1.3, "F2b": 2.3, "F2c": 2.8, "F2d": 2.8, "S1b": 2.6, "S1c": 2.8, "Scas9": 6.25}
+FS_START = {"F2a": 1.3, "F2b": 2.8, "F2c": 2.8, "F2d": 3.6, "S1b": 2.6, "S1c": 2.8, "Scas9": 6.25}
 
 
 def box_of(pid: str) -> tuple[float, float]:
