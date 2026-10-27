@@ -57,7 +57,7 @@
 ## Seen by
 
 - `A15`: copies drawn alike (deviation at most `criteria.LIMITS` `copies_alike`, 0.5 page units).
-- `A12`: the same figure under any PYTHONHASHSEED, which catches an order that depends on set iteration.
+- `A12`: the same figure under a second PYTHONHASHSEED, which catches an order that depends on set iteration.
 - `D1`: the same figure drawn twice in one process.
 - No check sees the dependence on chain names (finding F1). Only the xfail test above does; `foldmap check` and the
   campaigns draw each entry under its own names.

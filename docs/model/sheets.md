@@ -48,8 +48,8 @@
 - `S3` stops counting pairing cycles at `science._MAX_CYCLES` and says so (the fallback `s3_cycles_capped`). On such a
   sheet the barrel count is not checked.
 - `sheets._ring` takes the longest cycle that one pairing left out of the tree closes. A ring made of two such cycles
-  may be missed; `S3` flags it when drawn open. This is a development note with no committed record or test; how often
-  it happens is not measured.
+  may be missed (from the code: only the longest single such cycle is taken); `S3` flags it when drawn open. How
+  often it happens is not measured.
 
 ## Seen by
 

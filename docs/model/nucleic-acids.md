@@ -54,7 +54,8 @@
   case, not a control. Its fallbacks 10, na_crossings 10 and 125 bead overlaps are F1's.
 - Pairs foldmap takes that a stricter kernel does not (metamorphic findings F2-F4): 44 by the H-bond window (to 3.8
   and 4.0 Å, the kernel 3.5), 6 by the C1'-C1' window (9.0-12.0 Å, the kernel 9.5-11.5), 5 by planarity (the kernel
-  has no bound). Whether each is a real pair is not measured; RNApolis agrees on the `D3` runs above.
+  has no bound). On the `D3` runs RNApolis has 24 of the 25 H-bond-window pairs those entries hold; 1AOI I:28/J:265
+  is foldmap's only. Whether the rest are real pairs is not measured.
 - `nucleic.HBOND_STRETCH` is sensitive, and without it 7F5S fails `A17` and `A6` (`docs/validation/prune/report.md`).
 - `layout._SIDE_CLEAR` is the one fragile constant: at x1.25 the third sample's pass count falls by 5 and `A17`
   failures go 7 to 13 (`docs/validation/sensitivity/report.md`). It was set on test structures (4YBB P5 at 2.81 Å is

@@ -69,20 +69,27 @@ A check's own failure is seen by its tests and by the records that measured it, 
 
 The failures no check sees, collected from the other pages:
 
-- Chain names choose protomer 0 (metamorphic finding F1): only an xfail test sees it
-  ([symmetry.md](symmetry.md)).
-- The latent `layout._open_at_ends` bug under `--like` ([layout.md](layout.md)).
-- A drawing that moves while every key stays equal: the prune record shows such moves; no key orders them.
-- Fallbacks counted but gated by no check: `route_unsnapped`, `glyph_width_guessed`, `helix_name_moved`; and those said
-  in the notes only, `mark_least_bad_spot` and `interactions_hidden` (the inventory's check column).
-- Loop crossings (`figcheck.loop_crossings`), na_run_crossings and na_protein_crossings: reported, not judged.
-- angle_median, angle_max and joint_error_max on a plain frame: zero by construction (`nacheck.ZERO_BY_CONSTRUCTION`),
-  a regression guard only.
-- 3EGZ's spearman per copy: not measured (too few stems) ([nucleic-acids.md](nucleic-acids.md)).
-- A wrong domain split on an entry with no CATH reference ([domains.md](domains.md)).
-- The membrane placed against OPM's: not measured ([membrane.md](membrane.md)).
-- A plausible but wrong assembly choice, and which altloc is drawn ([reading.md](reading.md)).
-- The length of a disulfide bar; text drawn under 6 pt by design (residue counts, base letters, ligand names).
+- Reading ([reading.md](reading.md)): a plausible but wrong assembly choice; which altloc is drawn.
+- DSSP ([dssp.md](dssp.md)): an element split or joined by the kink or copy rules against what a reader would choose.
+- Sheets ([sheets.md](sheets.md)): the register of a pairing on the page; a one-bridge pairing a reader would call a
+  sheet (`sheets._MIN_PAIRS` decides); `S6` passing an accessory whose pairing is only named in the notes.
+- Symmetry ([symmetry.md](symmetry.md)): chain names choose protomer 0 (metamorphic finding F1; only an xfail test
+  sees it); a wrong symmetry call that still draws its copies alike.
+- Layout ([layout.md](layout.md)): the latent `layout._open_at_ends` bug under `--like`; a drawing that moves while
+  every key stays equal (the prune record shows such moves); the length of a disulfide bar; text drawn under 6 pt by
+  design (residue counts, base letters, ligand names).
+- Routing ([routing.md](routing.md)): loops crossing loops (`figcheck.loop_crossings`), reported, not judged.
+- Fallbacks counted and gated by no check (the inventory's check column): `route_unsnapped`, `glyph_width_guessed`,
+  `helix_name_moved`; and those said in the notes only: `counts_hidden`, `mark_least_bad_spot`,
+  `interactions_dropped`, `interactions_hidden`, `crosslinks_unplaced`. `counts_hidden` fires often: 15 in the
+  sensitivity record's stage B baseline (`docs/validation/sensitivity/report.md`).
+- Nucleic acids ([nucleic-acids.md](nucleic-acids.md)): na_run_crossings and na_protein_crossings, reported, not
+  judged; angle_median, angle_max and joint_error_max on a plain frame, zero by construction
+  (`nacheck.ZERO_BY_CONSTRUCTION`); 3EGZ's spearman per copy (not measured, too few stems); whether a pair taken under
+  foldmap's wider windows is real, where RNApolis was not run.
+- Membrane ([membrane.md](membrane.md)): the membrane placed against OPM's (not measured); a wrong cytoplasmic side.
+- Domains ([domains.md](domains.md)): a wrong split on an entry with no CATH reference; the residue cuts the element
+  rules undo.
 - Every science check is internal: a figure true to a wrong DSSP call passes `S1` to `S4` and `S6`. Only `A10` and
   `D2` hold DSSP to mkdssp, and only `S5` holds anything to an outside chopping.
 

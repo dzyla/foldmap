@@ -12,11 +12,15 @@ What a page quotes, in backticks (docs/model/index.md says the same):
 - a check id (`S1`, `A17`, `A1c`, `R1`, `D2`, `H3`): defined by science.SCIENCE, criteria.CRITERIA,
   criteria.LIKE_CHECKS, floor.CODE or deep.DEEP;
 - a path under docs/, tests/, scripts/ or src/ (`docs/validation/prune/report.md`): it exists; `tests/x.py::name`
-  names a test function defined in that file.
+  names a test function defined in that file;
+- a bare word (`loop_curve`, `copies_alike`): a key of fallback.FALLBACKS, nacheck.THRESHOLDS or criteria.LIMITS, a
+  module's name, or one of a few allowed words (WORDS);
+- a constant quoted with its value (`layout._SIDE_CLEAR` (2.75 Å), `nucleic.C1_PAIR` (9.0-12.0 Å)): the value is the
+  live constant's (ruling Q52). Numbers quoted from records are not pinned.
 
 Relative links between pages and to the records must resolve too. docs/model and docs/validation are not in the
-sdist (MANIFEST.in grafts only docs/examples, docs/names and docs/domains), so this module is skipped where they are
-absent."""
+sdist (MANIFEST.in grafts only docs/examples, docs/names and docs/domains), so this module is skipped where
+docs/validation is absent; with docs/validation present, a missing docs/model fails."""
 
 from __future__ import annotations
 
@@ -33,11 +37,11 @@ ROOT = Path(__file__).resolve().parents[1]
 MODEL = ROOT / "docs" / "model"
 VALIDATION = ROOT / "docs" / "validation"
 
-if not (MODEL / "index.md").exists() or not VALIDATION.is_dir():
+if not VALIDATION.is_dir():  # the sdist's signature: docs/validation (and docs/model) are not in it
     pytest.skip("docs/model and docs/validation are not part of the sdist", allow_module_level=True)
 
 import foldmap  # noqa: E402
-from foldmap import criteria, deep, floor, science  # noqa: E402
+from foldmap import criteria, deep, fallback, floor, nacheck, science  # noqa: E402
 
 SECTIONS = ("Scope", "Assumes", "Guarantees", "Fails", "Seen by", "Evidence")
 PAGES = sorted(p for p in MODEL.glob("*.md") if p.name != "index.md")
@@ -56,6 +60,14 @@ CHECK = re.compile(r"(?:S\d+|A\d+[a-z]?|R\d+|D\d+|H\d+)")
 PATH = re.compile(r"(?:docs|tests|scripts|src)/[^\s:`]+")
 TEST = re.compile(r"(tests/[\w/]+\.py)::(\w+)(?:\[[^\]]*\])?")
 LINK = re.compile(r"\]\(([^)\s]+)\)")
+BARE = re.compile(r"[a-z_][a-z0-9_]*")
+# bare words a page may tick that name no code: option values, model.Sheet's fields, a local step, a local name
+WORDS = {"foldmap", "auto", "asu", "closed", "ambiguous", "accessory", "fold", "read_as"}
+# a constant quoted with its value: `module.NAME` (2.5 Å), `nucleic.C1_PAIR` (9.0-12.0 Å), `route._MAX_NODES` (200,000)
+NUMBER = r"-?\d+(?:,\d{3})*(?:\.\d+)?"
+VALUED = re.compile(
+    rf"`([a-z_][a-z0-9_]*\.(?:[A-Za-z_][A-Za-z0-9_]*\.)*_?[A-Z][A-Z0-9_]*)`\s*\(({NUMBER})(?:-({NUMBER}))?(?=[\s)%])"
+)
 
 
 def _checks() -> set[str]:
@@ -66,13 +78,50 @@ def _resolves(name: str) -> bool:
     """Does `module.attr[.attr...]` name live code in foldmap?"""
     module, *parts = name.split(".")
     obj = importlib.import_module(f"foldmap.{module}")
-    for part in parts:
+    for k, part in enumerate(parts):
         if hasattr(obj, part):
             obj = getattr(obj, part)
             continue
         fields = {f.name for f in dataclasses.fields(obj)} if dataclasses.is_dataclass(obj) else set()
-        return part in fields or part in getattr(obj, "__annotations__", {})
+        return k == len(parts) - 1 and (part in fields or part in getattr(obj, "__annotations__", {}))
     return True
+
+
+def _keys() -> set[str]:
+    """Bare words that name something: a named fallback, a nacheck measure, a criteria limit."""
+    return {*fallback.FALLBACKS, *nacheck.THRESHOLDS, *criteria.LIMITS}
+
+
+def _value(name: str):
+    module, *parts = name.split(".")
+    obj = importlib.import_module(f"foldmap.{module}")
+    for part in parts:
+        obj = getattr(obj, part)
+    return obj
+
+
+def _number(text: str) -> float:
+    return float(text.replace(",", ""))
+
+
+def value_problems(text: str) -> list[str]:
+    """Each constant quoted with its value (VALUED) against the live constant: a number, or a pair's two ends."""
+    out = []
+    for name, first, last in VALUED.findall(text):
+        try:
+            live = _value(name)
+        except (ImportError, AttributeError):
+            continue  # the name itself is reported by problems()
+        said = (_number(first), _number(last)) if last else _number(first)
+        if isinstance(live, (tuple, list)) and last:
+            ok = len(live) >= 2 and abs(float(live[0]) - said[0]) < 1e-9 and abs(float(live[-1]) - said[1]) < 1e-9
+        elif isinstance(live, (int, float)) and not isinstance(live, bool) and not last:
+            ok = abs(float(live) - said) < 1e-9
+        else:
+            ok = False
+        if not ok:
+            out.append(f"value of {name}: the page says {first}{'-' + last if last else ''}, the code has {live!r}")
+    return out
 
 
 def _defines(path: Path, name: str) -> bool:
@@ -85,7 +134,8 @@ def problems(page: Path) -> list[str]:
     text = page.read_text(encoding="utf-8")
     records = "\n".join(p.read_text(encoding="utf-8") for p in RECORDS)
     checks = _checks()
-    out = []
+    keys = _keys()
+    out = value_problems(text)
     for token in TICKED.findall(text):
         token = token.strip()
         if m := TEST.fullmatch(token):
@@ -108,6 +158,9 @@ def problems(page: Path) -> list[str]:
                 out.append(f"code name {token}: no module {token.split('.')[0]}")
             elif not _resolves(token):
                 out.append(f"code name {token}: not in the code")
+        elif BARE.fullmatch(token):
+            if token not in keys and token not in MODULES and token not in WORDS:
+                out.append(f"word {token}: no fallback, nacheck measure, criteria limit, module or allowed word")
     for target in LINK.findall(text):
         if target.startswith(("http://", "https://", "#")):
             continue
@@ -117,6 +170,7 @@ def problems(page: Path) -> list[str]:
 
 
 def test_every_page_is_listed_in_the_index_and_every_listed_page_exists():
+    assert (MODEL / "index.md").exists(), "docs/model/index.md is missing (docs/validation is here: not an sdist)"
     index = (MODEL / "index.md").read_text(encoding="utf-8")
     listed = {Path(t).name for t in LINK.findall(index) if not t.startswith(("http", "#", "../"))}
     assert listed == {p.name for p in PAGES}
@@ -154,9 +208,13 @@ def test_a_drifted_name_is_caught(tmp_path):
     page = tmp_path / "x.md"
     page.write_text(
         "`layout._no_such_name` `layout:_NO_SUCH` `A99` `docs/validation/no-such` `tests/test_layout.py::test_none` "
-        "[x](no-such.md) `layout._open_at_ends` `like.Like.order` `S1` `layout:_NAME_OPEN`",
+        "[x](no-such.md) `loop_curved` `like.Like.order.anything` `io._PEPTIDE_BOND_MAX` (2.6 Å)\n"
+        "`layout._open_at_ends` `like.Like.order` `S1` `layout:_NAME_OPEN` `loop_curve` `copies_alike` `fold` "
+        "`route._MAX_NODES` (200,000) `nucleic.C1_PAIR`\n  (9.0-12.0 Å) `layout._sheet_order` (3WZ0-2AV5)",
         encoding="utf-8",
     )
     found = problems(page)
-    assert len(found) == 6
-    assert all("_open_at_ends" not in p and "Like.order" not in p and "_NAME_OPEN" not in p for p in found)
+    assert len(found) == 9, found
+    assert any("_PEPTIDE_BOND_MAX" in p and "2.6" in p for p in found)
+    for good in ("_open_at_ends", "Like.order:", "_NAME_OPEN", "loop_curve:", "copies_alike", "_MAX_NODES", "C1_PAIR"):
+        assert not any(good in p for p in found), good

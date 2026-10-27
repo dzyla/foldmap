@@ -53,11 +53,11 @@
 
 - `A10`: residue agreement with mkdssp 3.1.2 at `criteria.LIMITS` `dssp_agree` 0.99 (campaign only; it needs mkdssp).
 - `D2`: the same measure in `foldmap check --deep`, when the MKDSSP environment variable names mkdssp.
-- `S1`, `S2`, `S3`: a missed or extra bridge shows when a drawn sheet disagrees with DSSP's pairing (see
-  [sheets.md](sheets.md)).
+- `S1`, `S2`, `S3`: they see a drawn sheet that disagrees with DSSP's pairing (see [sheets.md](sheets.md)). They do
+  not see a bridge DSSP itself missed or invented: only `A10` and `D2` hold DSSP to mkdssp.
 - No check sees an element split or joined by the kink or copy rules against what a reader would choose. The notes
   name them; nothing judges them.
-- No check sees DSSP's noise sensitivity on a single entry. It is measured on five fixtures only.
+- No check sees DSSP's noise sensitivity on a single entry. It is measured on four fixtures only.
 
 ## Evidence
 

@@ -56,8 +56,9 @@
 - Boundary moved (5 chains): the lowest cut lies elsewhere than CATH's (1GQ2 A, C and L; 1NID A; 3EOM C).
 - Extra split (15 chains): a cut below the limit inside one CATH domain, a lobe CATH keeps whole (1GQ2's other 13
   chains; 4ZH4 F and L).
-- Keeping weakly supported splits undivided does not help: every threshold above 0 lowers some dom_cal chain (record,
-  section 3). No threshold is drawn from the confidence.
+- Keeping weakly supported splits undivided: every threshold above 0 lowers some dom_cal chain (record, section 3).
+  Only the third sample would gain: at t = 0.30, 67 to 83 chains meet the targets (17 newly, 12 of them 1GQ2's
+  copies; 4GWY A no longer does; `docs/validation/domain-uncertainty/report-chains.json`). It cannot choose t. No threshold is drawn from the confidence.
 - Every domain constant is sensitive (`features.DOMAIN_NCUT`, `features.DOMAIN_CONTACT`,
   `features.DOMAIN_SEPARATION`, `features.DOMAIN_MIN_RESIDUES`, `features.DOMAIN_MIN_SEGMENT`;
   `docs/validation/sensitivity/report.md`). `features.DOMAIN_NCUT` at x1.25 takes the third sample's `S5` failures from

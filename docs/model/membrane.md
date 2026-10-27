@@ -13,9 +13,9 @@
 ## Assumes
 
 - When the file has OPM's dummy atoms, they give the membrane exactly: planes, thickness and sides.
-- Otherwise it is estimated. An outer-membrane β-barrel (closed, oily outside) gives the normal as its axis and a 24 Å
-  slab (`membrane.BARREL_HALF`). Else the long helices and strands give a first normal and a 30 Å slab
-  (`membrane.HALF`) is slid to the most hydrophobic, least charged place; the normal is refitted to the crossing
+- Otherwise it is estimated. An outer-membrane β-barrel (closed, oily outside) gives the normal as its axis and a slab of
+  half-thickness `membrane.BARREL_HALF` (12 Å). Else the long helices and strands give a first normal and a slab of
+  half-thickness `membrane.HALF` (15 Å) is slid to the most hydrophobic, least charged place; the normal is refitted to the crossing
   helices when there are at least `membrane.MIN_CROSSING_HELICES` (3).
 - The normal comes from the elements' axes. No search over tilt angles is made.
 - The cytoplasmic side comes from the positive-inside rule: more Lys and Arg on the loops of the crossing elements.

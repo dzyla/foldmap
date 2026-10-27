@@ -31,8 +31,8 @@
 - Sheets are face-on, never mirrored: `tests/test_layout.py::test_sheets_are_drawn_face_on_never_mirrored`.
 - The layout is deterministic: `tests/test_layout.py::test_deterministic`; `A12` passes on every entry of the third
   sample with something to judge (`docs/validation/random100-third/review.md`).
-- The bench's 22 entries draw the same layouts at the prune record's code (`docs/validation/prune/report.md`, bench
-  --exact).
+- The bench's 22 entries equal the plan-15 bench baseline exactly at the prune record's code (bench --exact,
+  `docs/validation/prune/report.md`).
 - A TIM barrel is one row, a helix between each pair of strands, opened between its last and first strand:
   `tests/test_template.py::test_tim_barrel_is_one_row_with_each_helix_between_its_strands`,
   `tests/test_template.py::test_template_barrel_opens_between_its_last_and_first_strand`.
@@ -57,14 +57,18 @@
     reading wraps at the seam, or reads reversed there.
   - Trigger: a closed one-chain sheet drawn as a βα row, its first and last strands in sequence ring neighbours, drawn
     `--like` a reference that sets its order (two or more mates in one of the reference's sheets, in one order there).
-  - It occurred in none of the 46 sheets with an order set on the homologue sets (25 tuning, 21 held-out;
-    `docs/validation/homologues/topology-transfer/report.md`). No test reaches the trigger: 1TIM drawn like itself
-    (`tests/test_like.py::test_like_itself_reproduces_the_layout`) has its ring shifted but no order set for it
-    (looked at once for this page: its one sheet's `like.Like.order` entry is None).
+  - Seen only when the reference draws strands on both sides of foldmap's seam side by side in one order (an open
+    sheet, a circular permutant). A reference barrel opened at its own β8|β1 gives no order (`like._order` answers
+    None), as 1TIM drawn like itself does (`tests/test_like.py::test_like_itself_reproduces_the_layout` reaches the
+    shifted ring, not the trigger).
+  - It occurred in none of the 46 sheets with an order set on the homologue sets: the topology-transfer record's
+    "read and point as A's" column compares drawn order directly and holds 25 of 25 and 21 of 21
+    (`docs/validation/homologues/topology-transfer/report.md`).
   - Not fixed: a fix waits for an unseen case.
 - 9NMN (third sample): helix α153's name lies on the loop into it, failing `A4` and `A6` in three views.
 - 8OJZ/8QX1 (third sample): one state draws a helix the other does not, so its helix names shift by one letter; `A19`
-  fails. 9YKJ/10UJ on the first sample is the same kind (`docs/validation/random100/review.md`).
+  fails. 9YKJ/10UJ on the first sample fails the same check for another cause: a βα row in one state only
+  (`docs/validation/random100/review.md`).
 - Large figures: the page reaches 48 in and the text falls under 6 pt. On the three samples' default views: 9FZL
   (2.0 pt), 6ET5 (2.4), 6JLN (4.5), 7NZ2 (5.2), 8XJV (5.4), 7JU4 (5.5), 8WMV (5.5) and 8ZTU (5.7)
   (`docs/validation/readability-floor/report.md`).
