@@ -14,7 +14,8 @@ no membrane entry yet, and S5, S8 and S9 are small); the sampler records how sho
 per stratum.
 
 split adds `"split": {"tune": [...], "check": [...]}` to the sample: split() sorts the ids by
-sha256(f"{seed}:{id}") and takes the first N_CHECK as check, the rest as tune. Fixes are tuned on `tune` and measured
+sha256(f"{seed}:{id}") and takes the first round(CHECK_SHARE x n) as check (32 of the 79 drawn: ruling P29-2, the
+plan's 60/40), the rest as tune. Fixes are tuned on `tune` and measured
 on `check`, which the fix was not tuned on.
 
 run draws each id (default: every entry of the sample) the app's way, one child process per entry (`entry`, run with
@@ -53,7 +54,7 @@ RANDOM100 = SCRIPT.parent / "random100.py"
 OUT = ROOT / "docs" / "validation" / "app29"
 SAMPLE = OUT / "sample.json"
 SEED = 20261027
-N_CHECK = 40
+CHECK_SHARE = 0.4  # of the sample measured on, never tuned on: the plan's 60/40 (ruling P29-2)
 ENTRY_TIMEOUT = 900.0  # s: one entry's process (the draw job's 90 s, the PNG, the redraw and the checks)
 DRAW = [  # plan 29 Task 1 Step 1, as given; --no-alphafold: ruling Q61
     "sample",
@@ -89,18 +90,20 @@ def random100():
 # ------------------------------------------------------------------------------------------------ sample
 
 
-def split(ids, seed: int = SEED, n_check: int = N_CHECK) -> dict[str, list[str]]:
-    """The ids sorted by sha256(f"{seed}:{id}"): the first n_check are "check", the rest "tune". Whatever order the
-    ids come in, the same split."""
+def split(ids, seed: int = SEED, n_check: int | None = None) -> dict[str, list[str]]:
+    """The ids sorted by sha256(f"{seed}:{id}"): the first n_check (default round(CHECK_SHARE x n)) are "check", the
+    rest "tune". Whatever order the ids come in, the same split."""
     ranked = sorted(set(ids), key=lambda i: hashlib.sha256(f"{seed}:{i}".encode()).hexdigest())
+    n_check = round(CHECK_SHARE * len(ranked)) if n_check is None else n_check
     return {"tune": ranked[n_check:], "check": ranked[:n_check]}
 
 
-def add_split(path: Path, seed: int = SEED, n_check: int = N_CHECK) -> dict:
+def add_split(path: Path, seed: int = SEED, n_check: int | None = None) -> dict:
     """Write the split of the sample's entries into the sample file (its "split"), with how it was made."""
     doc = json.loads(Path(path).read_text(encoding="utf-8"))
     doc["split"] = split([e["id"] for e in doc["entries"]], seed, n_check)
-    doc["split_rule"] = f"sorted by sha256(f'{{seed}}:{{id}}'), seed {seed}: the first {n_check} check, the rest tune"
+    n = len(doc["split"]["check"])
+    doc["split_rule"] = f"sorted by sha256(f'{{seed}}:{{id}}'), seed {seed}: the first {n} check, the rest tune"
     Path(path).write_text(json.dumps(doc, indent=1, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
     return doc
 

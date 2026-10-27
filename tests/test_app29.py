@@ -38,6 +38,14 @@ def test_split_is_seeded_disjoint_and_complete(app29):
     assert a != app29.split(ids, seed=1, n_check=40)  # the seed chooses
 
 
+def test_the_default_split_is_60_40_of_the_sample(app29):
+    """Ruling P29-2: check is round(0.4 x n) of the sample: 32 of the 79 drawn, 47 tune."""
+    ids = [f"{i}XYZ" for i in range(79)]
+    a = app29.split(ids)
+    assert (len(a["tune"]), len(a["check"])) == (47, 32)
+    assert a["check"] == app29.split(ids, n_check=32)["check"]  # the same ranking, cut at 32
+
+
 def test_app_view_judges_the_apps_own_figure(random100, tmp_path):
     got = random100.app_view(DATA / "1UBQ.cif", "1UBQ", keep=tmp_path)
     assert got["refused"] is None and got["error"] is None
