@@ -1,6 +1,6 @@
 # The topology carried by --like
 
-Plan 28 Task 6 (the review's 3.5, ruling Q44). Written by: foldmap 0.1.0, git c6e94c1ccddb (asserted by runner, dirty False), code fingerprint 4eb4cad74365b1ed, scripts/topology_transfer.py sha256 84ce27f28860; Python 3.13.13 on Linux-7.0.0-38-generic-x86_64-with-glibc2.43; gemmi 0.7.5, numpy 2.5.4, scipy 1.18.1, networkx 3.7, matplotlib 3.11.2, PyYAML 6.0.3
+Plan 28 Task 6 (the review's 3.5, ruling Q44). Written by: foldmap 0.1.0, git cdd29dd49035 (asserted by runner, dirty False), code fingerprint 4eb4cad74365b1ed, scripts/topology_transfer.py sha256 731bc36e96e0; Python 3.13.13 on Linux-7.0.0-38-generic-x86_64-with-glibc2.43; gemmi 0.7.5, numpy 2.5.4, scipy 1.18.1, networkx 3.7, matplotlib 3.11.2, PyYAML 6.0.3
 
 Whether a sheet drawn like a reference keeps the reference's strand order and direction. Each pair is drawn like A twice: **carried**, as foldmap draws it (each of B's sheets reads left to right as A reads its mates, Like.order, where like._order says), and **withheld**, the same with like._order answering None, so each sheet's order is its own (layout._sheet_order's default). Both are judged by H1-H5 as the homologue campaign judges them (scripts/homologues.py; limits criteria.LIMITS, frozen at 76fd936). The record is made by scripts/topology_transfer.py; report.json holds every pair and sheet.
 
@@ -9,6 +9,8 @@ Whether a sheet drawn like a reference keeps the reference's strand order and di
 - **hom_tuning** (tuning): plan 13a's homologue tuning pairs (docs/validation/homologues/tuning.json: 11 positive, 4 negative); the H1-H5 limits (criteria.LIMITS like_*) were frozen at 76fd936 while looking at this set's results (docs/validation/homologues/tuning-report.md).
 - **hom_heldout** (unseen at c099787, historical): plan 13a's held-out homologue pairs (docs/validation/homologues/heldout.json: 30 positive, 10 negative); one run at c099787 with the limits frozen at 76fd936 on the tuning set; nothing changed after the run; its count describes c099787, not the release (reruns since give 17 of 30 positives against the frozen 16; docs/validation/homologues/review.md).
 - Neither set is unseen for this record: hom_tuning is the set the limits were chosen on, and the fix measured here (Like.order, 1a3f9d6, plan 13a-12) was aimed at 3WZ0-2AV5, a hom_heldout pair, after its one run. The carried column is a regression measure on both sets, not evidence on unseen structures.
+
+- Withheld is today's code with like._order answering None, judged by today's criteria, not the code before 1a3f9d6: that commit also removed H3's pairing excuse and made H1's refusal a flag; withheld reproduces the c099787 counts (16 of 30, H2 17, H3 17) all the same.
 
 ## The mechanism (3WZ0-2AV5)
 

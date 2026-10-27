@@ -248,7 +248,7 @@ changes**: every pair passes and fails the same checks on both sets.
 
 ## The sheet order carried (plan 28 Task 6, post hoc)
 
-The external review's 3.5 quoted 3WZ0-2AV5 from the held-out run above (B C A D drawn D A C B at TM 0.97). Its
+Added 2026-10-26. The external review's 3.5 quoted 3WZ0-2AV5 from the held-out run above (B C A D drawn D A C B at TM 0.97). Its
 mechanism was fixed after that run, at 1a3f9d6 (plan 13a-12, Like.order), and `topology-transfer/report.md` measures
 it at c6e94c1 on both sets, each pair drawn with the reference's sheet order carried (as foldmap draws) and withheld.
 Nothing frozen above changes.

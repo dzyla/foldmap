@@ -6,13 +6,13 @@
   "checkout_fingerprint": "4eb4cad74365b1ed",
   "installed_matches_checkout": true,
   "git": {
-   "commit": "c6e94c1ccddb5d76999cbfea9f2b88ca9189a84e",
+   "commit": "cdd29dd490357760974769fb1791e2523feba1e5",
    "dirty": false,
    "source": "asserted by runner"
   },
   "script": {
    "name": "scripts/topology_transfer.py",
-   "sha256": "84ce27f28860ae55851622b5c4559d692e6bb3cee6be8e2f8e53fdab4ad0a336"
+   "sha256": "731bc36e96e0f8d165d8acede7aa14f022e366bc71d2469de16043d18f0b9bd0"
   },
   "python": {
    "version": "3.13.13",
