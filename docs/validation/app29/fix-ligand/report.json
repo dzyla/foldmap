@@ -1,0 +1,3809 @@
+{
+ "source_stamp": {
+  "foldmap": "0.1.0",
+  "code_fingerprint": "43e1d11adf24d91b",
+  "package": "checkout",
+  "checkout_fingerprint": "43e1d11adf24d91b",
+  "installed_matches_checkout": true,
+  "git": {
+   "commit": "552687f251ea5267724c253c1e74778ce4bee5e0",
+   "dirty": false,
+   "dirty_paths": [],
+   "source": "git"
+  },
+  "script": {
+   "name": "scripts/app29_fix.py",
+   "sha256": "f9ba7e369dccc0d5ef1a6763bb8fce3b36a65cac0dc449951f6eca392389e537"
+  },
+  "python": {
+   "version": "3.12.9",
+   "implementation": "CPython"
+  },
+  "platform": {
+   "platform": "Linux-6.18.33.1-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+   "machine": "x86_64"
+  },
+  "packages": {
+   "gemmi": "0.7.5",
+   "numpy": "2.5.3",
+   "scipy": "1.18.1",
+   "networkx": "3.7",
+   "matplotlib": "3.11.2",
+   "PyYAML": "6.0.3"
+  }
+ },
+ "name": "fix-ligand",
+ "inputs": {
+  "before_record": "docs/validation/app29/before",
+  "before_stamp": {
+   "foldmap": "0.1.0",
+   "code_fingerprint": "f624dcc2403b2888",
+   "package": "checkout",
+   "checkout_fingerprint": "f624dcc2403b2888",
+   "installed_matches_checkout": true,
+   "git": {
+    "commit": "549bef96bf1e40795fc16f6c9459315e304e323b",
+    "dirty": false,
+    "source": "asserted by runner"
+   },
+   "script": {
+    "name": "scripts/app29.py",
+    "sha256": "cdf60fa1e05239c2d5fcd93ce5d5945f8e260122ff9af7ed8a25b61ffa6f605e"
+   },
+   "python": {
+    "version": "3.13.13",
+    "implementation": "CPython"
+   },
+   "platform": {
+    "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+    "machine": "x86_64"
+   },
+   "packages": {
+    "gemmi": "0.7.5",
+    "numpy": "2.5.4",
+    "scipy": "1.18.1",
+    "networkx": "3.7",
+    "matplotlib": "3.11.2",
+    "PyYAML": "6.0.3"
+   }
+  },
+  "after_record": "docs/validation/app29/fix-ligand/run",
+  "after_stamp": {
+   "foldmap": "0.1.0",
+   "code_fingerprint": "43e1d11adf24d91b",
+   "package": "checkout",
+   "checkout_fingerprint": "43e1d11adf24d91b",
+   "installed_matches_checkout": true,
+   "git": {
+    "commit": "6ebc5c847704ae8ba9734708b6bdd3fc300125e3",
+    "dirty": false,
+    "source": "asserted by runner"
+   },
+   "script": {
+    "name": "scripts/app29.py",
+    "sha256": "cdf60fa1e05239c2d5fcd93ce5d5945f8e260122ff9af7ed8a25b61ffa6f605e"
+   },
+   "python": {
+    "version": "3.13.13",
+    "implementation": "CPython"
+   },
+   "platform": {
+    "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+    "machine": "x86_64"
+   },
+   "packages": {
+    "gemmi": "0.7.5",
+    "numpy": "2.5.4",
+    "scipy": "1.18.1",
+    "networkx": "3.7",
+    "matplotlib": "3.11.2",
+    "PyYAML": "6.0.3"
+   }
+  },
+  "runs_before_stamp": {
+   "foldmap": "0.1.0",
+   "code_fingerprint": "f624dcc2403b2888",
+   "package": "checkout",
+   "checkout_fingerprint": "f624dcc2403b2888",
+   "installed_matches_checkout": true,
+   "git": {
+    "commit": null,
+    "source": "git",
+    "error": "CalledProcessError: Command '['git', '-C', '/tmp/claude-1000/-home-dzyla-foldmap/23e71d62-5b86-4ba7-832d-8711a9baf021/scratchpad/t4/base', 'rev-parse', 'HEAD']' returned non-zero exit status 128."
+   },
+   "script": {
+    "name": "scripts/random100.py",
+    "sha256": "b552d3c3d4b358ca960e55c1a684f2dd5f20d9e863b3efac735b9a9ba6d89aff"
+   },
+   "python": {
+    "version": "3.13.13",
+    "implementation": "CPython"
+   },
+   "platform": {
+    "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+    "machine": "x86_64"
+   },
+   "packages": {
+    "gemmi": "0.7.5",
+    "numpy": "2.5.4",
+    "scipy": "1.18.1",
+    "networkx": "3.7",
+    "matplotlib": "3.11.2",
+    "PyYAML": "6.0.3"
+   }
+  },
+  "runs_after_stamp": {
+   "foldmap": "0.1.0",
+   "code_fingerprint": "43e1d11adf24d91b",
+   "package": "checkout",
+   "checkout_fingerprint": "43e1d11adf24d91b",
+   "installed_matches_checkout": true,
+   "git": {
+    "commit": "6ebc5c847704ae8ba9734708b6bdd3fc300125e3",
+    "dirty": false,
+    "source": "asserted by runner"
+   },
+   "script": {
+    "name": "scripts/random100.py",
+    "sha256": "b552d3c3d4b358ca960e55c1a684f2dd5f20d9e863b3efac735b9a9ba6d89aff"
+   },
+   "python": {
+    "version": "3.13.13",
+    "implementation": "CPython"
+   },
+   "platform": {
+    "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+    "machine": "x86_64"
+   },
+   "packages": {
+    "gemmi": "0.7.5",
+    "numpy": "2.5.4",
+    "scipy": "1.18.1",
+    "networkx": "3.7",
+    "matplotlib": "3.11.2",
+    "PyYAML": "6.0.3"
+   }
+  },
+  "marks_before_foldmap": "/tmp/claude-1000/-home-dzyla-foldmap/23e71d62-5b86-4ba7-832d-8711a9baf021/scratchpad/t4/base/src/foldmap",
+  "marks_before_stamp": {
+   "foldmap": "0.1.0",
+   "code_fingerprint": "f624dcc2403b2888",
+   "package": "installed",
+   "checkout_fingerprint": "43e1d11adf24d91b",
+   "installed_matches_checkout": false,
+   "git": {
+    "commit": "552687f251ea5267724c253c1e74778ce4bee5e0",
+    "dirty": false,
+    "source": "asserted by runner"
+   },
+   "script": {
+    "name": "scripts/app29_fix.py",
+    "sha256": "f9ba7e369dccc0d5ef1a6763bb8fce3b36a65cac0dc449951f6eca392389e537"
+   },
+   "python": {
+    "version": "3.13.13",
+    "implementation": "CPython"
+   },
+   "platform": {
+    "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+    "machine": "x86_64"
+   },
+   "packages": {
+    "gemmi": "0.7.5",
+    "numpy": "2.5.4",
+    "scipy": "1.18.1",
+    "networkx": "3.7",
+    "matplotlib": "3.11.2",
+    "PyYAML": "6.0.3"
+   }
+  },
+  "marks_after_foldmap": "/home/dzyla/foldmap/src/foldmap",
+  "marks_after_stamp": {
+   "foldmap": "0.1.0",
+   "code_fingerprint": "43e1d11adf24d91b",
+   "package": "checkout",
+   "checkout_fingerprint": "43e1d11adf24d91b",
+   "installed_matches_checkout": true,
+   "git": {
+    "commit": "552687f251ea5267724c253c1e74778ce4bee5e0",
+    "dirty": false,
+    "source": "asserted by runner"
+   },
+   "script": {
+    "name": "scripts/app29_fix.py",
+    "sha256": "f9ba7e369dccc0d5ef1a6763bb8fce3b36a65cac0dc449951f6eca392389e537"
+   },
+   "python": {
+    "version": "3.13.13",
+    "implementation": "CPython"
+   },
+   "platform": {
+    "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+    "machine": "x86_64"
+   },
+   "packages": {
+    "gemmi": "0.7.5",
+    "numpy": "2.5.4",
+    "scipy": "1.18.1",
+    "networkx": "3.7",
+    "matplotlib": "3.11.2",
+    "PyYAML": "6.0.3"
+   }
+  }
+ },
+ "tune": {
+  "entries": 47,
+  "svg_changed": [
+   "9SXF",
+   "29TB",
+   "31FD",
+   "9X4L",
+   "9WNE"
+  ],
+  "rows": [
+   {
+    "id": "9SXY",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     0.27,
+     0.25
+    ]
+   },
+   {
+    "id": "9SXU",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     0.28,
+     0.25
+    ]
+   },
+   {
+    "id": "9SXF",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": true,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     0.25,
+     0.24
+    ]
+   },
+   {
+    "id": "9SXG",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     0.27,
+     0.25
+    ]
+   },
+   {
+    "id": "29LB",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     0.24,
+     0.23
+    ]
+   },
+   {
+    "id": "29TB",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": true,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     0.36,
+     0.35
+    ]
+   },
+   {
+    "id": "9T57",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     0.34,
+     0.34
+    ]
+   },
+   {
+    "id": "9ZFX",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     0.61,
+     0.61
+    ]
+   },
+   {
+    "id": "14CU",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     1.26,
+     1.28
+    ]
+   },
+   {
+    "id": "30CY",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     0.94,
+     0.96
+    ]
+   },
+   {
+    "id": "44LS",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     1.22,
+     1.24
+    ]
+   },
+   {
+    "id": "9YL9",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     0.64,
+     0.65
+    ]
+   },
+   {
+    "id": "20XT",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     0.75,
+     0.73
+    ]
+   },
+   {
+    "id": "9WVR",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     0.28,
+     0.29
+    ]
+   },
+   {
+    "id": "9Z0S",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     1.32,
+     1.31
+    ]
+   },
+   {
+    "id": "9TCF",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     0.92,
+     0.94
+    ]
+   },
+   {
+    "id": "9YOA",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     3.68,
+     3.63
+    ]
+   },
+   {
+    "id": "38NR",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     0.28,
+     0.27
+    ]
+   },
+   {
+    "id": "23FR",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     17.26,
+     17.24
+    ]
+   },
+   {
+    "id": "31FD",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     false,
+     false
+    ],
+    "svg_changed": true,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     13.14,
+     13.05
+    ]
+   },
+   {
+    "id": "22VF",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     1.52,
+     1.51
+    ]
+   },
+   {
+    "id": "12XK",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     1.19,
+     1.2
+    ]
+   },
+   {
+    "id": "35VC",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     1.01,
+     1.14
+    ]
+   },
+   {
+    "id": "23CX",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     1.29,
+     1.28
+    ]
+   },
+   {
+    "id": "28HY",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     0.47,
+     0.47
+    ]
+   },
+   {
+    "id": "26EL",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     1.59,
+     1.63
+    ]
+   },
+   {
+    "id": "9X4L",
+    "criteria": [
+     [
+      "A20"
+     ],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": true,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     16.83,
+     16.52
+    ]
+   },
+   {
+    "id": "9NYA",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     0.14,
+     0.14
+    ]
+   },
+   {
+    "id": "45JF",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     0.11,
+     0.11
+    ]
+   },
+   {
+    "id": "34XH",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     0.14,
+     0.13
+    ]
+   },
+   {
+    "id": "9WXY",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     0.05,
+     0.05
+    ]
+   },
+   {
+    "id": "9ZSJ",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     2.7,
+     2.64
+    ]
+   },
+   {
+    "id": "9YPK",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     23.66,
+     23.77
+    ]
+   },
+   {
+    "id": "9YPN",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     20.87,
+     20.87
+    ]
+   },
+   {
+    "id": "9WNE",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": true,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     1.47,
+     1.48
+    ]
+   },
+   {
+    "id": "22MZ",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     0.36,
+     0.43
+    ]
+   },
+   {
+    "id": "9XIC",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     9.77,
+     9.65
+    ]
+   },
+   {
+    "id": "9TMF",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     3.37,
+     3.4
+    ]
+   },
+   {
+    "id": "34QD",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     0.82,
+     0.78
+    ]
+   },
+   {
+    "id": "12KF",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     1.52,
+     1.48
+    ]
+   },
+   {
+    "id": "30CU",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     0.95,
+     0.94
+    ]
+   },
+   {
+    "id": "30CV",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     1.01,
+     1.03
+    ]
+   },
+   {
+    "id": "9YLA",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     0.68,
+     0.69
+    ]
+   },
+   {
+    "id": "9YLG",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     0.68,
+     0.69
+    ]
+   },
+   {
+    "id": "32IL",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     0.18,
+     0.17
+    ]
+   },
+   {
+    "id": "9SXD",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     0.27,
+     0.27
+    ]
+   },
+   {
+    "id": "9YLD",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     0.26,
+     0.26
+    ]
+   }
+  ]
+ },
+ "check": {
+  "before": {
+   "entries": 32,
+   "drawn": 31,
+   "refused": 1,
+   "error": 0,
+   "not_measured": 0,
+   "png_error": 0,
+   "criteria_failed": 3,
+   "floor_failed": 1,
+   "ui_run": 0,
+   "ui_failed": 0
+  },
+  "after": {
+   "entries": 32,
+   "drawn": 31,
+   "refused": 1,
+   "error": 0,
+   "not_measured": 0,
+   "png_error": 0,
+   "criteria_failed": 3,
+   "floor_failed": 1,
+   "ui_run": 0,
+   "ui_failed": 0
+  },
+  "worse": [],
+  "better": []
+ },
+ "third": {
+  "verdict": "identical",
+  "worse": [],
+  "better": [],
+  "moved": [],
+  "svg_moved": [
+   "3ABR",
+   "3G6E",
+   "3WAU",
+   "5S4U",
+   "6IZP",
+   "6QIK",
+   "6VBG",
+   "7F5S",
+   "7XBK",
+   "8EM7"
+  ],
+  "entries": 100,
+  "passed": [
+   82,
+   82
+  ],
+  "committed_reference": {
+   "note": "the committed report (views all, an older code) against the after run, default view: for reference",
+   "passed": [
+    83,
+    82
+   ],
+   "worse": 36,
+   "better": 18,
+   "moved": 10
+  }
+ },
+ "na": {
+  "verdict": "identical",
+  "worse": [],
+  "better": [],
+  "moved": [],
+  "svg_moved": [
+   "1KX5",
+   "6IZP",
+   "6QIK"
+  ],
+  "entries": 46
+ },
+ "bench": {
+  "exit": [
+   0,
+   0
+  ],
+  "entries": 22,
+  "changed": [],
+  "worse": []
+ },
+ "marks": {
+  "9SXF": {
+   "marks": [
+    1,
+    1
+   ],
+   "over_bodies": [
+    4.6,
+    4.435
+   ],
+   "along_loops": [
+    0.0,
+    0.0
+   ],
+   "c9": [
+    4.6,
+    4.435
+   ],
+   "on_loop": [
+    [
+     "A1JRG:A1001"
+    ],
+    []
+   ],
+   "crowded": [
+    0,
+    0
+   ],
+   "longest_cross_chain_tether": [
+    null,
+    null
+   ],
+   "moved": [
+    {
+     "mark": "A1JRG:A1001",
+     "from": [
+      -4.868,
+      -1.36
+     ],
+     "to": [
+      -3.749,
+      -1.395
+     ],
+     "on_loop": [
+      0.54,
+      0.0
+     ],
+     "over_bodies": [
+      4.6,
+      4.435
+     ],
+     "along_loops": [
+      0.0,
+      0.0
+     ],
+     "longest_tether": [
+      5.644,
+      6.295
+     ],
+     "tethers": [
+      [
+       5.171,
+       5.644,
+       5.182,
+       4.773
+      ],
+      [
+       6.277,
+       6.129,
+       6.295,
+       3.729
+      ]
+     ]
+    }
+   ]
+  },
+  "29TB": {
+   "marks": [
+    3,
+    3
+   ],
+   "over_bodies": [
+    14.378,
+    13.368
+   ],
+   "along_loops": [
+    0.0,
+    0.0
+   ],
+   "c9": [
+    14.378,
+    13.368
+   ],
+   "on_loop": [
+    [
+     "A1J4K:A306"
+    ],
+    []
+   ],
+   "crowded": [
+    0,
+    0
+   ],
+   "longest_cross_chain_tether": [
+    null,
+    null
+   ],
+   "moved": [
+    {
+     "mark": "A1J4K:A306",
+     "from": [
+      2.269,
+      3.76
+     ],
+     "to": [
+      2.666,
+      3.814
+     ],
+     "on_loop": [
+      0.54,
+      0.0
+     ],
+     "over_bodies": [
+      11.759,
+      10.749
+     ],
+     "along_loops": [
+      0.0,
+      0.0
+     ],
+     "longest_tether": [
+      7.252,
+      7.568
+     ],
+     "tethers": [
+      [
+       0.97,
+       7.252,
+       4.307,
+       7.184
+      ],
+      [
+       1.219,
+       7.568,
+       4.689,
+       7.312
+      ]
+     ]
+    }
+   ]
+  },
+  "31FD": {
+   "marks": [
+    108,
+    108
+   ],
+   "over_bodies": [
+    302.043,
+    296.422
+   ],
+   "along_loops": [
+    16.68,
+    17.287
+   ],
+   "c9": [
+    318.723,
+    313.709
+   ],
+   "on_loop": [
+    [
+     "CLA:C509",
+     "CLA:c516",
+     "CLA:c511",
+     "CLA:c505"
+    ],
+    []
+   ],
+   "crowded": [
+    0,
+    0
+   ],
+   "longest_cross_chain_tether": [
+    6.227,
+    6.227
+   ],
+   "moved": [
+    {
+     "mark": "CLA:C509",
+     "from": [
+      -10.642,
+      7.717
+     ],
+     "to": [
+      -12.882,
+      13.121
+     ],
+     "on_loop": [
+      0.54,
+      0.0
+     ],
+     "over_bodies": [
+      6.504,
+      3.515
+     ],
+     "along_loops": [
+      0.0,
+      0.0
+     ],
+     "longest_tether": [
+      9.276,
+      13.341
+     ],
+     "tethers": [
+      [
+       1.904,
+       4.219,
+       8.081,
+       9.276
+      ],
+      [
+       6.761,
+       8.22,
+       5.897,
+       13.341
+      ]
+     ]
+    },
+    {
+     "mark": "CLA:C511",
+     "from": [
+      -9.732,
+      10.684
+     ],
+     "to": [
+      -9.732,
+      7.287
+     ],
+     "on_loop": [
+      0.0,
+      0.0
+     ],
+     "over_bodies": [
+      6.549,
+      7.683
+     ],
+     "along_loops": [
+      0.771,
+      0.0
+     ],
+     "longest_tether": [
+      8.5,
+      8.704
+     ],
+     "tethers": [
+      [
+       3.693,
+       8.5,
+       7.089,
+       5.919
+      ],
+      [
+       2.354,
+       8.336,
+       7.814,
+       8.704
+      ]
+     ]
+    },
+    {
+     "mark": "CLA:C516",
+     "from": [
+      -9.778,
+      6.974
+     ],
+     "to": [
+      -9.928,
+      3.867
+     ],
+     "on_loop": [
+      0.0,
+      0.0
+     ],
+     "over_bodies": [
+      0.717,
+      0.727
+     ],
+     "along_loops": [
+      0.0,
+      0.0
+     ],
+     "longest_tether": [
+      4.27,
+      5.022
+     ],
+     "tethers": [
+      [
+       2.761,
+       2.108,
+       4.27,
+       4.186
+      ],
+      [
+       2.59,
+       5.022,
+       1.509,
+       1.087
+      ]
+     ]
+    },
+    {
+     "mark": "CLA:c516",
+     "from": [
+      104.462,
+      5.945
+     ],
+     "to": [
+      106.889,
+      9.717
+     ],
+     "on_loop": [
+      0.54,
+      0.0
+     ],
+     "over_bodies": [
+      5.422,
+      4.156
+     ],
+     "along_loops": [
+      0.0,
+      0.0
+     ],
+     "longest_tether": [
+      8.643,
+      8.431
+     ],
+     "tethers": [
+      [
+       6.211,
+       6.781,
+       8.643
+      ],
+      [
+       8.431,
+       4.46,
+       4.5
+      ]
+     ]
+    },
+    {
+     "mark": "PHO:a409",
+     "from": [
+      112.324,
+      7.286
+     ],
+     "to": [
+      112.238,
+      6.739
+     ],
+     "on_loop": [
+      0.0,
+      0.0
+     ],
+     "over_bodies": [
+      9.319,
+      10.327
+     ],
+     "along_loops": [
+      0.909,
+      1.975
+     ],
+     "longest_tether": [
+      24.63,
+      24.64
+     ],
+     "tethers": [
+      [
+       7.224,
+       3.512,
+       24.63,
+       16.61
+      ],
+      [
+       7.38,
+       3.23,
+       24.64,
+       16.481
+      ]
+     ]
+    },
+    {
+     "mark": "CLA:c511",
+     "from": [
+      102.467,
+      7.743
+     ],
+     "to": [
+      105.467,
+      14.208
+     ],
+     "on_loop": [
+      0.54,
+      0.0
+     ],
+     "over_bodies": [
+      7.118,
+      3.19
+     ],
+     "along_loops": [
+      0.0,
+      0.0
+     ],
+     "longest_tether": [
+      8.532,
+      10.663
+     ],
+     "tethers": [
+      [
+       2.314,
+       8.532,
+       7.574,
+       8.432
+      ],
+      [
+       7.374,
+       7.862,
+       10.663,
+       1.536
+      ]
+     ]
+    },
+    {
+     "mark": "CLA:c507",
+     "from": [
+      102.62,
+      12.895
+     ],
+     "to": [
+      102.991,
+      13.961
+     ],
+     "on_loop": [
+      0.0,
+      0.0
+     ],
+     "over_bodies": [
+      0.0,
+      0.0
+     ],
+     "along_loops": [
+      0.0,
+      0.0
+     ],
+     "longest_tether": [
+      4.928,
+      6.049
+     ],
+     "tethers": [
+      [
+       1.326,
+       4.928,
+       2.765
+      ],
+      [
+       1.716,
+       6.049,
+       1.769
+      ]
+     ]
+    },
+    {
+     "mark": "CLA:c505",
+     "from": [
+      101.939,
+      5.32
+     ],
+     "to": [
+      102.731,
+      7.366
+     ],
+     "on_loop": [
+      0.54,
+      0.0
+     ],
+     "over_bodies": [
+      0.385,
+      0.713
+     ],
+     "along_loops": [
+      0.0,
+      0.0
+     ],
+     "longest_tether": [
+      3.902,
+      4.907
+     ],
+     "tethers": [
+      [
+       1.517,
+       3.902,
+       3.013,
+       3.808
+      ],
+      [
+       3.045,
+       1.765,
+       4.642,
+       4.907
+      ]
+     ]
+    },
+    {
+     "mark": "CLA:c509",
+     "from": [
+      107.146,
+      5.888
+     ],
+     "to": [
+      107.297,
+      3.901
+     ],
+     "on_loop": [
+      0.0,
+      0.0
+     ],
+     "over_bodies": [
+      6.901,
+      4.568
+     ],
+     "along_loops": [
+      0.0,
+      0.0
+     ],
+     "longest_tether": [
+      8.747,
+      8.675
+     ],
+     "tethers": [
+      [
+       7.081,
+       3.968,
+       8.747,
+       4.698
+      ],
+      [
+       7.989,
+       3.766,
+       8.675,
+       3.857
+      ]
+     ]
+    },
+    {
+     "mark": "CLA:c508",
+     "from": [
+      107.942,
+      4.641
+     ],
+     "to": [
+      112.371,
+      4.029
+     ],
+     "on_loop": [
+      0.0,
+      0.0
+     ],
+     "over_bodies": [
+      3.066,
+      4.337
+     ],
+     "along_loops": [
+      0.0,
+      0.312
+     ],
+     "longest_tether": [
+      6.639,
+      8.07
+     ],
+     "tethers": [
+      [
+       3.064,
+       6.639,
+       5.315,
+       3.783
+      ],
+      [
+       1.415,
+       2.913,
+       8.07,
+       7.833
+      ]
+     ]
+    },
+    {
+     "mark": "CLA:c503",
+     "from": [
+      107.953,
+      10.057
+     ],
+     "to": [
+      109.652,
+      12.054
+     ],
+     "on_loop": [
+      0.0,
+      0.0
+     ],
+     "over_bodies": [
+      1.0,
+      1.192
+     ],
+     "along_loops": [
+      0.0,
+      0.0
+     ],
+     "longest_tether": [
+      6.046,
+      5.976
+     ],
+     "tethers": [
+      [
+       1.731,
+       6.046,
+       5.636
+      ],
+      [
+       1.36,
+       5.976,
+       4.417
+      ]
+     ]
+    },
+    {
+     "mark": "CLA:c515",
+     "from": [
+      109.521,
+      11.601
+     ],
+     "to": [
+      112.121,
+      8.693
+     ],
+     "on_loop": [
+      0.0,
+      0.0
+     ],
+     "over_bodies": [
+      0.0,
+      0.952
+     ],
+     "along_loops": [
+      0.0,
+      0.0
+     ],
+     "longest_tether": [
+      4.302,
+      5.331
+     ],
+     "tethers": [
+      [
+       4.302,
+       1.458,
+       1.635
+      ],
+      [
+       1.634,
+       5.331,
+       2.417
+      ]
+     ]
+    }
+   ]
+  },
+  "9X4L": {
+   "marks": [
+    30,
+    30
+   ],
+   "over_bodies": [
+    40.896,
+    40.218
+   ],
+   "along_loops": [
+    1.066,
+    1.066
+   ],
+   "c9": [
+    41.962,
+    41.284
+   ],
+   "on_loop": [
+    [],
+    []
+   ],
+   "crowded": [
+    0,
+    0
+   ],
+   "longest_cross_chain_tether": [
+    7.885,
+    3.115
+   ],
+   "moved": [
+    {
+     "mark": "ADP:32001",
+     "from": [
+      0.487,
+      21.602
+     ],
+     "to": [
+      5.825,
+      19.393
+     ],
+     "on_loop": [
+      0.0,
+      0.0
+     ],
+     "over_bodies": [
+      6.568,
+      5.89
+     ],
+     "along_loops": [
+      0.0,
+      0.0
+     ],
+     "longest_tether": [
+      8.493,
+      13.881
+     ],
+     "tethers": [
+      [
+       2.418,
+       8.493,
+       8.218,
+       7.885
+      ],
+      [
+       4.467,
+       13.881,
+       2.919,
+       3.115
+      ]
+     ]
+    }
+   ]
+  },
+  "9WNE": {
+   "marks": [
+    3,
+    3
+   ],
+   "over_bodies": [
+    1.742,
+    1.742
+   ],
+   "along_loops": [
+    0.488,
+    0.488
+   ],
+   "c9": [
+    2.23,
+    2.23
+   ],
+   "on_loop": [
+    [
+     "MG:A1302"
+    ],
+    []
+   ],
+   "crowded": [
+    0,
+    0
+   ],
+   "longest_cross_chain_tether": [
+    null,
+    null
+   ],
+   "moved": [
+    {
+     "mark": "MG:A1302",
+     "from": [
+      -11.932,
+      2.923
+     ],
+     "to": [
+      -7.576,
+      3.606
+     ],
+     "on_loop": [
+      0.6,
+      0.0
+     ],
+     "over_bodies": [
+      0.0,
+      0.0
+     ],
+     "along_loops": [
+      0.0,
+      0.0
+     ],
+     "longest_tether": [
+      0.982,
+      4.75
+     ],
+     "tethers": [
+      [
+       0.788,
+       0.982
+      ],
+      [
+       4.75,
+       3.65
+      ]
+     ]
+    }
+   ]
+  }
+ },
+ "marks_total": {
+  "entries": 47,
+  "marks": [
+   289,
+   289
+  ],
+  "on_loop": [
+   13,
+   6
+  ],
+  "crowded": [
+   0,
+   0
+  ],
+  "over_bodies": [
+   594.605,
+   587.131
+  ],
+  "c9": [
+   625.147,
+   618.28
+  ],
+  "moved_in_unchanged_figures": []
+ },
+ "marks_elsewhere": {
+  "1KX5": {
+   "marks": [
+    1,
+    1
+   ],
+   "over_bodies": [
+    0.0,
+    0.0
+   ],
+   "along_loops": [
+    0.0,
+    0.0
+   ],
+   "c9": [
+    0.0,
+    0.0
+   ],
+   "on_loop": [
+    [
+     "MN:E3132"
+    ],
+    []
+   ],
+   "crowded": [
+    0,
+    0
+   ],
+   "longest_cross_chain_tether": [
+    null,
+    null
+   ],
+   "moved": [
+    {
+     "mark": "MN:E3132",
+     "from": [
+      -14.798,
+      -1.592
+     ],
+     "to": [
+      -18.479,
+      -0.152
+     ],
+     "on_loop": [
+      0.6,
+      0.0
+     ],
+     "over_bodies": [
+      0.0,
+      0.0
+     ],
+     "along_loops": [
+      0.0,
+      0.0
+     ],
+     "longest_tether": [
+      1.05,
+      3.5
+     ],
+     "tethers": [
+      [
+       1.05
+      ],
+      [
+       3.5
+      ]
+     ]
+    }
+   ]
+  },
+  "3ABR": {
+   "marks": [
+    1,
+    1
+   ],
+   "over_bodies": [
+    6.686,
+    5.989
+   ],
+   "along_loops": [
+    0.78,
+    0.0
+   ],
+   "c9": [
+    7.466,
+    5.989
+   ],
+   "on_loop": [
+    [
+     "B12:B1601"
+    ],
+    []
+   ],
+   "crowded": [
+    0,
+    0
+   ],
+   "longest_cross_chain_tether": [
+    null,
+    null
+   ],
+   "moved": [
+    {
+     "mark": "B12:B1601",
+     "from": [
+      4.161,
+      -13.444
+     ],
+     "to": [
+      8.27,
+      -11.446
+     ],
+     "on_loop": [
+      1.12,
+      0.0
+     ],
+     "over_bodies": [
+      6.686,
+      5.989
+     ],
+     "along_loops": [
+      0.78,
+      0.0
+     ],
+     "longest_tether": [
+      5.464,
+      8.089
+     ],
+     "tethers": [
+      [
+       3.586,
+       3.23,
+       5.464,
+       5.356
+      ],
+      [
+       8.089,
+       3.29,
+       6.269,
+       2.026
+      ]
+     ]
+    }
+   ]
+  },
+  "3G6E": {
+   "marks": [
+    28,
+    28
+   ],
+   "over_bodies": [
+    9.527,
+    8.802
+   ],
+   "along_loops": [
+    9.495,
+    0.799
+   ],
+   "c9": [
+    19.022,
+    9.601
+   ],
+   "on_loop": [
+    [
+     "MG:08052",
+     "SR:A8929",
+     "MG:08044",
+     "CD:U8701"
+    ],
+    []
+   ],
+   "crowded": [
+    0,
+    0
+   ],
+   "longest_cross_chain_tether": [
+    null,
+    null
+   ],
+   "moved": [
+    {
+     "mark": "MG:08052",
+     "from": [
+      -6.352,
+      42.2
+     ],
+     "to": [
+      -1.528,
+      38.996
+     ],
+     "on_loop": [
+      0.6,
+      0.0
+     ],
+     "over_bodies": [
+      0.0,
+      0.0
+     ],
+     "along_loops": [
+      0.0,
+      0.0
+     ],
+     "longest_tether": [
+      3.85,
+      4.55
+     ],
+     "tethers": [
+      [
+       3.85
+      ],
+      [
+       4.55
+      ]
+     ]
+    },
+    {
+     "mark": "SR:A8929",
+     "from": [
+      0.428,
+      31.571
+     ],
+     "to": [
+      -1.81,
+      38.059
+     ],
+     "on_loop": [
+      0.592,
+      0.0
+     ],
+     "over_bodies": [
+      0.0,
+      0.0
+     ],
+     "along_loops": [
+      0.0,
+      0.0
+     ],
+     "longest_tether": [
+      5.037,
+      5.831
+     ],
+     "tethers": [
+      [
+       5.037,
+       3.12
+      ],
+      [
+       2.597,
+       5.831
+      ]
+     ]
+    },
+    {
+     "mark": "MG:08044",
+     "from": [
+      -2.77,
+      35.901
+     ],
+     "to": [
+      0.667,
+      31.526
+     ],
+     "on_loop": [
+      0.6,
+      0.0
+     ],
+     "over_bodies": [
+      0.0,
+      0.0
+     ],
+     "along_loops": [
+      0.0,
+      0.0
+     ],
+     "longest_tether": [
+      3.15,
+      3.5
+     ],
+     "tethers": [
+      [
+       3.15
+      ],
+      [
+       3.5
+      ]
+     ]
+    },
+    {
+     "mark": "CD:U8701",
+     "from": [
+      4.087,
+      14.622
+     ],
+     "to": [
+      3.055,
+      14.916
+     ],
+     "on_loop": [
+      0.6,
+      0.0
+     ],
+     "over_bodies": [
+      2.746,
+      2.021
+     ],
+     "along_loops": [
+      8.696,
+      0.0
+     ],
+     "longest_tether": [
+      9.386,
+      9.162
+     ],
+     "tethers": [
+      [
+       5.855,
+       4.911,
+       9.386
+      ],
+      [
+       6.705,
+       5.65,
+       9.162
+      ]
+     ]
+    }
+   ]
+  },
+  "3WAU": {
+   "marks": [
+    1,
+    1
+   ],
+   "over_bodies": [
+    5.049,
+    3.014
+   ],
+   "along_loops": [
+    0.0,
+    0.0
+   ],
+   "c9": [
+    5.049,
+    3.014
+   ],
+   "on_loop": [
+    [
+     "M1P:A1404"
+    ],
+    []
+   ],
+   "crowded": [
+    0,
+    0
+   ],
+   "longest_cross_chain_tether": [
+    null,
+    null
+   ],
+   "moved": [
+    {
+     "mark": "M1P:A1404",
+     "from": [
+      -4.163,
+      -3.865
+     ],
+     "to": [
+      -5.108,
+      -4.797
+     ],
+     "on_loop": [
+      1.12,
+      0.0
+     ],
+     "over_bodies": [
+      5.049,
+      3.014
+     ],
+     "along_loops": [
+      0.0,
+      0.0
+     ],
+     "longest_tether": [
+      6.582,
+      6.555
+     ],
+     "tethers": [
+      [
+       5.317,
+       6.099,
+       6.582,
+       3.151
+      ],
+      [
+       6.555,
+       6.117,
+       6.329,
+       4.299
+      ]
+     ]
+    }
+   ]
+  },
+  "5S4U": {
+   "marks": [
+    12,
+    12
+   ],
+   "over_bodies": [
+    20.973,
+    20.08
+   ],
+   "along_loops": [
+    0.909,
+    0.909
+   ],
+   "c9": [
+    21.882,
+    20.989
+   ],
+   "on_loop": [
+    [
+     "GX4:B505"
+    ],
+    []
+   ],
+   "crowded": [
+    0,
+    0
+   ],
+   "longest_cross_chain_tether": [
+    null,
+    null
+   ],
+   "moved": [
+    {
+     "mark": "GX4:B505",
+     "from": [
+      0.323,
+      -9.199
+     ],
+     "to": [
+      4.204,
+      -10.701
+     ],
+     "on_loop": [
+      0.54,
+      0.0
+     ],
+     "over_bodies": [
+      5.531,
+      4.638
+     ],
+     "along_loops": [
+      0.0,
+      0.0
+     ],
+     "longest_tether": [
+      4.263,
+      6.29
+     ],
+     "tethers": [
+      [
+       3.135,
+       4.025,
+       4.263,
+       2.692
+      ],
+      [
+       3.144,
+       5.019,
+       4.042,
+       6.29
+      ]
+     ]
+    }
+   ]
+  },
+  "6IZP": {
+   "marks": [
+    2,
+    2
+   ],
+   "over_bodies": [
+    0.0,
+    0.0
+   ],
+   "along_loops": [
+    0.0,
+    0.0
+   ],
+   "c9": [
+    0.0,
+    0.0
+   ],
+   "on_loop": [
+    [],
+    []
+   ],
+   "crowded": [
+    0,
+    0
+   ],
+   "longest_cross_chain_tether": [
+    null,
+    null
+   ],
+   "moved": [
+    {
+     "mark": "B2R:A102",
+     "from": [
+      -3.409,
+      -0.202
+     ],
+     "to": [
+      -3.281,
+      1.06
+     ],
+     "on_loop": [
+      0.0,
+      0.0
+     ],
+     "over_bodies": [
+      0.0,
+      0.0
+     ],
+     "along_loops": [
+      0.0,
+      0.0
+     ],
+     "longest_tether": [
+      2.249,
+      2.791
+     ],
+     "tethers": [
+      [
+       2.249,
+       1.939,
+       2.104
+      ],
+      [
+       2.575,
+       2.791,
+       1.459
+      ]
+     ]
+    }
+   ]
+  },
+  "6QIK": {
+   "marks": [
+    7,
+    7
+   ],
+   "over_bodies": [
+    6.529,
+    7.354
+   ],
+   "along_loops": [
+    6.288,
+    0.242
+   ],
+   "c9": [
+    12.817,
+    7.596
+   ],
+   "on_loop": [
+    [
+     "ZN:g201"
+    ],
+    []
+   ],
+   "crowded": [
+    0,
+    0
+   ],
+   "longest_cross_chain_tether": [
+    null,
+    null
+   ],
+   "moved": [
+    {
+     "mark": "ZN:g201",
+     "from": [
+      47.978,
+      -24.861
+     ],
+     "to": [
+      44.368,
+      -25.588
+     ],
+     "on_loop": [
+      0.6,
+      0.0
+     ],
+     "over_bodies": [
+      0.63,
+      1.455
+     ],
+     "along_loops": [
+      6.288,
+      0.242
+     ],
+     "longest_tether": [
+      7.433,
+      7.545
+     ],
+     "tethers": [
+      [
+       3.894,
+       2.394,
+       6.751,
+       7.433
+      ],
+      [
+       7.545,
+       6.055,
+       4.159,
+       5.06
+      ]
+     ]
+    }
+   ]
+  },
+  "6VBG": {
+   "marks": [
+    5,
+    5
+   ],
+   "over_bodies": [
+    20.134,
+    19.823
+   ],
+   "along_loops": [
+    0.0,
+    0.0
+   ],
+   "c9": [
+    20.134,
+    19.823
+   ],
+   "on_loop": [
+    [
+     "YIO+GAL:E1"
+    ],
+    []
+   ],
+   "crowded": [
+    0,
+    0
+   ],
+   "longest_cross_chain_tether": [
+    null,
+    null
+   ],
+   "moved": [
+    {
+     "mark": "YIO+GAL:E1",
+     "from": [
+      0.993,
+      -2.569
+     ],
+     "to": [
+      -2.646,
+      -3.992
+     ],
+     "on_loop": [
+      0.54,
+      0.0
+     ],
+     "over_bodies": [
+      6.304,
+      6.158
+     ],
+     "along_loops": [
+      0.0,
+      0.0
+     ],
+     "longest_tether": [
+      12.813,
+      14.132
+     ],
+     "tethers": [
+      [
+       4.198,
+       10.932,
+       5.939,
+       12.813
+      ],
+      [
+       2.791,
+       14.132,
+       2.034,
+       9.778
+      ]
+     ]
+    },
+    {
+     "mark": "BNG:A701",
+     "from": [
+      -2.266,
+      -3.295
+     ],
+     "to": [
+      0.396,
+      -3.903
+     ],
+     "on_loop": [
+      0.0,
+      0.0
+     ],
+     "over_bodies": [
+      4.024,
+      3.859
+     ],
+     "along_loops": [
+      0.0,
+      0.0
+     ],
+     "longest_tether": [
+      10.265,
+      12.945
+     ],
+     "tethers": [
+      [
+       6.951,
+       7.587,
+       3.911,
+       10.265
+      ],
+      [
+       4.26,
+       10.313,
+       1.232,
+       12.945
+      ]
+     ]
+    }
+   ]
+  },
+  "7F5S": {
+   "marks": [
+    23,
+    23
+   ],
+   "over_bodies": [
+    12.491,
+    12.491
+   ],
+   "along_loops": [
+    1.502,
+    1.502
+   ],
+   "c9": [
+    13.993,
+    13.993
+   ],
+   "on_loop": [
+    [
+     "MG:LV201",
+     "MG:L55156"
+    ],
+    [
+     "MG:LV201"
+    ]
+   ],
+   "crowded": [
+    0,
+    0
+   ],
+   "longest_cross_chain_tether": [
+    null,
+    null
+   ],
+   "moved": [
+    {
+     "mark": "MG:L55156",
+     "from": [
+      -6.503,
+      5.774
+     ],
+     "to": [
+      -7.117,
+      9.126
+     ],
+     "on_loop": [
+      0.6,
+      0.0
+     ],
+     "over_bodies": [
+      0.0,
+      0.0
+     ],
+     "along_loops": [
+      0.0,
+      0.0
+     ],
+     "longest_tether": [
+      0.35,
+      3.15
+     ],
+     "tethers": [
+      [
+       0.35
+      ],
+      [
+       3.15
+      ]
+     ]
+    }
+   ]
+  },
+  "7XBK": {
+   "marks": [
+    16,
+    16
+   ],
+   "over_bodies": [
+    48.148,
+    43.086
+   ],
+   "along_loops": [
+    3.59,
+    0.985
+   ],
+   "c9": [
+    51.738,
+    44.071
+   ],
+   "on_loop": [
+    [
+     "ATP:A701",
+     "ATP:D702",
+     "ATP:G702",
+     "ATP:H702",
+     "MG:G701",
+     "MG:H701"
+    ],
+    [
+     "ATP:A701",
+     "ATP:G702",
+     "MG:G701",
+     "MG:H701"
+    ]
+   ],
+   "crowded": [
+    0,
+    0
+   ],
+   "longest_cross_chain_tether": [
+    2.343,
+    2.343
+   ],
+   "moved": [
+    {
+     "mark": "ATP:D702",
+     "from": [
+      22.935,
+      1.964
+     ],
+     "to": [
+      20.72,
+      -0.391
+     ],
+     "on_loop": [
+      0.54,
+      0.0
+     ],
+     "over_bodies": [
+      6.396,
+      3.194
+     ],
+     "along_loops": [
+      1.0,
+      0.0
+     ],
+     "longest_tether": [
+      12.143,
+      14.959
+     ],
+     "tethers": [
+      [
+       3.598,
+       4.799,
+       4.706,
+       12.143
+      ],
+      [
+       1.963,
+       2.35,
+       7.322,
+       14.959
+      ]
+     ]
+    },
+    {
+     "mark": "MG:D701",
+     "from": [
+      20.556,
+      0.24
+     ],
+     "to": [
+      20.627,
+      -2.043
+     ],
+     "on_loop": [
+      0.0,
+      0.0
+     ],
+     "over_bodies": [
+      0.0,
+      0.0
+     ],
+     "along_loops": [
+      0.0,
+      0.0
+     ],
+     "longest_tether": [
+      2.1,
+      3.15
+     ],
+     "tethers": [
+      [
+       2.1
+      ],
+      [
+       3.15
+      ]
+     ]
+    },
+    {
+     "mark": "ATP:H702",
+     "from": [
+      -2.435,
+      -17.904
+     ],
+     "to": [
+      -3.465,
+      -22.221
+     ],
+     "on_loop": [
+      0.516,
+      0.0
+     ],
+     "over_bodies": [
+      10.829,
+      8.969
+     ],
+     "along_loops": [
+      1.605,
+      0.0
+     ],
+     "longest_tether": [
+      8.849,
+      9.622
+     ],
+     "tethers": [
+      [
+       4.64,
+       5.384,
+       5.292,
+       8.849
+      ],
+      [
+       7.875,
+       7.966,
+       9.433,
+       9.622
+      ]
+     ]
+    }
+   ]
+  },
+  "8EM7": {
+   "marks": [
+    88,
+    88
+   ],
+   "over_bodies": [
+    79.706,
+    79.63
+   ],
+   "along_loops": [
+    16.595,
+    16.202
+   ],
+   "c9": [
+    96.301,
+    95.832
+   ],
+   "on_loop": [
+    [
+     "CA:B4778"
+    ],
+    []
+   ],
+   "crowded": [
+    0,
+    0
+   ],
+   "longest_cross_chain_tether": [
+    5.588,
+    5.588
+   ],
+   "moved": [
+    {
+     "mark": "CA:B4778",
+     "from": [
+      -10.381,
+      -3.315
+     ],
+     "to": [
+      -14.401,
+      -7.553
+     ],
+     "on_loop": [
+      0.377,
+      0.0
+     ],
+     "over_bodies": [
+      1.13,
+      1.054
+     ],
+     "along_loops": [
+      0.393,
+      0.0
+     ],
+     "longest_tether": [
+      2.808,
+      5.873
+     ],
+     "tethers": [
+      [
+       1.148,
+       1.587,
+       2.03,
+       2.808,
+       1.471
+      ],
+      [
+       4.889,
+       4.499,
+       4.121,
+       3.079,
+       5.873
+      ]
+     ]
+    }
+   ]
+  }
+ },
+ "marks_elsewhere_total": {
+  "entries": 11,
+  "marks": [
+   184,
+   184
+  ],
+  "on_loop": [
+   19,
+   5
+  ],
+  "crowded": [
+   0,
+   0
+  ],
+  "over_bodies": [
+   209.243,
+   200.269
+  ],
+  "c9": [
+   248.402,
+   220.908
+  ]
+ },
+ "pngs": {
+  "9SXF": {
+   "before": "docs/superpowers/work/app29/fix-ligand/png/9SXF-before.png",
+   "after": "docs/superpowers/work/app29/fix-ligand/png/9SXF-after.png",
+   "pair": "docs/superpowers/work/app29/fix-ligand/png/9SXF-pair.png"
+  },
+  "29TB": {
+   "before": "docs/superpowers/work/app29/fix-ligand/png/29TB-before.png",
+   "after": "docs/superpowers/work/app29/fix-ligand/png/29TB-after.png",
+   "pair": "docs/superpowers/work/app29/fix-ligand/png/29TB-pair.png"
+  },
+  "31FD": {
+   "before": "docs/superpowers/work/app29/fix-ligand/png/31FD-before.png",
+   "after": "docs/superpowers/work/app29/fix-ligand/png/31FD-after.png",
+   "pair": "docs/superpowers/work/app29/fix-ligand/png/31FD-pair.png"
+  },
+  "9X4L": {
+   "before": "docs/superpowers/work/app29/fix-ligand/png/9X4L-before.png",
+   "after": "docs/superpowers/work/app29/fix-ligand/png/9X4L-after.png",
+   "pair": "docs/superpowers/work/app29/fix-ligand/png/9X4L-pair.png"
+  },
+  "9WNE": {
+   "before": "docs/superpowers/work/app29/fix-ligand/png/9WNE-before.png",
+   "after": "docs/superpowers/work/app29/fix-ligand/png/9WNE-after.png",
+   "pair": "docs/superpowers/work/app29/fix-ligand/png/9WNE-pair.png"
+  }
+ },
+ "worse": {
+  "tune": [],
+  "check": [],
+  "third": [],
+  "na": [],
+  "bench": [],
+  "marks_on_loop": [],
+  "marks_crowded": [],
+  "marks_c9": [],
+  "marks_elsewhere": []
+ },
+ "better": {
+  "tune": [
+   "9X4L: now passes A20"
+  ],
+  "check": [],
+  "third": [],
+  "na": [],
+  "marks_on_loop": [
+   "9SXF",
+   "29TB",
+   "31FD",
+   "9WNE"
+  ],
+  "marks_c9": [
+   "9SXF",
+   "29TB",
+   "31FD",
+   "9X4L"
+  ]
+ },
+ "verdict": "better",
+ "patch": null
+}
