@@ -539,7 +539,8 @@ class Drawn:
     @property
     def floor(self) -> list[dict]:
         """The named reasons the figure is below the readability floor (floor.readability_floor: text under 6 pt on
-        its page, route budget spent, made in more than the hosted time), [] when it is above it."""
+        its page, route budget spent), [] when it is above it. The time it took is never a reason (rulings Q40, Q41:
+        floor.time_notes says it)."""
         from .floor import readability_floor
 
         return readability_floor(self)

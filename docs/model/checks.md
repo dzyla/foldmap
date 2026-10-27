@@ -55,8 +55,11 @@
 - `R1` changes exit codes: 6 of the 300 sample default figures (9FZL, 7JU4, 6JLN, 6ET5, 8WMV, 7NZ2) now exit 1 on `R1`
   alone; 8XJV and 8ZTU failed other checks before (`docs/validation/readability-floor/report.md`). That every sample
   default under 6 pt is among those measured is inferred from the samples' reports, not run at this code on all 300.
-- `R1`'s route-budget reason fired on none of the figures measured and none of the samples' default views. It is
-  tested on synthetic measures only (`docs/validation/readability-floor/report.md`).
+- `R1`'s route-budget reason fired on none of the figures the floor record measured and none of the samples' default
+  views, where it is tested on synthetic measures only (`docs/validation/readability-floor/report.md`). It does fire
+  past the default views: 7NZ2's domains view spends the page's budget, 6 searches refused
+  (`docs/validation/prune/report.md`, held), so `foldmap check 7NZ2 --domains auto` fails `R1` on it. `R1`'s
+  exit-code change reaches past the default views.
 - `S5` is measured only where the committed CATH reference holds the entry. On most entries it is not measured.
 - `D3` cannot read the committed .cif.gz fixtures (RNApolis fails on them); it ran on PDB copies
   (`docs/validation/metamorphic/report.md`).

@@ -294,7 +294,10 @@ def render(doc: dict) -> str:
         "- **route_budget**: the page's budget for second, wider route searches (route._MAX_NODES_PAGE) spent, "
         "counted as the named fallbacks route_second_search_refused. It fired on none of the figures measured here "
         "and on none of the samples' default views (census below: their reports count none refused), so it is "
-        "tested on synthetic measures only; a stuck loop of another kind is A3's, as it happens on small pages too.",
+        "tested on synthetic measures only here. It does fire past the default views: 7NZ2's domains view (the "
+        "held-out sample) spends the budget, 6 searches refused (docs/validation/prune/report.md, held), so "
+        "`foldmap check 7NZ2 --domains auto` fails R1 on it and R1's exit-code change reaches past the default views. "
+        "A stuck loop of another kind is A3's, as it happens on small pages too.",
         f"- **time**: reported, never judged (ruling Q40). A figure that took longer than the hosted app's "
         f"{floor.TIME_LIMIT_S:g} s (criteria.LIMITS app_s) to make, measured as spec.draw_spec's wall time, is said "
         "so in the notes, the check's text, the MCP note and the app; it never fails R1, never changes `foldmap "

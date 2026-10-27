@@ -24,7 +24,7 @@ from .domain_confidence import said as splits_said
 from .domain_confidence import under_s5
 from .dssp import assign_dssp
 from .fallback import line as fallback_line
-from .features import helices_on_sheets, sse_contacts
+from .features import DOMAIN_NCUT, helices_on_sheets, sse_contacts
 from .floor import check as floor_check
 from .floor import lines as floor_lines
 from .floor import said as floor_said
@@ -2041,8 +2041,8 @@ def build_parser() -> argparse.ArgumentParser:
         "level with it, or its pairing is named in the notes. S4, a linked residue's star stands at its "
         "residue (linked-residue stars only: not ligand tethers, glycans, disulfide ends or UniProt marks); S5 "
         "(automatic domains) is not measured here; with --domains auto each inferred split is said under it with its "
-        "confidence, 1 - its normalized cut / 0.37 (DOMAIN_NCUT, the tuned split limit: the margin below it, not a "
-        "probability, moving with the limit; said, never judged). Then the figure criteria A1-A20 the "
+        f"confidence, 1 - its normalized cut / {DOMAIN_NCUT:g} (DOMAIN_NCUT, the tuned split limit: the margin "
+        "below it, not a probability, moving with the limit; said, never judged). Then the figure criteria A1-A20 the "
         "random-100 campaign judges "
         "every figure by, with the same limits: route fallbacks, loops over labels, overlapping elements, text "
         "collisions, text off the page, repeated labels, chains left out without a note, N->C and sheet order, "
@@ -2262,8 +2262,8 @@ def build_parser() -> argparse.ArgumentParser:
         "--strict-floor",
         action="store_true",
         help="write no figure below the readability floor (its text under 6 pt on its page, or the page's route "
-        "budget spent) and exit 1; by default it is written and the notes say so. The time it took is said, never "
-        "judged",
+        "budget spent), or one the floor could not judge, and exit 1; by default it is written and the notes say so. "
+        "The time it took is said, never judged",
     )
     kq.add_argument(
         "--deep",
@@ -2589,7 +2589,14 @@ def _cmd_figure(args: argparse.Namespace) -> int:
             print(f"foldmap: {said}", file=sys.stderr)
         if said := splits_said(drawn)[1]:  # inferred domain splits' confidence (domain_confidence.py), never drawn
             print(f"foldmap: {said}", file=sys.stderr)
-        below, line = floor_said(drawn)  # the readability floor (floor.py, plan 28 Task 4): said, never drawn
+        try:  # the readability floor (floor.py, plan 28 Task 4): said, never drawn
+            below, line = floor_said(drawn, strict=args.strict_floor)
+        except Exception as err:  # noqa: BLE001 (--strict-floor only: a floor not judged writes nothing; F6)
+            said = (
+                f"foldmap: error: no figure written: the readability floor could not be judged ({type(err).__name__})"
+            )
+            print(f"{said} (--strict-floor)", file=sys.stderr)
+            return 1
         if line:  # its judged reasons, and the time note (never judged)
             print(f"foldmap: warning: {line}", file=sys.stderr)
         if below and args.strict_floor:  # judged reasons only: the time note never stops a figure (Q40)

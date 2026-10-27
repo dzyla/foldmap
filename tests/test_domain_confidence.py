@@ -6,6 +6,7 @@ each with its confidence (1 - normalized cut / DOMAIN_NCUT), and the notes, `fol
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -321,3 +322,57 @@ def test_the_record_says_what_the_code_says():
             if b["n"]:
                 lo, hi = common.wilson(b["right"], b["n"])
                 assert b["wilson95"] == [round(lo, 2), round(hi, 2)], name
+
+
+# ---- the typed copies of the limit and its sensitivity (plan 28 final review F8) --------------------------------
+
+ROOT = Path(__file__).resolve().parents[1]
+SENSITIVITY = ROOT / "docs" / "validation" / "sensitivity" / "report.json"
+LIMIT = re.compile(r"normalized cut(?: at|\s*/)\s*(\d+\.\d+)")
+MOVES = re.compile(r"S5 failures (?:from )?(\d+) (?:to|→) (\d+)")
+
+
+def _flat(text: str) -> str:
+    return re.sub(r"\s+", " ", text).replace("`", "")
+
+
+def _texts() -> dict[str, str]:
+    """Every text that types DOMAIN_NCUT's value or its sensitivity: the check help, the MCP tool's docstring (its
+    source: the mcp package may be absent), this module's docstring, the record script's text, and the README and
+    the model page where they ship."""
+    from foldmap.cli import build_parser
+
+    sub = next(a for a in build_parser()._actions if a.dest == "command")
+    out = {
+        "check help": sub.choices["check"].description,
+        "mcp_server.py": (ROOT / "src" / "foldmap" / "mcp_server.py").read_text(encoding="utf-8"),
+        "domain_confidence": domain_confidence.__doc__,
+    }
+    for rel in ("README.md", "docs/model/domains.md", "scripts/domain_uncertainty.py"):
+        if (ROOT / rel).is_file():
+            out[rel] = (ROOT / rel).read_text(encoding="utf-8")
+    return {k: _flat(v) for k, v in out.items()}
+
+
+def test_the_typed_limit_is_the_constant():
+    texts = _texts()
+    for name in ("check help", "mcp_server.py") + (("README.md",) if "README.md" in texts else ()):
+        assert LIMIT.search(texts[name]), f"{name} no longer says the limit"
+    for name, text in texts.items():
+        for got in LIMIT.findall(text):
+            assert got == f"{features.DOMAIN_NCUT:g}", f"{name} types the limit as {got}"
+
+
+@pytest.mark.skipif(not SENSITIVITY.is_file(), reason="docs/validation is not part of the sdist")
+def test_the_typed_sensitivity_is_the_records():
+    """ "x1.25 moves the third sample's S5 failures from 12 to 19" is stage B's S5 count for DOMAIN_NCUT x1.25 in the
+    sensitivity record; a rerun of that record that moves it fails here until every copy is changed."""
+    doc = json.loads(SENSITIVITY.read_text(encoding="utf-8"))
+    row = next(c for c in doc["constants"] if c["id"] == "features:DOMAIN_NCUT")
+    want = tuple(str(n) for n in row["runs"]["x1.25"][row["stage"]]["criteria"]["S5"])
+    texts = _texts()
+    for name in ("mcp_server.py", "domain_confidence") + tuple(n for n in ("README.md",) if n in texts):
+        assert MOVES.search(texts[name]), f"{name} no longer says the sensitivity"
+    for name, text in texts.items():
+        for got in MOVES.findall(text):
+            assert got == want, f"{name} says S5 failures {got[0]} to {got[1]}; the record {want[0]} to {want[1]}"

@@ -204,8 +204,23 @@ def test_a_floor_that_cannot_judge_never_stops_a_figure(small_page, monkeypatch,
 
     monkeypatch.setattr(floor, "suggestions", broken)
     out = tmp_path / "f.svg"
-    assert main(["plot", str(UBQ), "-o", str(out), "--strict-floor"]) == 0 and out.is_file()
+    assert main(["plot", str(UBQ), "-o", str(out)]) == 0 and out.is_file()
     assert "foldmap: warning: readability floor not judged: RuntimeError" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("where", ["measures", "suggestions"])
+def test_strict_writes_nothing_the_floor_could_not_judge(small_page, monkeypatch, tmp_path, capsys, where):
+    """Final review F6: --strict-floor fails closed: a floor that cannot judge the figure is no pass."""
+
+    def broken(*args, **kwargs):
+        raise RuntimeError("no")
+
+    monkeypatch.setattr(floor, where, broken)
+    out = tmp_path / "f.svg"
+    assert main(["plot", str(UBQ), "-o", str(out), "--strict-floor"]) == 1
+    err = capsys.readouterr().err
+    assert "no figure written: the readability floor could not be judged (RuntimeError) (--strict-floor)" in err
+    assert not out.exists()
 
 
 def test_the_mcp_result_says_it(small_page, monkeypatch):

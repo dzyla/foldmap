@@ -191,15 +191,18 @@ def note(reasons: list[dict], offered: list[dict], how: str = "cli", timed: list
     return "; ".join(parts)
 
 
-def said(drawn, how: str = "cli") -> tuple[list[dict], str]:
+def said(drawn, how: str = "cli", strict: bool = False) -> tuple[list[dict], str]:
     """(the judged reasons, the notes' line: note() with the time note) for the figure `drawn`, in `how`'s words;
     guarded: a failure to judge it is said ("readability floor not judged: ..."), never raised, so a figure is
-    always written whatever the floor's code does."""
+    always written whatever the floor's code does. `strict` (`--strict-floor`): the failure is raised instead, so a
+    figure the floor could not judge is not written as if it were above it (plan 28 final review F6)."""
     try:
         got = measures(drawn)
         reasons = reasons_of(got)
         return reasons, note(reasons, suggestions(drawn) if reasons else [], how, time_notes(got))
-    except Exception as err:  # noqa: BLE001 (said in the notes: the floor never stops a figure)
+    except Exception as err:  # noqa: BLE001 (said in the notes: the floor never stops a figure, unless strict)
+        if strict:
+            raise
         return [], f"readability floor not judged: {type(err).__name__}"
 
 

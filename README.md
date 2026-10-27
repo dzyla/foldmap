@@ -209,8 +209,8 @@ foldmap styles                                    # every theme and style key
   the text that much smaller. A figure below the readability floor (its text under 6 pt on its page, judged at text
   size 1 as above, or its route budget spent) is drawn as before and says so in the notes, `foldmap check` (R1,
   which then fails and exits 1) and the MCP result and app, naming the options that draw less (`--focus protomer`,
-  `--focus B`, `--chains B`); `--strict-floor` writes no figure below it instead (exit 1). What each option achieved on the
-  largest figures measured is in `docs/validation/readability-floor`. A figure that took longer than the hosted
+  `--focus B`, `--chains B`); `--strict-floor` writes no figure below it instead (exit 1), nor one the floor could not
+  judge. What each option achieved on the largest figures measured is in `docs/validation/readability-floor`. A figure that took longer than the hosted
   app's 90 s to make is said so in the notes too, never judged: the time is the machine's as much as the figure's.
 - **How each figure was made** comes with it: one list of what it infers, leaves ambiguous or moves for
   readability — domains inferred from contacts (or CATH's, UniProt's, or given), strands drawn off a sheet's run and
@@ -874,8 +874,23 @@ Then R1, the readability floor: the figure's text under 6 pt on its page (judged
 smaller `font_scale` prints smaller text than the size judged), or the page's route budget spent, fails and exits 1,
 naming the options that draw less. The time the figure took is said when over the hosted app's 90 s, never judged,
 and is not in the `--json` report. R1 was added in plan 28 (Task 4): a figure whose page holds its text under 6 pt
-now exits 1 where it exited 0 before (on the samples' default figures, about 6 of 300; see
-`docs/validation/readability-floor`).
+now exits 1 where it exited 0 before. Of the 300 sample default figures, 6 named ones (9FZL, 7JU4, 6JLN, 6ET5, 8WMV,
+7NZ2) now exit 1 on R1 alone, and 8XJV and 8ZTU failed other checks before; that every sample default under 6 pt is
+among those measured is inferred from the samples' reports, not run at this code on all 300
+(`docs/validation/readability-floor`). The route budget also fails R1 past the default views: 7NZ2's domains view
+spends it.
+
+`foldmap check --deep` adds three deep checks after R1: D1, the figure drawn a second time in the same process is the
+same (layout signature and SVG bytes); D2, foldmap's DSSP against mkdssp 3.1.2, residue by residue at A10's limit
+(only when `MKDSSP` names the program); D3, its canonical and wobble base pairs against RNApolis (only when
+`NA_RNAPOLIS_PYTHON` names a Python that has it). A deep check that cannot run reads "unavailable" with the reason and
+is never counted as passed; a failed one exits 1. `foldmap check --json PATH` (or `--json -` for standard output in
+place of the text) writes the report as JSON, schema `foldmap-check` version 1: every check's code, group, kind,
+status (pass, fail, unavailable, not_judged, not_applicable), detail and findings, the counts per status, and a
+verdict: "fail" when any check fails, else "incomplete" when any is unavailable, else "pass". Without `--deep` the
+criteria one process cannot measure (A1, A2, A10, A12 ...) are unavailable, so the verdict reads "incomplete" at best;
+the exit code is unchanged by an unavailable check. The report holds no wall time, so it is the same on every run; a
+field is added only with the version raised.
 
 A figure drawn like a reference (`foldmap check 1MBN --like 2HHB --like-chain B`) is also judged on H1-H5, after
 A1-A20: H1, it is drawn alike exactly when the two are one fold (TM-score at least 0.5 and half the smaller chain's
@@ -1141,7 +1156,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the freeze rule: what a change needs 
 
 ```bash
 python -m venv .venv && .venv/bin/pip install -e ".[dev,app,mcp]"
-.venv/bin/python -m pytest              # about 2200 tests, ~5 min
+.venv/bin/python -m pytest              # about 4600 tests, ~40 min on one core (-n auto with pytest-xdist)
 .venv/bin/ruff check . && .venv/bin/ruff format --check .
 .venv/bin/python scripts/gallery.py     # re-render the images above
 .venv/bin/python scripts/sweep.py --sample 60 --out sweep/   # render random PDB entries and check them
