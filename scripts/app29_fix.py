@@ -6,6 +6,9 @@ names, written as report.json and report.md, stamped with the code that wrote th
     python scripts/app29_fix.py marks --ids A,B --out FILE [--src DIR]
     python scripts/app29_fix.py report --name NAME --before RECORD --after RECORD --runs-before DIR --runs-after DIR
                                        --marks-before FILE --marks-after FILE --pngs DIR [--patch FILE] --out DIR
+    python scripts/app29_fix.py report --name NAME --before RECORD --after RECORD --runs-before DIR --runs-after DIR
+                                       --leads-before FILE --leads-after FILE --tune-flags FILE --controls A,B
+                                       --pngs DIR [--patch FILE] --out DIR
 
 marks draws each id the app's way (random100.app_settings, app_jobs.draw_settings: no job process, no limits) and
 lists every ligand mark: its place, how much of the loops' lines its box holds (`on_loop`, page units: a line under
@@ -23,7 +26,9 @@ report reads, read-only:
   - bench --check --exact (bench.txt in each runs folder): the entries whose layout moved, each explained by
     BENCH_WHY or said unexplained;
   - the marks of the tune entries whose figure changed, before and after (marks's output);
-  - the PNGs kept for those entries (PNGS: <id>-before.png, <id>-after.png), named by path.
+  - the PNGs kept for those entries (PNGS: <id>-before.png, <id>-after.png), named by path;
+  - without marks (a fix of the readability floor, Task 5): the leads and controls drawn before and after, and the
+    tune half's assemblies of two (floor_part), in place of the marks.
 The verdict is the plan's: kept only when every measure is identical or better and no test fails (the suite's result
 is the gate's, said in the task's report, not here)."""
 
@@ -54,6 +59,7 @@ LOOK_CONCERNS: dict[str, str] = {
     "and alpha18: ruled policy, home tethers are unpriced (plan 11; A20 bounds tethers to other chains only)",
 }
 
+LIMITS_APP_S = 90.0  # seconds: criteria.LIMITS["app_s"], the hosted app's limit (A2b), as the record judges it
 LINE_EPS = 1e-9  # page units: a box holding less of a line than this holds none
 C9_EPS = 2e-3  # page units: C9 as the rows keep it (3 decimals per mark, summed): differences within it are rounding
 
@@ -362,9 +368,61 @@ def build(args) -> dict:
     na["svg_moved"] = prune.svg_moved(na_b["svg"], na_a["svg"])
     na["entries"] = len(na_a["entries"])
     bench = bench_diff(bench_notes(rb / "bench.txt"), bench_notes(ra / "bench.txt"))
+    changed = [r["id"] for r in tune if r.get("svg_changed")]
+    pngs = {
+        i: {
+            k: f"{args.pngs}/{i}-{k}.png"
+            for k in ("before", "after", "pair")
+            if (Path(args.pngs) / f"{i}-{k}.png").is_file()
+        }
+        for i in changed
+    }
+    patch = None
+    if args.patch:
+        p = Path(args.patch)
+        patch = {"path": str(p), "sha256": hashlib.sha256(p.read_bytes()).hexdigest()}
+    inputs = {
+        "before_record": str(args.before),
+        "before_stamp": before.get("source_stamp"),
+        "after_record": str(args.after),
+        "after_stamp": after.get("source_stamp"),
+        "runs_before_stamp": third_b.get("report_stamp"),
+        "runs_after_stamp": third_a.get("report_stamp"),
+    }
+    worse = {
+        "tune": _worse_tune(tune),
+        "check": check_totals(before, after)["worse"],
+        "third": third["worse"],
+        "na": na["worse"],
+        "bench": bench["worse"],
+    }
+    better = {
+        "tune": _better_tune(tune),
+        "check": check_totals(before, after)["better"],
+        "third": third["better"],
+        "na": na["better"],
+    }
+    if not args.marks_before:  # a fix that moves no ligand mark (Task 5 on): its own measures instead (floor_part)
+        floor = floor_part(args, tune)
+        worse["floor"], better["floor"] = floor["worse"], floor["better"]
+        inputs.update(floor["inputs"])
+        return {
+            "name": args.name,
+            "inputs": inputs,
+            "tune": {"entries": len(tune), "svg_changed": changed, "rows": tune},
+            "check": check_totals(before, after),
+            "third": third,
+            "na": na,
+            "bench": bench,
+            "floor": floor,
+            "pngs": pngs,
+            "worse": worse,
+            "better": better,
+            "verdict": "worse" if any(worse.values()) else "better" if any(better.values()) else "identical",
+            "patch": patch,
+        }
     mb = json.loads(Path(args.marks_before).read_text(encoding="utf-8"))
     ma = json.loads(Path(args.marks_after).read_text(encoding="utf-8"))
-    changed = [r["id"] for r in tune if r.get("svg_changed")]
     marks = {i: mark_changes(mb["entries"].get(i, []), ma["entries"].get(i, [])) for i in changed}
     both = set(mb["entries"]) & set(ma["entries"])  # every entry measured both ways
     every = [r["id"] for r in tune if r["id"] in both]  # the tune half's
@@ -482,6 +540,123 @@ def build(args) -> dict:
     }
 
 
+def floor_part(args, tune: list[dict]) -> dict:
+    """Plan 29 Task 5's own measures (a two-copy complex under the floor; ruling P29-7): the tune half's floor tally;
+    its assemblies of two that focus auto draws whole (TUNE_FLAGS: each tune id laid out the app's way, no floor
+    judged), each with its floor and figure before and after; the leads and controls (LEADS_BEFORE, LEADS_AFTER: each
+    drawn the app's way, random100.app_view under the hosted limits, then here with focus auto, none and protomer),
+    each with its floor, text, time and focus; and whether the text size predicted from the layout alone (before
+    routing and drawing) gives the drawn floor's answer on every drawing measured. Worse: a lead or control below the
+    floor that was above it, a control (CONTROLS) no longer drawn whole, an app view refused or over the hosted
+    A2b limit (criteria.LIMITS app_s, 90 s) that was not; better: a lead now above the floor."""
+    lb = json.loads(Path(args.leads_before).read_text(encoding="utf-8"))
+    la = json.loads(Path(args.leads_after).read_text(encoding="utf-8"))
+    flags = json.loads(Path(args.tune_flags).read_text(encoding="utf-8"))
+    controls = [c.strip() for c in (args.controls or "").split(",") if c.strip()]
+    rows = {r["id"]: r for r in tune if "criteria" in r}
+    tally = [sum(not r["floor_ok"][k] for r in rows.values()) for k in (0, 1)]
+    twos = [
+        {"id": i, "floor_ok": rows[i]["floor_ok"], "svg_changed": rows[i]["svg_changed"], "chains": flags[i]["chains"]}
+        for i in sorted(flags)
+        if flags[i].get("whole_of_two") and i in rows
+    ]
+    worse, better, entries, drawings = [], [], {}, []
+    for name, b in la["entries"].items():
+        a = lb["entries"].get(name, {})
+        was, now = a.get("auto") or {}, b.get("auto") or {}
+        app_a, app_b = a.get("app") or {}, b.get("app") or {}
+        role = "control" if name in controls else "lead"
+        entries[name] = {"role": role, "app": [app_a, app_b], "auto": [was, now], "none": b.get("none"),
+                         "protomer": b.get("protomer")}  # fmt: skip
+        if was.get("floor") == [] and now.get("floor"):
+            worse.append(f"{name}: now under the floor")
+        if role == "control" and (now.get("focus_chains") or now.get("floor")):
+            worse.append(f"{name}: a control no longer drawn whole above the floor")
+        if app_b.get("refused") and not app_a.get("refused"):
+            worse.append(f"{name}: the app view now refused ({app_b['refused']})")
+        if (app_b.get("seconds") or 0) > LIMITS_APP_S >= (app_a.get("seconds") or 0):
+            worse.append(f"{name}: the app view now over {LIMITS_APP_S:g} s")
+        if was.get("floor") and now.get("floor") == []:
+            better.append(f"{name}: now above the floor")
+        for d in (was, b.get("none") or {}, b.get("protomer") or {}, now):
+            if "text_pt" in d:
+                drawings.append(d)
+    agree = [d["predicted_below"] == bool(d["floor"]) for d in drawings]
+    gap = max((abs(d["predicted_pt"] - d["text_pt"]) for d in drawings if d["text_pt"] is not None), default=None)
+    return {
+        "inputs": {
+            "leads_before_foldmap": lb.get("foldmap"),
+            "leads_after_foldmap": la.get("foldmap"),
+            "tune_flags": str(args.tune_flags),
+        },
+        "tune_floor_failed": tally,
+        "tune_whole_of_two": twos,
+        "entries": entries,
+        "prediction": {"drawings": len(drawings), "agree": sum(agree), "largest_gap_pt": gap},
+        "worse": worse,
+        "better": better,
+    }
+
+
+def _floor_lines(f: dict) -> list[str]:
+    """The record's section for a fix of the readability floor (floor_part)."""
+    lines = ["", "## The readability floor and focus auto (plan 29 Task 5)", ""]
+    lines.append(f"- Tune half under the floor: {_pair(f['tune_floor_failed'])}.")
+    twos = f["tune_whole_of_two"]
+    lines.append(
+        f"- Tune entries focus auto lays out as an assembly of two, drawn whole unless that figure is under the floor: "
+        f"{len(twos)}. Under the floor whole, so drawn again as one subunit: "
+        f"{', '.join(t['id'] for t in twos if not t['floor_ok'][0]) or 'none'}; every other one is drawn whole as "
+        "before (figure unchanged: "
+        f"{', '.join(t['id'] for t in twos if t['floor_ok'][0] and not t['svg_changed']) or 'none'}; changed: "
+        f"{', '.join(t['id'] for t in twos if t['floor_ok'][0] and t['svg_changed']) or 'none'})."
+    )
+    lines += [
+        "",
+        "Leads and controls, each drawn the app's way (random100.app_view, the hosted limits; seconds: the job's, "
+        "both drawings when it draws twice) and here (draw_spec, focus auto: seconds, text pt, chains drawn in full, "
+        "of all; 0 is the whole). Before -> after.",
+        "",
+        "| entry | role | app floor | app seconds | auto floor | auto seconds | text pt | in full |",
+        "|---|---|---|---|---|---|---|---|",
+    ]
+
+    def ok(d: dict, key: str = "floor") -> str:
+        v = d.get(key)
+        if isinstance(v, dict):  # the app view's {ok, reasons}
+            return "above" if v.get("ok") else "under"
+        return "-" if v is None else "under" if v else "above"
+
+    for name, e in f["entries"].items():
+        (aa, ab), (wa, wb) = e["app"], e["auto"]
+        lines.append(
+            f"| `{name}` | {e['role']} | {ok(aa)} -> {ok(ab)} | {aa.get('seconds', '-')} -> {ab.get('seconds', '-')} | "
+            f"{ok(wa)} -> {ok(wb)} | {wa.get('seconds')} -> {wb.get('seconds')} | {wa.get('text_pt')} -> "
+            f"{wb.get('text_pt')} | {wa.get('focus_chains')} -> {wb.get('focus_chains')} of {wb.get('chains')} |"
+        )
+    lines += [
+        "",
+        "The two drawings apart, after (focus none: the whole; focus protomer: the one subunit), seconds and text pt:",
+        "",
+    ]
+    for name, e in f["entries"].items():
+        n, p = e["none"] or {}, e["protomer"] or {}
+        lines.append(
+            f"- `{name}`: whole {n.get('seconds')} s, {n.get('text_pt')} pt ({ok(n)}); one subunit "
+            f"{p.get('seconds', '-')} s, {p.get('text_pt', '-')} pt ({ok(p) if 'floor' in p else p.get('error', '-')})"
+        )
+    pr = f["prediction"]
+    lines += [
+        "",
+        "Predicting the floor from the layout alone (layout.page_scale of its extent plus render's pad, before "
+        f"routing and drawing): the drawn floor's answer on {pr['agree']} of {pr['drawings']} drawings measured; the "
+        f"largest gap between the predicted and the drawn text, {pr['largest_gap_pt']} pt. The route budget, the "
+        "floor's other reason, is known only once the loops are routed. spec.draw_spec draws the whole, judges it and "
+        "draws again instead.",
+    ]
+    return lines
+
+
 def since_last(args, after: dict, third_a: dict, na_a: dict, ma: dict, prune) -> dict | None:
     """The figures that changed since the fix's last record (`--since-*`: that record's tune run, its third-sample and
     NA runs, and the marks its code drew for the figures that moved), each with its cause, read from its marks: which
@@ -576,6 +751,19 @@ def render(doc: dict) -> str:
         lines.append("- changed: none")
     for x in b["changed"]:
         lines.append(f"- `{x['entry']}`: {x['note']}; why: {x['why']}")
+    lines += _floor_lines(doc["floor"]) if doc.get("floor") is not None else _marks_lines(doc)
+    lines += ["", "## Pictures (gitignored, for looking)", ""]
+    for i, p in doc["pngs"].items():
+        lines.append(f"- `{i}`: " + ", ".join(f"{k} {v}" for k, v in p.items()))
+    if doc["patch"]:
+        lines += ["", f"Patch: {doc['patch']['path']} (sha256 {doc['patch']['sha256'][:12]})"]
+    return "\n".join(lines) + "\n"
+
+
+def _marks_lines(doc: dict) -> list[str]:
+    """The record's ligand-mark sections (Task 4's fix): the marks, those not changed by design, the precedence, the
+    look concerns and what changed since the last record."""
+    lines: list[str] = []
     t = doc["marks_total"]
     lines += ["", "## Ligand marks", ""]
     lines.append(
@@ -668,12 +856,7 @@ def render(doc: dict) -> str:
                 + (" (C9 rises: the text gate comes first)." if x["c9"][1] > x["c9"][0] + C9_EPS else ".")
             )
             lines.append(f"- `{x['id']}`: {'; '.join(x['cause'])}.{nums}")
-    lines += ["", "## Pictures (gitignored, for looking)", ""]
-    for i, p in doc["pngs"].items():
-        lines.append(f"- `{i}`: " + ", ".join(f"{k} {v}" for k, v in p.items()))
-    if doc["patch"]:
-        lines += ["", f"Patch: {doc['patch']['path']} (sha256 {doc['patch']['sha256'][:12]})"]
-    return "\n".join(lines) + "\n"
+    return lines
 
 
 def cmd_report(args) -> int:
@@ -695,8 +878,14 @@ def main(argv=None) -> int:
     m.add_argument("--src", help="a folder holding the foldmap package to measure (default: this checkout's)")
     r = sub.add_parser("report", help="the fix's record")
     r.add_argument("--name", required=True)
-    for k in ("before", "after", "runs-before", "runs-after", "marks-before", "marks-after", "pngs", "out"):
+    for k in ("before", "after", "runs-before", "runs-after", "pngs", "out"):
         r.add_argument(f"--{k}", required=True)
+    r.add_argument("--marks-before", help="the marks the code before drew (marks); with --marks-after: a ligand fix")
+    r.add_argument("--marks-after", help="the marks the code after drew (marks)")
+    r.add_argument("--leads-before", help="without marks (a floor fix): the leads and controls drawn before")
+    r.add_argument("--leads-after", help="the same, drawn after")
+    r.add_argument("--tune-flags", help="each tune id laid out the app's way: whether focus auto drew two whole")
+    r.add_argument("--controls", help="comma-separated names in the leads files that are controls, not leads")
     r.add_argument("--patch", help="the fix as a patch, kept when the fix is reverted")
     r.add_argument("--since-label", help="the fix's last record, by its commit (a fix round's record)")
     r.add_argument("--since-record", help="that record's tune run report.json")
