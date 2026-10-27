@@ -242,9 +242,11 @@ def draw_topology(
     written: the note says why and which arguments draw less (focus, chains); the structured result's `floor` lists
     the reasons, each {reason, measured, limit, text} (empty above it). A figure that took longer than the hosted
     app's 90 s is said so in the note, never judged.
-    With domains_from "auto", the note says each inferred domain split with its confidence (1 - its normalized cut
-    / DOMAIN_NCUT: 0 at the limit, 1 with no contact across; said, never judged), and the structured result's
-    `domain_splits` lists them, each {chain, between, ncut, confidence, across, density_ratio, residues, sides}.
+    With domains_from "auto", the note says each inferred domain split with its confidence: 1 - its normalized cut
+    / 0.37 (DOMAIN_NCUT, the tuned split limit), the margin below that limit, not a probability; it moves with the
+    limit (x1.25 moves the third random sample's S5 failures from 12 to 19). Said, never judged. The structured
+    result's `domain_splits` lists them, each {chain, between, ncut, confidence, across, density_ratio, residues,
+    sides} (a record that failed: {chain, error}).
     msa_path: alignment for theme 'conservation'. uniprot: "auto" or an accession, to mark UniProt active and binding
     sites (style key uniprot_sites: all, or types like "active,modified"); uniprot_domains: UniProt domain panels.
     layout_file / save_layout: load or write a YAML layout file that re-creates the figure

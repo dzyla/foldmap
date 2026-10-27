@@ -26,9 +26,10 @@ version, "deep": whether D1-D3 were run, "verdict", "counts": {status: n}, "kind
 "reason", "measures"}, ...]}. A field is added in a later version only with VERSION raised. The floor group (plan 28
 Task 4) holds R1, the readability floor (floor.check), after the criteria: a check id added, the shape unchanged;
 its measures hold no wall time (the time a figure took is said in the text only, ruling Q41), so the report is the
-same on every run. S5's entry holds "measures" (plan 28 Task 5, ruling Q42) when the figure's domains are inferred
-and split: {"domain_splits": each split with its confidence, "confidence": what that is} (domain_confidence); its
-status is S5's as before."""
+same on every run. S5's entry holds "measures" (plan 28 Task 5, rulings Q42, Q43) when the figure's domains are
+inferred and split: {"domain_splits": each split with its confidence, "confidence": what that is, not a
+probability} (domain_confidence); its status is S5's as before, and its reason, when unmeasured, says what the
+measures are (domain_confidence.S5_REASON). No top-level key is added."""
 
 from __future__ import annotations
 
@@ -354,14 +355,17 @@ def report(
     from . import __version__
     from . import floor as floor_mod
     from .criteria import CRITERIA, LIKE_CHECKS
+    from .domain_confidence import S5_REASON
     from .domain_confidence import measures as split_measures
 
     kinds = {**check_kinds(CRITERIA), **DEEP_KIND}
     checks = []
     for code, title in SCIENCE.items():
         entry = _science_entry(code, found["science"].get(code), found.get("science_judged"))
-        if code == "S5" and splits:  # plan 28 Task 5: an added field, the shape unchanged
+        if code == "S5" and splits:  # plan 28 Task 5: an optional key of the v1 shape, the status unchanged
             entry["measures"] = split_measures(splits)
+            if entry["status"] == UNAVAILABLE:  # what was not measured, and what the measures are (ruling Q43 M1)
+                entry["reason"] = S5_REASON
         checks.append({"code": code, "group": "science", "title": title, "kind": kinds[code], **entry})
     for code, title in CRITERIA.items():
         entry = _criterion_entry(found["criteria"].get(code))

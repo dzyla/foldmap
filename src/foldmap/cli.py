@@ -20,8 +20,8 @@ import numpy as np
 
 from . import layoutfile
 from .criteria import LIMITS
-from .domain_confidence import lines as split_lines
 from .domain_confidence import said as splits_said
+from .domain_confidence import under_s5
 from .dssp import assign_dssp
 from .fallback import line as fallback_line
 from .features import helices_on_sheets, sse_contacts
@@ -2041,7 +2041,8 @@ def build_parser() -> argparse.ArgumentParser:
         "level with it, or its pairing is named in the notes. S4, a linked residue's star stands at its "
         "residue (linked-residue stars only: not ligand tethers, glycans, disulfide ends or UniProt marks); S5 "
         "(automatic domains) is not measured here; with --domains auto each inferred split is said under it with its "
-        "confidence, 1 - its normalized cut / 0.37 (said, never judged). Then the figure criteria A1-A20 the "
+        "confidence, 1 - its normalized cut / 0.37 (DOMAIN_NCUT, the tuned split limit: the margin below it, not a "
+        "probability, moving with the limit; said, never judged). Then the figure criteria A1-A20 the "
         "random-100 campaign judges "
         "every figure by, with the same limits: route fallbacks, loops over labels, overlapping elements, text "
         "collisions, text off the page, repeated labels, chains left out without a note, N->C and sheet order, "
@@ -2782,14 +2783,12 @@ def _cmd_check(args: argparse.Namespace) -> int:
     for out in args.output:
         print(f"wrote {save(drawn.figure, out)}", file=sys.stdout if text else sys.stderr)
     found = check_figure(drawn, spec, args.structure)
-    splits, _ = splits_said(drawn)  # inferred domain splits' confidence (domain_confidence.py): said, never judged
+    splits, _ = splits_said(drawn)  # inferred domain splits' confidence (domain_confidence.py): said, never judged;
+    # a failure to say them is a split {"error"}, said under S5 and in its measures
     if text:
         print(kind_line())  # what each check is evidence of (science.KIND; plan 28 Task 2)
-        science = science_lines(found["science"], found["science_judged"])
-        at = next((k + 1 for k, line in enumerate(science) if line.startswith("S5 ")), len(science))
-        while at < len(science) and science[at].startswith("  "):  # after S5's findings
-            at += 1
-        for line in science[:at] + split_lines(splits) + science[at:] + criteria_lines(found["criteria"]):
+        science = under_s5(science_lines(found["science"], found["science_judged"]), splits)  # splits under S5
+        for line in science + criteria_lines(found["criteria"]):
             print(line)
     failed = any(c["pass"] is False for c in found["criteria"].values())
     floor = floor_check(drawn)  # R1, the readability floor (floor.py, plan 28 Task 4): readability, as A1-A20

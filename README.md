@@ -341,13 +341,16 @@ domain (calling each chain one domain matches 54 %) and finds 88 % of CATH's dom
 some had a homologue among the 22). Eleven more chains, from CATH superfamilies none of the 33 has, were picked
 before foldmap ran on them and never tuned on: on those it matches 86 % of the residues and finds 85 % of the
 boundaries (F1 0.78). The calibration is `tests/test_domain_score.py`. Each split comes with its confidence,
-1 - (its normalized cut / 0.37, the limit a cut must be under): 0 at the limit, where the part would have stayed
-whole, 1 with no contact across. The notes, `foldmap check` (under S5, and in S5's measures in `--json`), the MCP
-result (`domain_splits`) and the app say it with the contacts across and the sides' sizes; it is never drawn. It is
-how far a split is from not being made, not a probability that CATH draws it: most splits under 0.25 are boundaries
-CATH does not draw, most at 0.75 or more are ones it draws, not all (`docs/validation/domain-uncertainty`, which also
-says why the third random sample's multi-domain chains fail and shows that keeping weak splits undivided makes the
-calibration worse at every level tried, so foldmap does not). For a
+1 - (its normalized cut / 0.37, DOMAIN_NCUT, the tuned limit a cut must be under): 0 at the limit, where the part
+would have stayed whole, 1 with no contact across. The notes, `foldmap check` (under S5, and in S5's measures in
+`--json`), the MCP result (`domain_splits`) and the app say it with the contacts across and the sides' sizes; it is
+never drawn. It is the margin below a tuned limit, not a probability, and it moves with the limit: it inherits
+DOMAIN_NCUT's sensitivity (`docs/validation/sensitivity`: x1.25 moves the third random sample's S5 failures 12 → 19).
+Against CATH it is informative, not decisive: on the 44 splits of the two regression domain sets, 3 of 11 under 0.25
+fall on a CATH boundary and 5 of 5 at 0.75 or more do (AUC 0.75; n small, Wilson intervals in
+`docs/validation/domain-uncertainty`, which also says why the third random sample's multi-domain chains fail).
+Keeping weak splits undivided lowers some calibration chain at every level tried (at the smallest, 9 → 8 of 22
+chains meet the targets: 5DWZ C loses its split), so foldmap does not. For a
 published assignment, `--domains cath` draws CATH's chopping of a PDB entry (fetched once from the PDBe API, panels named by CATH id such as `1ldmA01`,
 captioned "domains: CATH"); when CATH has none the note says so and the figure is drawn without domains.
 
@@ -848,7 +851,8 @@ drawn open holds a ring of 5 strands or more; S6, a strand off a sheet's run of 
 partner, level with it, or the notes name the pairing ("x:67-68 also pairs with x:79-86"). S4, a linked residue's star (a chromophore, say) stands at its residue on the
 drawn figure; it judges only linked-residue stars, not ligand tethers, glycans, disulfide ends or UniProt site marks,
 and `foldmap summary` (which draws no marks) reports it not measured. S5 (automatic domains against a reference) is
-measured only in the campaign. `foldmap summary` prints the same checks of the sheets as built.
+measured only in the campaign; with `--domains auto`, `foldmap check` says each inferred split under S5 with its
+confidence (said, not judged; S5 stays not measured). `foldmap summary` prints the same checks of the sheets as built.
 
 Under them `foldmap check` prints the figure criteria A1-A20, the page checks the random-100 campaign judges every
 figure by, with the same limits (`src/foldmap/criteria.py`): no route fallbacks (A3) or loops over labels (A4), no
