@@ -52,7 +52,7 @@
   limit of 45; against the plain-frame limit 0.05 they fail.
 - 8XJV: bead_overlaps went 125 to 129 with F4 and to 127 with F6, net +2 from the base; accepted because 8XJV is a
   case, not a control. Its fallbacks 10, na_crossings 10 and 125 bead overlaps are F1's.
-- Pairs foldmap takes that a stricter kernel does not (metamorphic findings F2-F4): 44 by the H-bond window (to 3.8
+- Pairs foldmap takes that a stricter kernel does not (metamorphic findings MF2-MF4): 44 by the H-bond window (to 3.8
   and 4.0 Å, the kernel 3.5), 6 by the C1'-C1' window (9.0-12.0 Å, the kernel 9.5-11.5), 5 by planarity (the kernel
   has no bound). On the `D3` runs RNApolis has 24 of the 25 H-bond-window pairs those entries hold; 1AOI I:28/J:265
   is foldmap's only. Whether the rest are real pairs is not measured.
@@ -85,7 +85,7 @@
 
 - [na-fixes/report.md](../validation/na-fixes/report.md): F2-F7 measured, F3 and F5 reverted, F1 deferred, the
   limitations.
-- [metamorphic/report.md](../validation/metamorphic/report.md): findings F2-F4 and the `D3` runs.
+- [metamorphic/report.md](../validation/metamorphic/report.md): findings MF2-MF4 and the `D3` runs.
 - [sensitivity/report.md](../validation/sensitivity/report.md): `layout:_SIDE_CLEAR` fragile;
   `nucleic:HBOND_STRETCH`, `na_runs:_DETOUR_STEPS` and `na_runs:_BESIDE_DETOUR` sensitive.
 - [prune/report.md](../validation/prune/report.md): `na_runs:_JOINT_NEAR` pruned; the others kept.

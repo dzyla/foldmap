@@ -10,7 +10,7 @@ should not change what foldmap reads from it, and hold foldmap to the level each
 - A general rotation (37 degrees about (1, 2, 3)) is not exact once written (coordinates rounded to 0.001 Å): the
   structure facts are asserted equal (measured equal), the geometry within GENERAL_GAP.
 - A renaming that reverses the chains' name order: the facts and verdicts are equal; the figure of a symmetric
-  assembly of several deposited chains is not (finding F1, pinned xfail(strict): the C2 dimers 1TIM and 1LMB, the C4
+  assembly of several deposited chains is not (finding MF1, pinned xfail(strict): the C2 dimers 1TIM and 1LMB, the C4
   tetramer 1BL8).
 - Coordinate noise (sigma 0.05 and 0.1 Å on every coordinate, three seeds): measured as a change rate and asserted
   bounded (NOISE), not equal.
@@ -49,15 +49,15 @@ NOISE = {
     0.05: {"ss": 0.05, "bridges": 0.25, "base_pairs": 0.10, "tm_residues": 0.05},
     0.1: {"ss": 0.08, "bridges": 0.25, "base_pairs": 0.10, "tm_residues": 0.05},
 }
-F1 = (
-    "T7 finding F1: protomer order follows chain names (symmetry._orbits iterates sorted(perm), symmetry.py:234; "
+MF1 = (
+    "T7 finding MF1: protomer order follows chain names (symmetry._orbits iterates sorted(perm), symmetry.py:234; "
     "symmetry._protomers sorts orbits by first chain name, symmetry.py:255, and breaks its ties by name, "
     "symmetry.py:259); protomer 0 is laid out first and drawn "
     "on the left (cli._dyad_frame) or is the copy the other mirrors (cli._mirror_frame); on an unrolled frame its "
     "nucleic-acid stems are the template the copies' stems are tied to (layout._stem_ties), none tied when protomer 0 "
     "holds no nucleic acid"
 )
-XF1 = pytest.mark.xfail(strict=True, raises=AssertionError, reason=F1)
+XMF1 = pytest.mark.xfail(strict=True, raises=AssertionError, reason=MF1)
 
 
 def _chains(name: str) -> list[str]:
@@ -186,21 +186,21 @@ def test_general_rotation(work, name):
 @pytest.mark.parametrize(
     "name",
     [
-        pytest.param("1TIM.cif", marks=XF1),  # sides swap: 28.9
-        pytest.param("1LMB.cif", marks=XF1),  # a loop by 0.75
-        pytest.param("1BL8.cif", marks=XF1),  # C4: 15.8
+        pytest.param("1TIM.cif", marks=XMF1),  # sides swap: 28.9
+        pytest.param("1LMB.cif", marks=XMF1),  # a loop by 0.75
+        pytest.param("1BL8.cif", marks=XMF1),  # C4: 15.8
     ],
 )
 def test_reversed_chain_names_draw_the_same_figure(work, name):
     got, base = _read(work, name, "reverse", True), _read(work, name, "base", True)
-    assert got["facts"] == base["facts"] and got["verdicts"] == base["verdicts"]  # these hold: F1 is the figure's
+    assert got["facts"] == base["facts"] and got["verdicts"] == base["verdicts"]  # these hold: MF1 is the figure's
     gaps = _gap(base["geometry"], got["geometry"])
     assert max(gaps.values()) == 0.0, gaps
 
 
 @pytest.mark.parametrize("name", ["1TIM.cif", "1LMB.cif", "1BL8.cif"])
 def test_reversed_chain_names_keep_facts_and_verdicts(work, name):
-    """What F1 leaves standing: the structure facts and `foldmap check`'s verdicts of the renamed entry."""
+    """What MF1 leaves standing: the structure facts and `foldmap check`'s verdicts of the renamed entry."""
     got, base = _read(work, name, "reverse", True), _read(work, name, "base", True)
     assert got["facts"] == base["facts"]
     assert got["verdicts"] == base["verdicts"]

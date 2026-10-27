@@ -328,13 +328,13 @@ def disagreements(path) -> dict[str, list[str]]:
 
 PROTEIN_FIXTURES = [*PROTEINS, "6ZS5"]
 NA_FIXTURES = sorted(p.name for p in NA.glob("*.cif.gz")) + ["../1LMB.cif"]
-F2 = (
-    "T7 finding F2: foldmap calls a base pair whose Watson-Crick-edge H-bonds reach 3.8 Å (nucleic.HBOND_MAX, "
+MF2 = (
+    "T7 finding MF2: foldmap calls a base pair whose Watson-Crick-edge H-bonds reach 3.8 Å (nucleic.HBOND_MAX, "
     "nucleic.py:16; one stretched to 4.0, HBOND_STRETCH, nucleic.py:17); the kernel holds them to 3.5 Å"
 )
-F3 = "T7 finding F3: foldmap's C1'-C1' window is 9-12 Å (nucleic.C1_PAIR, nucleic.py:18); the kernel's 9.5-11.5"
-F4 = (
-    "T7 finding F4: foldmap drops a pair whose base planes are more than 45 degrees apart (nucleic.PLANE_MAX, "
+MF3 = "T7 finding MF3: foldmap's C1'-C1' window is 9-12 Å (nucleic.C1_PAIR, nucleic.py:18); the kernel's 9.5-11.5"
+MF4 = (
+    "T7 finding MF4: foldmap drops a pair whose base planes are more than 45 degrees apart (nucleic.PLANE_MAX, "
     "nucleic.py:19, applied in pair_nucleotides, nucleic.py:156); the kernel has no planarity bound"
 )
 
@@ -396,7 +396,7 @@ def test_base_pairs_agree_with_the_kernel():
 
 @pytest.mark.parametrize("name", NA_FIXTURES)
 def test_every_base_pair_disagreement_is_explained(name):
-    """Each disagreement is one the findings name (F2 H-bond window, F3 C1'-C1' window, F4 planarity; glycosidic
+    """Each disagreement is one the findings name (MF2 H-bond window, MF3 C1'-C1' window, MF4 planarity; glycosidic
     angle only together with one of them) or the kernel's scope (a modified nucleotide it does not read); never a
     pair of another kind, nor one both call with different kinds."""
     found = _disagreements(name)
@@ -409,8 +409,8 @@ def _any(why: str) -> list[str]:
     return [f"{name}: {p}" for name in NA_FIXTURES for p in _disagreements(name).get(why, [])]
 
 
-# The disagreements exactly as recorded (docs/validation/metamorphic/report.md): F2 by fixture (count), F3, F4, the
-# glycosidic angle (with F2) and the modified nucleotides by pair. A new one, or one gone, fails
+# The disagreements exactly as recorded (docs/validation/metamorphic/report.md): MF2 by fixture (count), MF3, MF4, the
+# glycosidic angle (with MF2) and the modified nucleotides by pair. A new one, or one gone, fails
 # test_the_findings_are_exactly_these, not only the xfails below.
 FINDINGS = {
     "hbond": {"1AOI.cif.gz": 16, "1HYS.cif.gz": 2, "1KX5.cif.gz": 8, "1URN.cif.gz": 1, "3CRX.cif.gz": 9,
@@ -433,22 +433,22 @@ def test_the_findings_are_exactly_these():
         assert sorted(_any(why)) == sorted(FINDINGS[why]), why
 
 
-def f2_pairs(name: str) -> list[str]:
-    """F2's pairs on one fixture ("CHAIN:NUMBER/CHAIN:NUMBER")."""
+def mf2_pairs(name: str) -> list[str]:
+    """MF2's pairs on one fixture ("CHAIN:NUMBER/CHAIN:NUMBER")."""
     return list(_disagreements(name).get("hbond", []))
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason=F2)
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason=MF2)
 def test_foldmap_pairs_hold_their_hbonds_within_3_5():
     assert not _any("hbond")
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason=F3)
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason=MF3)
 def test_foldmap_pairs_span_the_kernels_c1_window():
     assert not _any("c1")
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason=F4)
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason=MF4)
 def test_foldmap_finds_every_kernel_pair():
     assert not _any("plane")
 

@@ -41,7 +41,7 @@
 
 ## Fails
 
-- Chain names choose protomer 0 (metamorphic finding F1). `symmetry._orbits` walks the chains in name order and
+- Chain names choose protomer 0 (metamorphic finding MF1). `symmetry._orbits` walks the chains in name order and
   `symmetry._protomers` sorts the orbits by their first chain's name. Protomer 0 is drawn on the left (`cli._dyad_frame`)
   or is the copy the others mirror (`cli._mirror_frame`). On an unrolled frame its nucleic-acid stems are the template
   the copies' stems are tied to (`layout._stem_ties`). So a renaming that reverses the name order moves the figure of
@@ -59,13 +59,13 @@
 - `A15`: copies drawn alike (deviation at most `criteria.LIMITS` `copies_alike`, 0.5 page units).
 - `A12`: the same figure under a second PYTHONHASHSEED, which catches an order that depends on set iteration.
 - `D1`: the same figure drawn twice in one process.
-- No check sees the dependence on chain names (finding F1). Only the xfail test above does; `foldmap check` and the
+- No check sees the dependence on chain names (finding MF1). Only the xfail test above does; `foldmap check` and the
   campaigns draw each entry under its own names.
 - No check sees a symmetry call that is wrong but still draws its copies alike.
 
 ## Evidence
 
-- [metamorphic/report.md](../validation/metamorphic/report.md): finding F1 and the renaming gaps.
+- [metamorphic/report.md](../validation/metamorphic/report.md): finding MF1 and the renaming gaps.
 - [random100-third/review.md](../validation/random100-third/review.md): the `A15` failures.
 - [sensitivity/report.md](../validation/sensitivity/report.md) and [prune/report.md](../validation/prune/report.md):
   `symmetry:MIN_HELIX_COPIES`, `layout:_SEP_TIE_ROOM`, `layout:_SEP_MIRROR_ROOM`.

@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 Dawid Zyla. Additional terms (AGPL-3.0 section 7(b)): see NOTICE.
 """The record of plan 28 Task 7 (review 3.6, 3.8; rulings Q34, Q35): what the metamorphic tests and the independent
-kernels measure, the findings F1-F4 with their mechanisms, and the deep checks' external runs.
+kernels measure, the findings MF1-MF4 with their mechanisms, and the deep checks' external runs.
 
     python scripts/metamorphic_record.py [--out docs/validation/metamorphic]
 
@@ -11,15 +11,15 @@ fixtures only:
 
 - exact transforms and the general rotation: the largest geometry gap of each fixture's figure, and whether its
   structure facts and `foldmap check` verdicts are equal;
-- F1: the reversed chain renaming of the assemblies of several deposited chains (1TIM, 1LMB, 1BL8);
+- MF1: the reversed chain renaming of the assemblies of several deposited chains (1TIM, 1LMB, 1BL8);
 - noise: the largest change over three seeds per fixture and sigma (DSSP codes as a fraction of residues; bridges,
   base pairs and transmembrane residues as |x △ y| / (|x| + |y|));
 - the kernels: H-bonds and bridges per protein fixture; base pairs, both, only foldmap, only the kernel, and every
-  disagreement by why (F2 hbond, F3 c1, F4 plane, lambda, modified);
+  disagreement by why (MF2 hbond, MF3 c1, MF4 plane, lambda, modified);
 - D2 (mkdssp, when MKDSSP is set) on the protein fixtures, D3 (RNApolis, when NA_RNAPOLIS_PYTHON is set) on the
-  nucleic-acid fixtures as committed and as PDB copies, and which F2 pairs RNApolis calls. A recorded run, not a test:
+  nucleic-acid fixtures as committed and as PDB copies, and which MF2 pairs RNApolis calls. A recorded run, not a test:
   the tests that check the RNApolis reading (tests/test_deep_check.py: test_d3_with_rnapolis,
-  test_f2_pairs_are_rnapolis_pairs) are skipped where RNApolis is not set up."""
+  test_mf2_pairs_are_rnapolis_pairs) are skipped where RNApolis is not set up."""
 
 from __future__ import annotations
 
@@ -43,19 +43,19 @@ OUT = ROOT / "docs" / "validation" / "metamorphic"
 REVERSED = ("1TIM.cif", "1LMB.cif", "1BL8.cif")
 D3_ENTRIES = ("1EHZ", "2OEU", "4OO8", "1KX5", "1AOI")
 FINDINGS = {
-    "F1": "Chain names choose protomer 0: symmetry._orbits walks the chains in name order (symmetry.py:234), "
+    "MF1": "Chain names choose protomer 0: symmetry._orbits walks the chains in name order (symmetry.py:234), "
     "symmetry._protomers sorts the orbits by their first chain's name (symmetry.py:255) and breaks its ties by name "
     "(symmetry.py:259); protomer 0 is drawn on the left (cli._dyad_frame) or is the copy the others mirror "
     "(cli._mirror_frame); on an unrolled frame its nucleic-acid stems are the template its copies' stems are tied to "
-    "(layout._stem_ties, plan 28 F2), and when protomer 0 holds no nucleic acid no stem is tied at all, so a renaming "
-    "can change that figure in kind. A renaming that reverses the chains' name order moves the figure of "
+    "(layout._stem_ties, plan 28's NA fix F2), and when protomer 0 holds no nucleic acid no stem is tied at all, "
+    "so a renaming can change that figure in kind. A renaming that reverses the chains' name order moves the figure of "
     "an assembly of several deposited chains; its structure facts and check verdicts stay equal.",
-    "F2": "Base-pair H-bond window: foldmap calls a canonical pair whose Watson-Crick-edge H-bonds reach 3.8 Å "
+    "MF2": "Base-pair H-bond window: foldmap calls a canonical pair whose Watson-Crick-edge H-bonds reach 3.8 Å "
     "(nucleic.HBOND_MAX, nucleic.py:16, applied at :147), one stretched to 4.0 Å (HBOND_STRETCH, :17, applied at "
     ":149); the kernel holds two of them to 3.5 Å.",
-    "F3": "C1'-C1' window: foldmap accepts 9.0-12.0 Å (nucleic.C1_PAIR, nucleic.py:18, applied at :127 and :131); "
+    "MF3": "C1'-C1' window: foldmap accepts 9.0-12.0 Å (nucleic.C1_PAIR, nucleic.py:18, applied at :127 and :131); "
     "the kernel 9.5-11.5 Å.",
-    "F4": "Planarity: foldmap drops a pair whose base planes are more than 45 degrees apart (nucleic.PLANE_MAX, "
+    "MF4": "Planarity: foldmap drops a pair whose base planes are more than 45 degrees apart (nucleic.PLANE_MAX, "
     "nucleic.py:19, applied at :156); the kernel has no planarity bound.",
 }
 
@@ -145,7 +145,7 @@ def kernels() -> dict:
 
 
 def external(work: Path) -> dict:
-    """D2 on the protein fixtures; D3 on the nucleic-acid fixtures as committed and as PDB copies, with the F2 pairs
+    """D2 on the protein fixtures; D3 on the nucleic-acid fixtures as committed and as PDB copies, with the MF2 pairs
     RNApolis does not call."""
     import test_independent_kernels as K
 
@@ -159,9 +159,9 @@ def external(work: Path) -> dict:
         row = {"mmcif": deep.pairs_check(src), "pdb": as_pdb}
         theirs = deep.rnapolis_pairs(pdb)
         if isinstance(theirs, set):
-            f2 = K.f2_pairs(f"{name}.cif.gz")
-            row["f2_pairs"] = len(f2)
-            row["f2_not_in_rnapolis"] = [p for p in f2 if frozenset(map(_key, p.split("/"))) not in theirs]
+            mf2 = K.mf2_pairs(f"{name}.cif.gz")
+            row["mf2_pairs"] = len(mf2)
+            row["mf2_not_in_rnapolis"] = [p for p in mf2 if frozenset(map(_key, p.split("/"))) not in theirs]
         d3[name] = row
     return {"D2": d2, "D3": d3}
 
@@ -186,20 +186,22 @@ def render(doc: dict) -> str:
         "",
         "## Findings",
         "",
+        "Named MF1-MF4 (metamorphic findings), apart from plan 28's NA fixes F1-F7 (docs/validation/na-fixes).",
+        "",
     ]
     for code, text in FINDINGS.items():
         lines.append(f"- **{code}.** {text}")
     rev = {n: rows["reverse"] for n, rows in doc["transforms"].items() if "reverse" in rows}
-    lines += ["", "F1, the order-reversing renaming (largest geometry gap, page units):", ""]
+    lines += ["", "MF1, the order-reversing renaming (largest geometry gap, page units):", ""]
     lines += ["| Fixture | gap | facts equal | verdicts equal |", "|---|---|---|---|"]
     lines += [f"| {n} | {r['gap']:.4g} | {r['facts_equal']} | {r['verdicts_equal']} |" for n, r in rev.items()]
     bp = doc["kernels"]["base_pairs"]
     why = bp["disagreements"]
     lines += [
         "",
-        f"F2-F4, base pairs over {len(doc['na_fixtures'])} fixtures: both {bp['both']}, only foldmap "
-        f"{bp['only_foldmap']}, only the kernel {bp['only_kernel']}. By why: F2 (hbond) {len(why['hbond'])}, "
-        f"F3 (c1) {len(why['c1'])}, F4 (plane) {len(why['plane'])}, glycosidic angle {len(why['lambda'])} (never "
+        f"MF2-MF4, base pairs over {len(doc['na_fixtures'])} fixtures: both {bp['both']}, only foldmap "
+        f"{bp['only_foldmap']}, only the kernel {bp['only_kernel']}. By why: MF2 (hbond) {len(why['hbond'])}, "
+        f"MF3 (c1) {len(why['c1'])}, MF4 (plane) {len(why['plane'])}, glycosidic angle {len(why['lambda'])} (never "
         f"alone), modified nucleotides {len(why['modified'])} (outside the kernel's scope; not a finding).",
         "",
     ]
@@ -253,8 +255,8 @@ def render(doc: dict) -> str:
         lines.append(f"- D2 {n}: {r['status']} ({r['detail']})")
     for n, r in doc["external"]["D3"].items():
         extra = ""
-        if "f2_pairs" in r:
-            extra = f"; F2 pairs {r['f2_pairs']}, not in RNApolis: {', '.join(r['f2_not_in_rnapolis']) or 'none'}"
+        if "mf2_pairs" in r:
+            extra = f"; MF2 pairs {r['mf2_pairs']}, not in RNApolis: {', '.join(r['mf2_not_in_rnapolis']) or 'none'}"
         lines.append(
             f"- D3 {n}: as committed {r['mmcif']['status']} ({r['mmcif']['detail']}); as PDB {r['pdb']['status']} "
             f"({r['pdb']['detail']}){extra}"

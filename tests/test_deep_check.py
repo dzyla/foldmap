@@ -211,20 +211,20 @@ def _rnapolis_key(text: str) -> tuple[str, int, str]:
 @pytest.mark.parametrize(
     ("name", "outside", "agreement"), [("1AOI", {"I:28/J:265"}, (139, 140)), ("1KX5", set(), (146, 146))]
 )
-def test_f2_pairs_are_rnapolis_pairs(tmp_path, name, outside, agreement):
-    """F2's reading (docs/validation/metamorphic/report.md): the pairs foldmap calls with an H-bond past the kernel's
-    3.5 Å are, but for `outside` (1AOI's I:28/J:265, also past the kernel's C1'-C1' window: F3), pairs RNApolis calls
+def test_mf2_pairs_are_rnapolis_pairs(tmp_path, name, outside, agreement):
+    """MF2's reading (docs/validation/metamorphic/report.md): the pairs foldmap calls with an H-bond past the kernel's
+    3.5 Å are, but for `outside` (1AOI's I:28/J:265, also past the kernel's C1'-C1' window: MF3), pairs RNApolis calls
     too; and RNApolis calls `agreement` (both, of foldmap's) of foldmap's pairs. On PDB copies (RNApolis stops on the
     trimmed mmCIF fixtures). Run where RNApolis is set up (zyla-office), skipped in CI."""
     import gemmi
 
-    from test_independent_kernels import f2_pairs
+    from test_independent_kernels import mf2_pairs
 
     pdb = tmp_path / f"{name}.pdb"
     gemmi.read_structure(str(DATA / "na" / f"{name}.cif.gz")).write_pdb(str(pdb))
     theirs = deep.rnapolis_pairs(pdb)
     assert isinstance(theirs, set), theirs
-    pairs = f2_pairs(f"{name}.cif.gz")
+    pairs = mf2_pairs(f"{name}.cif.gz")
     assert pairs
     assert {p for p in pairs if frozenset(map(_rnapolis_key, p.split("/"))) not in theirs} == outside
     got = deep.pairs_check(pdb)

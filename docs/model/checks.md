@@ -76,7 +76,7 @@ The failures no check sees, collected from the other pages:
 - DSSP ([dssp.md](dssp.md)): an element split or joined by the kink or copy rules against what a reader would choose.
 - Sheets ([sheets.md](sheets.md)): the register of a pairing on the page; a one-bridge pairing a reader would call a
   sheet (`sheets._MIN_PAIRS` decides); `S6` passing an accessory whose pairing is only named in the notes.
-- Symmetry ([symmetry.md](symmetry.md)): chain names choose protomer 0 (metamorphic finding F1; only an xfail test
+- Symmetry ([symmetry.md](symmetry.md)): chain names choose protomer 0 (metamorphic finding MF1; only an xfail test
   sees it); a wrong symmetry call that still draws its copies alike.
 - Layout ([layout.md](layout.md)): the latent `layout._open_at_ends` bug under `--like`; a drawing that moves while
   every key stays equal (the prune record shows such moves); the length of a disulfide bar; text drawn under 6 pt by
@@ -101,7 +101,7 @@ The failures no check sees, collected from the other pages:
 - [inventory/inventory.md](../validation/inventory/inventory.md): every fallback and the check that reports it.
 - [sensitivity/report.md](../validation/sensitivity/report.md): `A2`'s load dependence; the method's limits.
 - [prune/report.md](../validation/prune/report.md): identical keys are not identical drawings.
-- [metamorphic/report.md](../validation/metamorphic/report.md): metamorphic findings F1-F4, kernels, `D2` and `D3`
+- [metamorphic/report.md](../validation/metamorphic/report.md): metamorphic findings MF1-MF4, kernels, `D2` and `D3`
   runs.
 - [readability-floor/report.md](../validation/readability-floor/report.md): `R1` and its census.
 - [homologues/tuning-report.md](../validation/homologues/tuning-report.md): the `H2` and `H3` limits.
