@@ -104,13 +104,13 @@ def _keys() -> set[str]:
 
 def _entries() -> set[str]:
     """PDB ids foldmap was measured on: plan 29's tune half (the split's "tune" list only), samples 1-3, the NA
-    controls (docs/validation/na/<ID>-figure.svg) and the structures in tests/data."""
+    controls (docs/validation/na/<ID>-figure.svg) and the structures in tests/data and its folders."""
     app29 = json.loads((VALIDATION / "app29" / "sample.json").read_text(encoding="utf-8"))
     out = set(app29["split"]["tune"])
     for sample in SAMPLES:
         out |= {e["id"] for e in json.loads(sample.read_text(encoding="utf-8"))["entries"]}
     out |= {p.name.split("-")[0] for p in (VALIDATION / "na").glob("*-figure.svg")}
-    out |= {p.name.split(".")[0].upper() for p in (ROOT / "tests" / "data").glob("*.cif*")}
+    out |= {p.name.split(".")[0].upper() for p in (ROOT / "tests" / "data").rglob("*.cif*")}
     return out
 
 
