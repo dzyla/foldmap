@@ -3253,6 +3253,14 @@
  },
  "split": {
   "tune": [
+   "30CY",
+   "38NR",
+   "12XK",
+   "9Z0S",
+   "45JF",
+   "35VC",
+   "31FD",
+   "30CU",
    "9YPK",
    "30CV",
    "9YLG",
@@ -3325,16 +3333,8 @@
    "31VY",
    "9YLC",
    "31DM",
-   "9QR0",
-   "30CY",
-   "38NR",
-   "12XK",
-   "9Z0S",
-   "45JF",
-   "35VC",
-   "31FD",
-   "30CU"
+   "9QR0"
   ]
  },
- "split_rule": "sorted by sha256(f'{seed}:{id}'), seed 20261027: the first 40 check, the rest tune"
+ "split_rule": "sorted by sha256(f'{seed}:{id}'), seed 20261027: the first 32 check, the rest tune"
 }
