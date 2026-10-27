@@ -989,7 +989,7 @@ def cmd_sample(args) -> int:
     exclude = sorted({e["id"] for f in args.exclude or [] for e in _sample_entries(Path(f))})
     if args.released_after and args.released_after >= args.date:
         raise SystemExit(f"--released-after {args.released_after} is not before --date {args.date}: an empty window")
-    doc = sample(args.seed, args.date, exclude, args.released_after)
+    doc = sample(args.seed, args.date, exclude, after=args.released_after)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(dump(doc), encoding="utf-8")
     print(quota_table(doc))
