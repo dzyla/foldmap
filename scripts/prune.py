@@ -104,7 +104,11 @@ DISABLE = {
     "na_runs:_BESIDE_TOLL": (0.0, "a route from beside a face pays nothing for cells under strands drawn before"),
     "nucleic:HBOND_STRETCH": (3.8, "= HBOND_MAX: no stretched pair is taken in the second pass (nucleic pairs)"),
     "panels:CLOSE": (0.0, "no gap between a domain's padded elements is filled (panels.panel_fields)"),
-    "render:_SPOT_FAR": (1, "a ligand mark is never looked for beyond _SPOT_RADIUS (render._place_mark)"),
+    "render:_SPOT_FAR": (
+        1,
+        "a ligand mark is never looked for beyond _SPOT_RADIUS (render._place_mark), and _least_bad_spot's rings are"
+        " narrowed to _SPOT_RADIUS too (not a faithful revert: that sweep reads the same constant)",
+    ),
     "render:_SPOT_MORE_RINGS": (0, "no ring past the first clear spot is searched for fewer crossed bodies"),
     "route:_SLAB_RUN": (3.0, "= _SLAB_COST: a step along the slab costs what a step across it does"),
     "route:_MAX_NODES_PAGE": (10**12, "a page's second route searches have no shared budget (never refused)"),
@@ -561,6 +565,10 @@ def _campaign_keys(where: Path, name: str, measure: str) -> dict | None:
         return None
     rep = where / "runs" / name / "report.json"
     rd = _script("random100").read_report(rep) if rep.is_file() or Path(f"{rep}.gz").is_file() else None
+    if rd is not None:  # each entry's drawing: no key, recorded beside the verdict (an SVG can move where no key sees)
+        view = "default" if measure in ("r100", "na") else measure
+        doc["svg"] = {e["id"]: (((e.get("views") or {}).get(view) or {}).get("result") or {}).get("svg_sha256")
+                      for e in rd["entries"]}  # fmt: skip
     if rd is None:
         doc["entries"] = None
     elif measure == "na":
@@ -569,6 +577,40 @@ def _campaign_keys(where: Path, name: str, measure: str) -> dict | None:
     else:
         doc["entries"] = _script("sensitivity").keys_of(rd, "default" if measure == "r100" else measure)
     return doc
+
+
+def svg_moved(base: dict, run: dict) -> list[str]:
+    """The entries whose drawing (SVG hash) differs between two runs: no key, so no verdict reads it."""
+    return sorted(i for i in set(base) | set(run) if base.get(i) != run.get(i))
+
+
+def equivalence(runs: Path, after: Path, the_plan: dict | None = None) -> dict:
+    """The pruned code against what was measured: the post-prune baselines (`after`, the same measures run unperturbed
+    at the commit removing PRUNED) drawn byte-identical to each pruned candidate's "-off" run, measure by measure,
+    and what moved against the measured baseline."""
+    the_plan = plan() if the_plan is None else the_plan
+    out = {"measures": {}}
+    for m in ("r100", *VIEWS, "na"):
+        new = _campaign_keys(after / m, "baseline", m)
+        old = _campaign_keys(runs / m, "baseline", m)
+        if new is None or old is None:
+            continue
+        stamp = new.get("report_stamp") or {}
+        out["after_code"] = stamp.get("code_fingerprint")
+        out["after_commit"] = (stamp.get("git") or {}).get("commit")
+        ostamp = old.get("report_stamp") or {}
+        out["runs_code"] = ostamp.get("code_fingerprint")
+        out["runs_commit"] = (ostamp.get("git") or {}).get("commit")
+        got = {"entries": len(new["svg"]), "moved_from_baseline": svg_moved(old["svg"], new["svg"]), "off": {}}
+        for t in the_plan["tried"]:
+            if t["id"] not in PRUNED:
+                continue
+            off = _campaign_keys(runs / m, t["label"], m)
+            if off is not None:
+                diff = svg_moved(off["svg"], new["svg"])
+                got["off"][t["id"]] = {"identical": len(new["svg"]) - len(diff), "differ": diff}
+        out["measures"][m] = got
+    return out
 
 
 def judge_measure(measure: str, where: Path, name: str, base_name: str = "baseline") -> dict | None:
@@ -588,6 +630,7 @@ def judge_measure(measure: str, where: Path, name: str, base_name: str = "baseli
         else:
             got = campaign_verdict(base["entries"], run["entries"])
         got["code"] = (run.get("report_stamp") or {}).get("code_fingerprint")
+        got["svg"] = svg_moved(base.get("svg") or {}, run.get("svg") or {})  # informational: no verdict reads it
         return got
     base, run = _load(where / f"{base_name}.json"), _load(where / f"{name}.json")
     if run is None:
@@ -667,7 +710,7 @@ def _seconds(runs: Path) -> dict:
     return out
 
 
-def build(runs: Path, stamp: dict, the_plan: dict | None = None) -> dict:
+def build(runs: Path, stamp: dict, the_plan: dict | None = None, after: Path | None = None) -> dict:
     """The record: each candidate's measures, verdicts and decision; the shared and the not tried; the baselines."""
     the_plan = plan() if the_plan is None else the_plan
     rows, codes = [], set()
@@ -730,6 +773,7 @@ def build(runs: Path, stamp: dict, the_plan: dict | None = None) -> dict:
         "removed": sorted(PRUNED),
         "held": {i: HELD[i] for i in HELD if by_id.get(i, {}).get("decision") == "held"},
         "named_looks": list(NAMED_LOOKS),
+        "equivalence": equivalence(runs, after, the_plan) if after else None,
     }
 
 
@@ -750,6 +794,9 @@ def _cell(v: dict | None) -> str:
         said += f" ({len(what)}: {what[0]}{'; …' if len(what) > 1 else ''})"
     if v.get("reached") is False:
         said += ", not imported"
+    if v.get("svg"):  # drawings no key sees
+        n = len(v["svg"])
+        said += f"; {n} SVG{'s' if n > 1 else ''} moved ({', '.join(v['svg'][:3])}{', …' if n > 3 else ''})"
     return said.replace("|", "\\|")
 
 
@@ -777,11 +824,17 @@ def render(doc: dict) -> str:
         "touched.",
         "",
         "**Limits.** One value per special case, one at a time: no interaction is measured. Turning off is not "
-        "always the code as it was before the special case (each value's reason says what it turns off). A view "
+        "always the code as it was before the special case (each value's reason says what it turns off); three "
+        "values are no faithful revert: `layout:_SEP_MIRROR_ROOM` (the extra room only; the extra push passes stay), "
+        "`layout:_STACK_SHUT` (the nudge, the move to the partner's other side and the pocket go together) and "
+        "`render:_SPOT_FAR` (it also narrows `_least_bad_spot`'s rings). A view "
         "other than the default is measured only for a constant the default view never reads, on the entries "
         "sensitivity's stage V drew it in. A test that runs foldmap in a child process (the CLI, random100) runs it "
-        "unperturbed. Identical on every measure means the measured sets never take the special case, not that its "
-        "named entry needs it no longer.",
+        "unperturbed. **Identical means identical keys and checks** (each entry's pass, failing criteria, named "
+        "fallbacks and figure area; the NA measures; the domain scores; the bench's layouts; the tests), not "
+        "identical drawings: a drawing can move where no key sees it. Each campaign cell names the entries whose SVG "
+        "moved (no verdict reads it), and each prune below says whether its drawings stayed the same. Identical keys "
+        "say nothing of an entry no measure holds, such as the special case's named entry.",
         "",
         "## Counts",
         "",
@@ -830,9 +883,38 @@ def render(doc: dict) -> str:
     secs = doc["seconds"]
     lines += ["", "zl time: " + ", ".join(f"{m} {s / 3600:.2f} h" for m, s in secs.items()) + ".", ""]
     lines += ["## Pruned", ""]
-    lines += [f"- `{i}`" + (": removed from the code" if i in doc["removed"] else "") for i in doc["pruned"]] or [
-        "None."
-    ]
+    by_id = {r["id"]: r for r in doc["candidates"]}
+    for i in doc["pruned"]:
+        ms = {m: v for m, v in by_id[i]["measures"].items() if v and "svg" in v}
+        moved = {m: v["svg"] for m, v in ms.items() if v["svg"]}
+        said = "keys and checks identical on every measure; "
+        if moved:
+            said += "live logic: its removal moved drawings no key orders, " + "; ".join(
+                f"{m} {len(ids)} SVGs ({', '.join(ids)})" for m, ids in moved.items()
+            )
+            said += "; SVGs identical on " + (", ".join(m for m in ms if m not in moved) or "no other measure")
+        else:
+            said += "SVGs identical too on " + ", ".join(ms) + ": no measured drawing took it"
+        lines.append(f"- `{i}`" + (" (removed from the code)" if i in doc["removed"] else "") + f": {said}.")
+    if not doc["pruned"]:
+        lines.append("None.")
+    eq = doc.get("equivalence")
+    if eq:
+        lines += ["", "### The pruned code draws what was measured", ""]
+        lines.append(
+            f"The runs measured foldmap code {eq['runs_code']} at {(eq['runs_commit'] or '?')[:7]}, before the prune. "
+            f"The same measures' baselines run again at {(eq['after_commit'] or '?')[:7]} (code {eq['after_code']}), "
+            'with the pruned special cases removed from the code, against each pruned candidate\'s "-off" run:'
+        )
+        lines.append("")
+        for m, g in eq["measures"].items():
+            offs = "; ".join(
+                f"`{i}`-off {o['identical']}/{g['entries']} SVGs byte-identical"
+                + (f" (differ: {', '.join(o['differ'])})" if o["differ"] else "")
+                for i, o in g["off"].items()
+            )
+            moved = ", ".join(g["moved_from_baseline"]) or "none"
+            lines.append(f"- {m}: {offs}; moved from the measured baseline: {moved}.")
     lines += ["", "## Met the condition, held", ""]
     lines += [f"- `{i}`: {why}" for i, why in doc["held"].items()] or ["None."]
     lines += ["", "## Named entries looked at (informational, not a measure of Q46)", ""]
@@ -866,7 +948,7 @@ def render(doc: dict) -> str:
 
 def cmd_report(args) -> int:
     stamp = _stamp()
-    doc = build(Path(args.runs), stamp)
+    doc = build(Path(args.runs), stamp, after=Path(args.after) if args.after else None)
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     (out / "report.json").write_text(json.dumps(doc, indent=1, default=str) + "\n", encoding="utf-8", newline="\n")
@@ -889,6 +971,7 @@ def main(argv=None) -> int:
     w = sub.add_parser("report", help="judge the runs and write report.md and report.json")
     w.add_argument("--runs", required=True)
     w.add_argument("--out", default=str(OUT))
+    w.add_argument("--after", help="the post-prune baselines' runs folder (r100, domains, na): the equivalence")
     w.set_defaults(func=cmd_report)
     c = sub.add_parser("child", help="(internal) one domsets or bench run, the perturbation installed first")
     c.add_argument("what", choices=("domsets", "bench"))

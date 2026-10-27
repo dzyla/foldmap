@@ -163,11 +163,12 @@ def _straight_joint(
     own two (a line that runs into one of those beyond a bead's radius is drawn as an _elbow instead where one is
     clear), and crossing no nucleic-acid strand drawn so far (`strands`, a _Strands) other than the partner strand of
     this same joint (two strands may cross where the duplex carries on, as in a helix). Between pieces whose boxes
-    touch; or, between pieces that do not, up to _JOINT_REACH, only when the line
-    also leaves its face within 60° of its axis (_JOINT_FORWARD), runs into neither piece, and keeps off every name
-    (`names`, as _off_names) and protein loop (`loops`, a _Strands). The touching joints keep the old test:
-    held to the names and loops too, two more of 4YBB's became plain curves, which cross more than a line does
-    (random-100 C2b-4 fix round 1)."""
+    touch; or, between pieces that do not, up to _JOINT_REACH, only when the line also leaves its face within 60° of
+    its axis (_JOINT_FORWARD), runs into neither piece, and keeps off every name (`names`, as _off_names) and protein
+    loop (`loops`, a _Strands). The touching joints keep the old test, held to no names or loops: so held, two more
+    of 4YBB's joints became plain curves, which cross more than a line does (random-100 C2b-4 fix round 1; then the
+    near and the touching joints together, before plan 28 Task 9.3 pruned the near ones, _JOINT_NEAR). At that prune
+    no tests/data/na fixture called this function (0 of 18, 4YBB among them)."""
     a, b = da.rect, db.rect
     touching = min(a[2], b[2]) - max(a[0], b[0]) >= -1e-9 and min(a[3], b[3]) - max(a[1], b[1]) >= -1e-9
     gap, forward = math.dist(fa, fb), _dot(np.subtract(fb, fa), ea)

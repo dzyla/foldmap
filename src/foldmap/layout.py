@@ -6143,7 +6143,8 @@ _NAME_ROUTE = 0.15  # (a wider keep-out forces loops over it where room is short
 # a loop's way out of an element's end (_ways_out, 0.2 either side of it), room or not (random-100 held-out 7NZ2's
 # domains view: "D1 · B1" 0.08 from A1:1330-1337's way out, with no room to keep, closed it). Plan 28 Task 9.3
 # (ruling Q46) pruned the 0.1 more it kept (_NAME_OPEN): turned off, the third sample's domains view, its default
-# view, the NA sets, the domain sets, the bench and the suite measured identical (docs/validation/prune/report.md)
+# view, the NA sets, the domain sets, the bench and the suite measured keys identical, name places moved on 3
+# measured entries (5NF8, 7F5S, 9FZL's domains views) and on 7NZ2's (docs/validation/prune/report.md)
 _NAME_NEAR_NT = 0.3  # page units a name keeps from a nucleotide of an unpaired strand, beyond its letter
 _NAME_STUB = 0.8  # page units: the straight run of a loop out of an element's end, kept clear of a name
 _SHORT_LOOP = 6.0  # page units: a loop whose ends are this near takes the short way between them, kept clear too

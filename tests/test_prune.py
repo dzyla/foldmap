@@ -174,7 +174,7 @@ def test_prune_refuses_to_run_perturbed_itself(prune, monkeypatch):
 
 
 @needs_report
-def test_the_committed_record_is_stamped_and_adds_up():
+def test_the_committed_record_is_stamped_and_adds_up(prune):
     doc = json.loads((VALIDATION / "prune" / "report.json").read_text(encoding="utf-8"))
     stamp = doc["source_stamp"]
     assert stamp["git"]["commit"] and not stamp["git"].get("dirty")
@@ -194,4 +194,26 @@ def test_the_committed_record_is_stamped_and_adds_up():
     assert doc["baselines"]["r100_deterministic"]["identical"]
     assert doc["removed"] == sorted(doc["pruned"])  # every special case that met the condition and was not held
     assert set(doc["held"]) == {r["id"] for r in doc["candidates"] if r["decision"] == "held"}
-    assert (VALIDATION / "prune" / "report.md").read_text(encoding="utf-8").startswith("# Pruning on evidence")
+    # the md is the JSON's (render), and the record is the code's tables (review finding 4)
+    assert prune.render(doc) == (VALIDATION / "prune" / "report.md").read_text(encoding="utf-8")
+    every = doc["candidates"] + doc["shared"] + doc["not_tried"]
+    assert {r["id"] for r in every} == {*prune.DISABLE, *prune.SHARED, *prune.NOT_TRIED}
+    assert all(r["off"] == prune.DISABLE[r["id"]][0] for r in doc["candidates"])
+    assert {s["id"]: s["with"] for s in doc["shared"]} == prune.SHARED
+    assert set(doc["held"]) == set(prune.HELD) and doc["removed"] == sorted(prune.PRUNED)
+    assert {k: c[k] for k in ("candidates", "tried", "kept", "pruned", "held", "not_tried")} == {
+        "candidates": 45,
+        "tried": 32,
+        "kept": 28,
+        "pruned": 2,
+        "held": 2,
+        "not_tried": 13,
+    }
+    # the pruned code draws what was measured: the post-prune baselines byte-identical to each "-off" run
+    eq = doc["equivalence"]
+    assert eq["runs_code"] == doc["code_fingerprint"] and eq["after_code"] != eq["runs_code"]
+    assert set(eq["measures"]) == {"r100", "domains", "na"}
+    for g in eq["measures"].values():
+        assert g["off"] and all(o["identical"] == g["entries"] and not o["differ"] for o in g["off"].values())
+    name_open = next(r for r in doc["candidates"] if r["id"] == "layout:_NAME_OPEN")
+    assert name_open["measures"]["domains"]["svg"] == ["5NF8", "7F5S", "9FZL"]  # live logic, keys identical (Q49)
