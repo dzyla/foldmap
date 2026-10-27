@@ -1734,33 +1734,55 @@ def _mark_spot(
 def _place_mark(
     anchor, half, targets, taken, lines, texts, tethers, bodies=(), runs=(), na=None, retarget=None, bound=()
 ):
-    """A ligand's spot: clear of the loops' lines and the tethers drawn before where there is room, else of the
-    elements and text only (the tethers' crossings given up), else of the elements and text with every tether given
-    up; else further out, else on its anchor: a chosen ligand is never left without a mark (C5 fix round 1: 6JO6 lost
-    24 on a crowded page; batch B: 7QUP lost one with nothing clear within _SPOT_RADIUS).
+    """A ligand's spot: clear of the loops' lines and the tethers drawn before where there is room, within
+    _SPOT_RADIUS, else further out, to _SPOT_FAR times it; else of the elements and text only (the tethers' crossings
+    given up), else of the elements and text with every tether given up; else further out, else on its anchor: a
+    chosen ligand is never left without a mark (C5 fix round 1: 6JO6 lost 24 on a crowded page; batch B: 7QUP lost
+    one with nothing clear within _SPOT_RADIUS). Every spot of the layers after the first lies on a loop line (or a
+    disulfide bar), the first having found none clear of them within _SPOT_RADIUS, so a mark given them up sat on a
+    line that seemed to end at it (plan 29 Task 4, triage proposal 1: 9SXF's A1JRG; docs/validation/app29/fix-ligand).
+    The spot off them further out is taken over that near one only when its tethers run over no more of the bodies
+    and along no more of the loops' lines (C9's measure, as _mark_spot ranks spots): further out, they lengthen and
+    can cross more (1GOX-A's FMN, tests/test_ligands.py), and neither fault is the lesser.
     `bound`: the home chain's main contact (its heaviest target), then its targets on other chains. Each of those lies
     within _TETHER_REACH of the main contact (_local_targets), but the anchor, the mean of all its targets, follows
     home contacts drawn far from it: a spot that leaves one of them farther than _TETHER_REACH gives way to the first
     spot, kept off as much (the same keep-outs, or stricter), out to _SPOT_FAR times _SPOT_RADIUS, that keeps them
     and the main contact within it, so the mark stays in its pocket (random-100 C2b-5: 6JLN's CLA B609 drawn 10.15
     from H's helix, 3.80 from the main contact; held to the other chains alone, 1SLV's Cu went 7.35 from its anchor,
-    7.67 from its main contact, in the beta view); else the spot stays."""
+    7.67 from its main contact, in the beta view); else the first such spot whose tethers to `bound` alone cross no
+    text, under the same keep-outs: the other home tethers, drawn whatever their length, may then pass under a text
+    (drawn in pieces round it, visible_pieces; plan 29 Task 4, triage proposal 5: 9X4L's ADP 32001, whose home
+    target 15 units off crossed a name from every spot keeping chain 5's within reach); else the spot stays."""
     layers = ((taken + lines, tethers), (taken, tethers), (taken, ()))
+    far = _SPOT_FAR * _SPOT_RADIUS
 
     def kept(spot, upto: int):
         if not _beyond_reach(spot, bound[1:]):
             return spot
-        for blocked, drawn in layers[: upto + 1]:
-            far = _SPOT_FAR * _SPOT_RADIUS
-            near = _mark_spot(anchor, half, targets, blocked, texts, drawn, bodies, far, runs, na, retarget, bound)
-            if near is not None:
-                return near
+        for judged in (targets, bound):  # every tether kept off text, then the bound's alone
+            for blocked, drawn in layers[: upto + 1]:
+                near = _mark_spot(anchor, half, judged, blocked, texts, drawn, bodies, far, runs, na, retarget, bound)
+                if near is not None:
+                    return near
         return spot
 
+    def cost(c):  # what C9 ranks spots by: the tethers' run over bodies and along loop lines (NA: the stems and
+        ts = targets if retarget is None else retarget(c)  # strands crossed first, as _mark_spot ranks them)
+        over = _over_bodies(c, ts, bodies) + _along_loops(c, ts, runs)
+        return (_stems_crossed(c, ts, na[0]), _strands_crossed(c, ts, na[1]), over) if na is not None else (over,)
+
+    off = None  # a spot clear of the loop lines further out, when none is within _SPOT_RADIUS
     for k, (blocked, drawn) in enumerate(layers):
         spot = _mark_spot(anchor, half, targets, blocked, texts, drawn, bodies, runs=runs, na=na, retarget=retarget)
-        if spot is not None:
+        if spot is None and k == 0:
+            off = _mark_spot(anchor, half, targets, blocked, texts, drawn, bodies, far, runs, na, retarget)
+        elif spot is not None and k == 0:
             return kept(spot, k)
+        elif spot is not None:  # on a loop line: the spot off them, unless its tethers cross more (C9)
+            return kept(off, 0) if off is not None and cost(off) <= cost(spot) else kept(spot, k)
+    if off is not None:
+        return kept(off, 0)
     # nothing clear within _SPOT_RADIUS (7QUP's crowded page dropped GTP:9E500): further out, else the least bad
     spot = _mark_spot(
         anchor,
@@ -1770,7 +1792,7 @@ def _place_mark(
         texts,
         (),
         bodies,
-        radius=_SPOT_FAR * _SPOT_RADIUS,
+        radius=far,
         runs=runs,
         na=na,
         retarget=retarget,

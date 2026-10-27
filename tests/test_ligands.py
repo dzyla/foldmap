@@ -342,3 +342,81 @@ def test_a_ligand_held_by_a_stem_is_tethered_to_the_rail_facing_it():
             same = [h for h in held if stem.get(h, h[0]) == stem.get(k, k[0])]
             gaps = [np.hypot(*(np.asarray(where[h], float) - c)) for h in same]
             assert np.hypot(*(np.asarray(t) - c)) <= min(gaps) + 1e-9
+
+
+APP29 = DATA / "app29"  # plan 29's fixtures (its sample's tune half: docs/validation/app29/sample.json)
+
+
+def test_a_ligand_mark_sits_on_no_loop_line():
+    """Plan 29 Task 4, triage proposal 1 (docs/validation/app29/fix-ligand). 9SXF's A1JRG box sat on the loop from η2
+    down to η3, the line seeming to end at the box: no spot within _SPOT_RADIUS kept off the loop lines and the
+    tethers drawn before, and the next keep-outs (render._place_mark's layers) left the loop lines out. The mark now
+    looks further out, to _SPOT_FAR times _SPOT_RADIUS, under the same keep-outs, and takes that spot when its tethers
+    run over no more bodies than the near one's (here they run over fewer).
+    app29/9SXF.cif.gz is the whole entry as gemmi writes it again (no residue cropped): model 1, hydrogens, waters,
+    alternative conformations and anisotropic factors dropped, every B factor 50 and occupancy 1; it drew the fault
+    as the download did (the mark crossed by the loop over its full height)."""
+    import numpy as np
+
+    from foldmap.render import ligand_marks
+    from foldmap.route import clip_lengths
+    from foldmap.spec import draw_spec, figure_spec
+
+    spec = figure_spec(APP29 / "9SXF.cif.gz")
+    d = draw_spec(spec)
+    marks = ligand_marks(d.layout, d.loops, d.sses, spec.look)
+    segs = np.array([(*p, *q) for lp in d.loops for p, q in zip(lp.points, lp.points[1:])], float)
+    assert [m["ligand"].name for m in marks] == ["A1JRG"]
+    for m in marks:
+        (cx, cy), (hx, hy) = m["centre"], m["half"]
+        crossed = float(clip_lengths(segs, np.array([[cx - hx, cy - hy, cx + hx, cy + hy]])).max())
+        assert crossed < 1e-9, (m["ligand"].name, m["centre"], crossed)
+
+
+def test_a_mark_kept_for_another_chain_finds_room_on_a_crowded_page():
+    """Plan 29 Task 4, triage proposal 5 (A20; docs/validation/app29/fix-ligand). 9X4L's ADP 32001 (home chain 3, one
+    target on chain 5): its first spot left chain 5's target 7.89 away, and every spot out to _SPOT_FAR times
+    _SPOT_RADIUS that keeps that target and the main contact within _TETHER_REACH was either on a box, a loop line or
+    a tether drawn before, or had a tether crossing a name (that of the home target 15 units off, which no spot near
+    the pocket reaches without one), so the spot stayed. The search now takes, under the same keep-outs, the first
+    spot whose tethers to the bound alone cross no text; the other home tethers, drawn whatever their length, may
+    pass under a name (drawn in pieces round it). No gemmi crop of 9X4L (8692 residues, 15 chains, a 7.7 MB file)
+    under 200 kB keeps the page: nine chain subsets were drawn and none failed A20. app29/9X4L-adp32001-mark.json is
+    the input render._place_mark was given for this mark on the whole entry's page (figure_spec's defaults, 649
+    elements), cut to the boxes, lines and tethers within reach of the search (its marks within _SPOT_FAR times
+    _SPOT_RADIUS plus 1, their tethers 16 further); cut so, the old search still kept the spot 7.89 from chain 5."""
+    import json
+
+    import numpy as np
+
+    from foldmap.layout import overlaps_any
+    from foldmap.render import _TETHER_REACH, _place_mark
+    from foldmap.route import clip_len
+
+    doc = json.loads((APP29 / "9X4L-adp32001-mark.json").read_text(encoding="utf-8"))
+    boxes = {k: [tuple(b) for b in doc[k]] for k in ("taken", "lines", "texts", "bodies", "runs")}
+    tethers = [(tuple(a), tuple(b)) for a, b in doc["tethers"]]
+    bound = [tuple(t) for t in doc["bound"]]
+    targets = [tuple(t) for t in doc["targets"]]
+    half = tuple(doc["half"])
+    args = (boxes["taken"], boxes["lines"], boxes["texts"], tethers, boxes["bodies"], boxes["runs"])
+    spot = _place_mark(np.asarray(doc["anchor"]), half, targets, *args, None, None, bound)
+    reach = [round(float(np.hypot(*np.subtract(t, spot))), 2) for t in bound]
+    assert max(reach) <= _TETHER_REACH, reach  # the main contact and chain 5's target
+    box = (spot[0] - half[0], spot[1] - half[1], spot[0] + half[0], spot[1] + half[1])
+    assert not overlaps_any(box, boxes["taken"] + boxes["lines"])  # off the elements, names and loop lines
+    assert not any(clip_len(a, b, box) > 1e-9 for a, b in tethers)  # and the tethers drawn before
+
+
+def test_9x4l_tethers_to_another_chain_stay_within_reach():
+    """The same, end to end on the whole 9X4L (the download; skipped where it is not): A20 holds on its page."""
+    from foldmap import criteria
+    from foldmap.spec import draw_spec, figure_spec
+    from helpers import r100_entry
+
+    spec = figure_spec(r100_entry("9X4L"))
+    d = draw_spec(spec)
+    tethers = criteria.tether_lengths(d, spec.look)
+    assert any(home != to for _, _, home, to in tethers)  # ADP 32001 and others held by two chains
+    long = [t for t in tethers if t[2] != t[3] and t[1] > criteria.LIMITS["tether_length"]]
+    assert not long, long
