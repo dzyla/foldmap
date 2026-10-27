@@ -1,20 +1,20 @@
 {
  "what": "foldmap's measured and named-entry constants perturbed x0.75 and x1.25 on the third random sample (scripts/sensitivity.py, plan 28 Task 9.2, rulings Q29, Q30)",
- "date": "2026-10-26",
+ "date": "2026-10-27",
  "source_stamp": {
   "foldmap": "0.1.0",
-  "code_fingerprint": "4b9c836b01cb8d00",
+  "code_fingerprint": "d3481a10e388ea51",
   "package": "checkout",
-  "checkout_fingerprint": "4b9c836b01cb8d00",
+  "checkout_fingerprint": "d3481a10e388ea51",
   "installed_matches_checkout": true,
   "git": {
-   "commit": "608e206905f19e1dbd9edb44f638ca12554e3191",
+   "commit": "3394689e44a56916d988e3228db5b7452829e066",
    "dirty": false,
    "source": "asserted by runner"
   },
   "script": {
    "name": "scripts/sensitivity.py",
-   "sha256": "d36bfe7f199c10e562a0e3a9b24561ee24f79e90f68bb9236bdd3c220fd75a3d"
+   "sha256": "a7d61f5e0323e5cffd89618a7ded7ce95e2e292473ad61b962ebade4795c9e8c"
   },
   "python": {
    "version": "3.13.13",
@@ -16573,5 +16573,87 @@
    "value": "(0.0, -0.25, 0.25, -0.4, 0.4)",
    "why": "a tuple: no single factor"
   }
- ]
+ ],
+ "code_since": {
+  "measured_at": "5f09684",
+  "commits": [
+   {
+    "commit": "ee5f34d",
+    "what": "deep checks (foldmap check --deep, --json): said, never drawn"
+   },
+   {
+    "commit": "ddc408c",
+    "what": "deep checks' fix round"
+   },
+   {
+    "commit": "24676d3",
+    "what": "NA fix F7 (nacheck: stems_nearer_frac only where an element can be nearer)"
+   },
+   {
+    "commit": "36adc3b",
+    "what": "NA fix F2 (layout, frame, cli, nacheck: each nucleic acid unrolled with the protomer holding it)"
+   },
+   {
+    "commit": "3380435",
+    "what": "NA fix F4 (na_ends, route_na: a gap meets a free end from the side it comes from)"
+   },
+   {
+    "commit": "218f4bb",
+    "what": "NA fix F6 (na_labels: where runs meet, the other run slides)"
+   },
+   {
+    "commit": "4aec81a",
+    "what": "NA fix round 1 (the unrolled judgement)"
+   },
+   {
+    "commit": "e060370",
+    "what": "NA fix round 1 (F4's straight chord limited to its reach)"
+   },
+   {
+    "commit": "17ddbbc",
+    "what": "NA fix round 1 (F6's slide loop)"
+   },
+   {
+    "commit": "eac6756",
+    "what": "the readability floor: said, never drawn"
+   },
+   {
+    "commit": "e6fcf36",
+    "what": "the readability floor's fix round"
+   },
+   {
+    "commit": "ba724ad",
+    "what": "the domain split confidence: said, never drawn"
+   },
+   {
+    "commit": "42e3fe8",
+    "what": "the domain split confidence's fix round"
+   },
+   {
+    "commit": "c64ea7a",
+    "what": "the prune: two special cases measured here removed"
+   },
+   {
+    "commit": "b730a05",
+    "what": "the prune's fix round (comments and docstrings)"
+   },
+   {
+    "commit": "702b4de",
+    "what": "the final review: --strict-floor fails closed, check's help text"
+   }
+  ],
+  "pruned": [
+   "layout:_NAME_OPEN",
+   "na_runs:_JOINT_NEAR"
+  ],
+  "prune_commit": "b730a05051f46d2b4787fa281c4bd5eb1b1cc3c7",
+  "prune_baseline": 82,
+  "prune_entries": 100,
+  "baseline": 80,
+  "entries": 100
+ },
+ "plan_from": {
+  "report": "docs/validation/sensitivity/report.json",
+  "inventory_sha256": "639bd27fb62b0c3a09a9469bf45d16808974e864526455e78205a7a491f7c92f"
+ }
 }

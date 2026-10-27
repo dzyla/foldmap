@@ -442,6 +442,11 @@ def test_the_committed_report_is_stamped_and_its_classes_add_up():
     assert doc["limitations"] == [c["id"] for c in doc["constants"] if c["class"] == "fragile"]
     assert doc["counts"]["incomplete"] == 0
     assert doc["named_in_sample"].get("route:_MAX_NODES_WINDOWS") == ["9FZL"]  # review I1: computed, not asserted
+    since = doc["code_since"]  # final review F1: the code since its runs, said in the record
+    assert since["measured_at"] == "5f09684" and set(since["pruned"]) == {"layout:_NAME_OPEN", "na_runs:_JOINT_NEAR"}
+    assert (since["baseline"], since["prune_baseline"]) == (doc["stage_b"]["baseline_passed"], 82)
+    md = (VALIDATION / "sensitivity" / "report.md").read_text(encoding="utf-8")
+    assert "## Code since this run" in md and "not among the samples and entries named" not in md  # N5
 
 
 def _stage_folder(sens, where: Path, runs: dict, reads: dict, unreached=(), foreign=()) -> Path:
