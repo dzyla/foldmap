@@ -52,9 +52,23 @@ def keys(ids) -> dict[str, int]:
     return out
 
 
-def names_record(evidence: str, root: Path = ROOT) -> bool:
-    """True when the evidence names a docs/validation path that exists (a directory or a file)."""
-    return any((root / m.group(0)).exists() for m in RECORD.finditer(evidence))
+def row_names(ident: str) -> set[str]:
+    """What a record must say to name the row `ident`: its `module:NAME`, or its name (the constant's or the
+    function's, each dotted part of it too)."""
+    module, name = key(ident).split(":")[:2]
+    return {f"{module}:{name}", name, *name.split(".")} - {""}
+
+
+def names_record(evidence: str, root: Path = ROOT, ident: str | None = None) -> bool:
+    """True when the evidence names a docs/validation file that exists (a folder is no record: plan 28 final review
+    F13) and, given the row's id, the file names the row (row_names)."""
+    for m in RECORD.finditer(evidence):
+        path = root / m.group(0)
+        if not path.is_file():
+            continue
+        if ident is None or any(n in path.read_text(encoding="utf-8", errors="replace") for n in row_names(ident)):
+            return True
+    return False
 
 
 def _beyond(ids: list[str], known: dict[str, int]) -> list[str]:
@@ -69,7 +83,8 @@ def new_special(rows: dict[str, dict], baseline: dict, origin_kind, root: Path =
     """Special-case rows (named-entry, measured, unknown) past the baseline's count for their key (the count first,
     then the record: a twin of a baseline row needs its own record), whose evidence names no existing record."""
     special = [i for i, r in rows.items() if origin_kind(r["origin"]) in SPECIAL]
-    return [i for i in _beyond(special, baseline["special"]) if not names_record(rows[i].get("evidence", ""), root)]
+    beyond = _beyond(special, baseline["special"])
+    return [i for i in beyond if not names_record(rows[i].get("evidence", ""), root, i)]
 
 
 def unevidenced(rows: dict[str, dict], baseline: dict, origin_kind) -> list[str]:
@@ -154,14 +169,23 @@ def test_the_freeze_catches_a_new_row_and_accepts_one_with_a_record(inv, rows, b
     for origin in ("biology", "geometry", "convention"):
         new, base = _plant(rows, baseline, "layout:_P", origin=origin, evidence="a quoted comment")
         assert not new_special(new, base, inv.origin_kind)
-    # evidence naming a record that exists passes; one that does not exist fails
+    # evidence naming a record that exists and names the row passes; one that does not exist fails
     made = tmp_path / "docs" / "validation" / "mine"
     made.mkdir(parents=True)
-    (made / "report.md").write_text("x", encoding="utf-8")
+    (made / "report.md").write_text("`layout:_P` measured: x", encoding="utf-8")
     new, base = _plant(rows, baseline, "layout:_P", evidence="docs/validation/mine/report.md")
     assert not new_special(new, base, inv.origin_kind, tmp_path)
     new, base = _plant(rows, baseline, "layout:_P", evidence="docs/validation/not-there/report.md")
     assert new_special(new, base, inv.origin_kind, tmp_path) == ["layout:_P"]
+    # F13: a folder is no record, and a record that never names the row is not its measurement
+    new, base = _plant(rows, baseline, "layout:_P", evidence="docs/validation/mine")
+    assert new_special(new, base, inv.origin_kind, tmp_path) == ["layout:_P"]
+    new, base = _plant(rows, baseline, "layout:_Q", evidence="docs/validation/mine/report.md")
+    assert new_special(new, base, inv.origin_kind, tmp_path) == ["layout:_Q"]
+    # a function's row is named by its function
+    (made / "fn.md").write_text("na_ends._reach: the 2 * grid.res reach, measured", encoding="utf-8")
+    new, base = _plant(rows, baseline, "na_ends:_reach:comparison:2@deadbeef", evidence="docs/validation/mine/fn.md")
+    assert not new_special(new, base, inv.origin_kind, tmp_path)
 
 
 def test_a_reformatted_line_keeps_its_key_and_a_new_one_does_not(inv, rows, baseline):
@@ -200,7 +224,7 @@ def test_a_baseline_with_a_record_does_not_excuse_a_twin_without_one(inv, rows, 
     ident = next(i for i, r in rows.items() if inv.origin_kind(r["origin"]) in SPECIAL and ANCHOR.search(i))
     made = tmp_path / "docs" / "validation" / "mine"
     made.mkdir(parents=True)
-    (made / "report.md").write_text("x", encoding="utf-8")
+    (made / "report.md").write_text(f"`{key(ident)}`", encoding="utf-8")  # it names the row
     twin = ANCHOR.sub("@ffffffff", ident)  # sorts after any real anchor: the later id is the one past the count
     assert ANCHOR.search(ident).group(0) < ANCHOR.search(twin).group(0)
     planted = {**rows, ident: {**rows[ident], "evidence": "docs/validation/mine/report.md"}, twin: dict(rows[ident])}
