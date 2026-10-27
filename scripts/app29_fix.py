@@ -78,6 +78,7 @@ def marks_of(i: str) -> dict:
     look = app.spec_of(path, settings).look
     lay, loops = drawn.layout, drawn.loops
     segs = np.array([(*p, *q) for lp in loops for p, q in zip(lp.points, lp.points[1:])], float).reshape(-1, 4)
+    bodies = [p.rect for p in lay.placed.values()] + [g.rect for g in lay.ghosts]  # as ligand_marks keeps them
     rows = []
     for m in render.ligand_marks(lay, loops, drawn.sses, look):
         g, (cx, cy), (hx, hy) = m["ligand"], m["centre"], m["half"]
@@ -90,6 +91,7 @@ def marks_of(i: str) -> dict:
                 "centre": [round(float(cx), 3), round(float(cy), 3)],
                 "on_loop": round(on, 3),
                 "crowded": bool(m["crowded"]),
+                "over_bodies": round(float(render._over_bodies(m["centre"], m["targets"], bodies)), 3),  # C9
                 "tethers": [
                     [round(float(np.hypot(tx - cx, ty - cy)), 3), chains[0], c]
                     for (tx, ty), c in zip(m["targets"], chains)
@@ -121,6 +123,10 @@ def _on(rows: list[dict]) -> list[str]:
     return [r["mark"] for r in rows if r["on_loop"] > LINE_EPS]
 
 
+def _over(rows: list[dict]) -> float:
+    return round(sum(r["over_bodies"] for r in rows), 3)
+
+
 def _cross(rows: list[dict]) -> list[float]:
     return [t[0] for r in rows for t in r["tethers"] if t[1] != t[2]]
 
@@ -137,6 +143,7 @@ def mark_changes(before: list[dict], after: list[dict]) -> dict:
                     "from": a["centre"],
                     "to": b["centre"],
                     "on_loop": [a["on_loop"], b["on_loop"]],
+                    "over_bodies": [a["over_bodies"], b["over_bodies"]],
                     "longest_tether": [
                         max((t[0] for t in a["tethers"]), default=None),
                         max((t[0] for t in b["tethers"]), default=None),
@@ -147,6 +154,7 @@ def mark_changes(before: list[dict], after: list[dict]) -> dict:
     xa, xb = _cross(before), _cross(after)
     return {
         "marks": [len(before), len(after)],
+        "over_bodies": [_over(before), _over(after)],
         "on_loop": [_on(before), _on(after)],
         "crowded": [sum(r["crowded"] for r in before), sum(r["crowded"] for r in after)],
         "longest_cross_chain_tether": [max(xa, default=None), max(xb, default=None)],
@@ -275,7 +283,7 @@ def build(args) -> dict:
     }
     na_b = prune._campaign_keys(rb / "na", "baseline", "na")
     na_a = prune._campaign_keys(ra / "na", "baseline", "na")
-    na = prune.na_verdict(na_b["entries"], na_a["entries"])
+    na = prune.na_verdict({"entries": na_b["entries"]}, {"entries": na_a["entries"]})
     na["svg_moved"] = prune.svg_moved(na_b["svg"], na_a["svg"])
     na["entries"] = len(na_a["entries"])
     bench = bench_diff(bench_notes(rb / "bench.txt"), bench_notes(ra / "bench.txt"))
@@ -283,19 +291,31 @@ def build(args) -> dict:
     ma = json.loads(Path(args.marks_after).read_text(encoding="utf-8"))
     changed = [r["id"] for r in tune if r.get("svg_changed")]
     marks = {i: mark_changes(mb["entries"].get(i, []), ma["entries"].get(i, [])) for i in changed}
-    every = sorted(set(mb["entries"]) & set(ma["entries"]))  # every entry measured both ways
-    marks_total = {
-        "entries": len(every),
-        "marks": [sum(len(mb["entries"][i]) for i in every), sum(len(ma["entries"][i]) for i in every)],
-        "on_loop": [sum(len(_on(mb["entries"][i])) for i in every), sum(len(_on(ma["entries"][i])) for i in every)],
-        "crowded": [
-            sum(r["crowded"] for i in every for r in mb["entries"][i]),
-            sum(r["crowded"] for i in every for r in ma["entries"][i]),
-        ],  # fmt: skip
-        "moved_in_unchanged_figures": [
-            i for i in every if i not in changed and mb["entries"][i] != ma["entries"][i]
-        ],  # fmt: skip
-    }
+    both = set(mb["entries"]) & set(ma["entries"])  # every entry measured both ways
+    every = [r["id"] for r in tune if r["id"] in both]  # the tune half's
+
+    def total(ids: list[str]) -> dict:
+        return {
+            "entries": len(ids),
+            "marks": [sum(len(mb["entries"][i]) for i in ids), sum(len(ma["entries"][i]) for i in ids)],
+            "on_loop": [sum(len(_on(mb["entries"][i])) for i in ids), sum(len(_on(ma["entries"][i])) for i in ids)],
+            "crowded": [
+                sum(r["crowded"] for i in ids for r in mb["entries"][i]),
+                sum(r["crowded"] for i in ids for r in ma["entries"][i]),
+            ],  # fmt: skip
+            "over_bodies": [
+                round(sum(_over(mb["entries"][i]) for i in ids), 3),
+                round(sum(_over(ma["entries"][i]) for i in ids), 3),
+            ],  # fmt: skip
+        }
+
+    marks_total = total(every)
+    marks_total["moved_in_unchanged_figures"] = [
+        i for i in every if i not in changed and mb["entries"][i] != ma["entries"][i]
+    ]
+    elsewhere = sorted({*third["svg_moved"], *na["svg_moved"]} & both)  # third sample and NA figures that moved
+    marks_elsewhere = {i: mark_changes(mb["entries"][i], ma["entries"][i]) for i in elsewhere}
+    marks_elsewhere_total = total(elsewhere)
     pngs = {
         i: {
             k: f"{args.pngs}/{i}-{k}.png"
@@ -312,6 +332,14 @@ def build(args) -> dict:
         "bench": bench["worse"],
         "marks_on_loop": [i for i, m in marks.items() if len(m["on_loop"][1]) > len(m["on_loop"][0])],
         "marks_crowded": [i for i, m in marks.items() if m["crowded"][1] > m["crowded"][0]],
+        "marks_over_bodies": [i for i, m in marks.items() if m["over_bodies"][1] > m["over_bodies"][0]],
+        "marks_elsewhere": [
+            i
+            for i, m in marks_elsewhere.items()
+            if len(m["on_loop"][1]) > len(m["on_loop"][0])
+            or m["crowded"][1] > m["crowded"][0]
+            or m["over_bodies"][1] > m["over_bodies"][0]
+        ],  # fmt: skip
     }
     better = {
         "tune": _better_tune(tune),
@@ -319,6 +347,7 @@ def build(args) -> dict:
         "third": third["better"],
         "na": na["better"],
         "marks_on_loop": [i for i, m in marks.items() if len(m["on_loop"][1]) < len(m["on_loop"][0])],
+        "marks_over_bodies": [i for i, m in marks.items() if m["over_bodies"][1] < m["over_bodies"][0]],
     }
     patch = None
     if args.patch:
@@ -344,6 +373,8 @@ def build(args) -> dict:
         "bench": bench,
         "marks": marks,
         "marks_total": marks_total,
+        "marks_elsewhere": marks_elsewhere,
+        "marks_elsewhere_total": marks_elsewhere_total,
         "pngs": pngs,
         "worse": worse,
         "better": better,
@@ -408,9 +439,19 @@ def render(doc: dict) -> str:
     lines += ["", "## Ligand marks", ""]
     lines.append(
         f"Over the {t['entries']} tune entries measured both ways: marks {_pair(t['marks'])}, on a loop line "
-        f"{_pair(t['on_loop'])}, crowded {_pair(t['crowded'])}; marks moved in a figure that did not change: "
+        f"{_pair(t['on_loop'])}, crowded {_pair(t['crowded'])}, tethers over bodies (C9, page units) "
+        f"{_pair(t['over_bodies'])}; marks moved in a figure that did not change: "
         f"{', '.join(t['moved_in_unchanged_figures']) or 'none'}."
     )
+    e = doc["marks_elsewhere_total"]
+    lines += ["", f"The third sample's and the NA figures that moved ({e['entries']}, drawn the app's way): marks "
+              f"{_pair(e['marks'])}, on a loop line {_pair(e['on_loop'])}, crowded {_pair(e['crowded'])}, tethers "
+              f"over bodies {_pair(e['over_bodies'])}."]  # fmt: skip
+    for i, m in doc["marks_elsewhere"].items():
+        lines.append(
+            f"- `{i}`: on a loop line {_pair([len(x) for x in m['on_loop']])}, over bodies {_pair(m['over_bodies'])}, "
+            f"{len(m['moved'])} moved"
+        )
     lines += ["", "The tune entries whose figure changed:", ""]
     lines += ["| id | marks | on a loop line | longest tether to another chain | moved |", "|---|---|---|---|---|"]
     for i, m in doc["marks"].items():
@@ -427,7 +468,7 @@ def render(doc: dict) -> str:
         for x in m["moved"]:
             lines.append(
                 f"- `{i}` {x['mark']}: {x['from']} -> {x['to']}; on a loop line {_pair(x['on_loop'])}; "
-                f"tethers {x['tethers'][0]} -> {x['tethers'][1]}"
+                f"over bodies {_pair(x['over_bodies'])}; tethers {x['tethers'][0]} -> {x['tethers'][1]}"
             )
     lines += ["", "## Pictures (gitignored, for looking)", ""]
     for i, p in doc["pngs"].items():
