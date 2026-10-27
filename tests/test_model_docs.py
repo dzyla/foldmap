@@ -18,15 +18,21 @@ What a page quotes, in backticks (docs/model/index.md says the same):
 - a constant quoted with its value (`layout._SIDE_CLEAR` (2.75 Å), `nucleic.C1_PAIR` (9.0-12.0 Å)): the value is the
   live constant's (ruling Q52). Numbers quoted from records are not pinned.
 
-Relative links between pages and to the records must resolve too. docs/model and docs/validation are not in the
-sdist (MANIFEST.in grafts only docs/examples, docs/names and docs/domains), so this module is skipped where
-docs/validation is absent; with docs/validation present, a missing docs/model fails."""
+- a PDB id (`9X4L`, `4OO8`): an entry foldmap was measured on, so a record cannot cite one it never drew: the tune
+  half of plan 29's sample (docs/validation/app29/sample.json's split; never its check half, which no record names),
+  an entry of samples 1-3, an NA control (docs/validation/na) or a structure in tests/data.
+
+Relative links between pages and to the records must resolve too. The same resolver holds plan 29's hand-written
+triage (docs/validation/app29/triage.md, Task 3) to the code and the entries it cites. docs/model and docs/validation
+are not in the sdist (MANIFEST.in grafts only docs/examples, docs/names and docs/domains), so this module is skipped
+where docs/validation is absent; with docs/validation present, a missing docs/model fails."""
 
 from __future__ import annotations
 
 import ast
 import dataclasses
 import importlib
+import json
 import pkgutil
 import re
 from pathlib import Path
@@ -60,6 +66,10 @@ CHECK = re.compile(r"(?:S\d+|A\d+[a-z]?|R\d+|D\d+|H\d+)")
 PATH = re.compile(r"(?:docs|tests|scripts|src)/[^\s:`]+")
 TEST = re.compile(r"(tests/[\w/]+\.py)::(\w+)(?:\[[^\]]*\])?")
 LINK = re.compile(r"\]\(([^)\s]+)\)")
+ENTRY = re.compile(r"\d[A-Z0-9]{3}")  # a PDB id
+TRIAGE = VALIDATION / "app29" / "triage.md"
+# where a cited entry may come from: samples 1-3 (never the fourth, docs/validation/fourth-sample-protocol.md)
+SAMPLES = tuple(VALIDATION / s / "sample.json" for s in ("random100", "random100-heldout", "random100-third"))
 BARE = re.compile(r"[a-z_][a-z0-9_]*")
 # bare words a page may tick that name no code: option values, model.Sheet's fields, a local step, a local name
 WORDS = {"foldmap", "auto", "asu", "closed", "ambiguous", "accessory", "fold", "read_as"}
@@ -90,6 +100,18 @@ def _resolves(name: str) -> bool:
 def _keys() -> set[str]:
     """Bare words that name something: a named fallback, a nacheck measure, a criteria limit."""
     return {*fallback.FALLBACKS, *nacheck.THRESHOLDS, *criteria.LIMITS}
+
+
+def _entries() -> set[str]:
+    """PDB ids foldmap was measured on: plan 29's tune half (the split's "tune" list only), samples 1-3, the NA
+    controls (docs/validation/na/<ID>-figure.svg) and the structures in tests/data."""
+    app29 = json.loads((VALIDATION / "app29" / "sample.json").read_text(encoding="utf-8"))
+    out = set(app29["split"]["tune"])
+    for sample in SAMPLES:
+        out |= {e["id"] for e in json.loads(sample.read_text(encoding="utf-8"))["entries"]}
+    out |= {p.name.split("-")[0] for p in (VALIDATION / "na").glob("*-figure.svg")}
+    out |= {p.name.split(".")[0].upper() for p in (ROOT / "tests" / "data").glob("*.cif*")}
+    return out
 
 
 def _value(name: str):
@@ -130,11 +152,13 @@ def _defines(path: Path, name: str) -> bool:
 
 
 def problems(page: Path) -> list[str]:
-    """What on a page does not resolve: code names, record ids, check ids, paths, tests and relative links."""
+    """What on a page does not resolve: code names, record ids, check ids, entries, paths, tests and relative
+    links."""
     text = page.read_text(encoding="utf-8")
     records = "\n".join(p.read_text(encoding="utf-8") for p in RECORDS)
     checks = _checks()
     keys = _keys()
+    entries = _entries()
     out = value_problems(text)
     for token in TICKED.findall(text):
         token = token.strip()
@@ -148,6 +172,9 @@ def problems(page: Path) -> list[str]:
         elif CHECK.fullmatch(token):
             if token not in checks:
                 out.append(f"check {token}: not defined in the code")
+        elif ENTRY.fullmatch(token):
+            if token not in entries:
+                out.append(f"entry {token}: in no sample the records may name (tune half, samples 1-3, NA controls)")
         elif m := RECORD_ID.fullmatch(token):
             if m.group(1) not in MODULES:
                 out.append(f"record id {token}: no module {m.group(1)}")
@@ -210,11 +237,26 @@ def test_a_drifted_name_is_caught(tmp_path):
         "`layout._no_such_name` `layout:_NO_SUCH` `A99` `docs/validation/no-such` `tests/test_layout.py::test_none` "
         "[x](no-such.md) `loop_curved` `like.Like.order.anything` `io._PEPTIDE_BOND_MAX` (2.6 Å)\n"
         "`layout._open_at_ends` `like.Like.order` `S1` `layout:_NAME_OPEN` `loop_curve` `copies_alike` `fold` "
-        "`route._MAX_NODES` (200,000) `nucleic.C1_PAIR`\n  (9.0-12.0 Å) `layout._sheet_order` (3WZ0-2AV5)",
+        "`route._MAX_NODES` (200,000) `nucleic.C1_PAIR`\n  (9.0-12.0 Å) `layout._sheet_order` (3WZ0-2AV5) "
+        "`0ZZZ` `9X4L` `4OO8` `1TIM`",
         encoding="utf-8",
     )
     found = problems(page)
-    assert len(found) == 9, found
+    assert len(found) == 10, found
     assert any("_PEPTIDE_BOND_MAX" in p and "2.6" in p for p in found)
+    assert any("entry 0ZZZ" in p for p in found)  # no PDB id starts with 0: in no sample
     for good in ("_open_at_ends", "Like.order:", "_NAME_OPEN", "loop_curve:", "copies_alike", "_MAX_NODES", "C1_PAIR"):
         assert not any(good in p for p in found), good
+    for good in ("9X4L", "4OO8", "1TIM"):  # the tune half, an NA control, tests/data
+        assert not any(good in p for p in found), good
+
+
+def test_the_triage_names_live_code_and_entries_foldmap_drew():
+    """Plan 29 Task 3: docs/validation/app29/triage.md, written by hand, quotes only code that exists (each mechanism's
+    `module.function`), check ids that are defined, paths that exist and entries of the tune half, samples 1-3 or the
+    NA controls: never a check-half id, which no record names."""
+    assert TRIAGE.exists()
+    assert problems(TRIAGE) == []
+    ticked = [t.strip() for t in TICKED.findall(TRIAGE.read_text(encoding="utf-8"))]
+    assert any(CODE.fullmatch(t) and t.split(".")[0] in MODULES for t in ticked)  # mechanisms named in the code
+    assert any(ENTRY.fullmatch(t) for t in ticked)  # and the entries they were traced on
