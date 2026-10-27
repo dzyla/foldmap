@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Dawid Zyla. Additional terms (AGPL-3.0 section 7(b)): see NOTICE.
 """Shrink docs/validation/inventory/freeze-baseline.json after a special case was removed (plan 28 Task 9.5, Q55).
 
     python scripts/freeze_baseline.py
