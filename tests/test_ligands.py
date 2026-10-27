@@ -378,9 +378,10 @@ def test_a_mark_kept_for_another_chain_finds_room_on_a_crowded_page():
     target on chain 5): its first spot left chain 5's target 7.89 away, and every spot out to _SPOT_FAR times
     _SPOT_RADIUS that keeps that target and the main contact within _TETHER_REACH was either on a box, a loop line or
     a tether drawn before, or had a tether crossing a name (that of the home target 15 units off, which no spot near
-    the pocket reaches without one), so the spot stayed. The search now takes, under the same keep-outs, the first
-    spot whose tethers to the bound alone cross no text; the other home tethers, drawn whatever their length, may
-    pass under a name (drawn in pieces round it). No gemmi crop of 9X4L (8692 residues, 15 chains, a 7.7 MB file)
+    the pocket reaches without one), so the spot stayed. The search now takes, under the same keep-outs, a spot
+    whose tethers to the bound alone cross no text, ranked by C9 over all its tethers (the first such, or the best
+    within _SPOT_MORE_RINGS rings of it); the other home tethers, drawn whatever their length, may pass under a name
+    (drawn in pieces round it). No gemmi crop of 9X4L (8692 residues, 15 chains, a 7.7 MB file)
     under 200 kB keeps the page: nine chain subsets were drawn and none failed A20. app29/9X4L-adp32001-mark.json is
     the input render._place_mark was given for this mark on the whole entry's page (figure_spec's defaults, 649
     elements), cut to the boxes, lines and tethers within reach of the search (its marks within _SPOT_FAR times
@@ -406,6 +407,23 @@ def test_a_mark_kept_for_another_chain_finds_room_on_a_crowded_page():
     box = (spot[0] - half[0], spot[1] - half[1], spot[0] + half[0], spot[1] + half[1])
     assert not overlaps_any(box, boxes["taken"] + boxes["lines"])  # off the elements, names and loop lines
     assert not any(clip_len(a, b, box) > 1e-9 for a, b in tethers)  # and the tethers drawn before
+
+
+def test_a_far_spot_off_the_lines_never_breaks_the_reach_a_nearer_one_keeps():
+    """Plan 29 Task 4 fix round 1 (review I1: a criterion before a look). Loop lines cover every spot left of
+    x = 3.6 and none is anywhere else; the bound (the main contact and a target on another chain) lies at x = -3. The
+    one spot clear of the lines lies further out (x > 4), farther than _TETHER_REACH from the bound, while the spot
+    on the lines at the anchor keeps it within reach. The off-line spot runs over no more bodies (none here), so
+    C9 alone would take it and A20 would fail; the spot within reach is kept."""
+    import numpy as np
+
+    from foldmap.render import _TETHER_REACH, _place_mark
+
+    lines = [(-12.0, y, 3.6, y + 0.05) for y in np.arange(-12.0, 12.0, 0.2)]
+    bound = [(-3.0, 0.0), (-3.0, 1.0)]  # the main contact, then the other chain's target
+    targets = [*bound, (6.0, 0.0)]  # and a home target far off
+    spot = _place_mark(np.zeros(2), (0.3, 0.3), targets, [], lines, [], [], bound=bound)
+    assert max(float(np.hypot(*np.subtract(t, spot))) for t in bound) <= _TETHER_REACH, spot
 
 
 def test_9x4l_tethers_to_another_chain_stay_within_reach():

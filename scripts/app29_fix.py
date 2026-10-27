@@ -43,6 +43,17 @@ THIRD = ROOT / "docs" / "validation" / "random100-third"
 # the bench entries a fix moves, each with why (filled once the fix's bench run is read; empty: none moved)
 BENCH_WHY: dict[str, str] = {}
 
+# figures whose move no key judges, looked at (plan 29 Task 4 review, rulings P29-9 and P29-10): id -> what is seen
+LOOK_CONCERNS: dict[str, str] = {
+    "9WNE": "the Mg's two tethers, to R's and W's tips, which lie level, run along one line, one over the other: the "
+    "far step's first zero-C9 spot is at angle 0 on its ring, and no check sees tethers drawn along each other "
+    "(C9 counts loop lines only; parked by ruling P29-10 for the Task N+1 look test)",
+    "1KX5": "the Mn left a loop line for a spot further out; its tether is several times longer (the move below), "
+    "won on a C9 tie (0 against 0)",
+    "9X4L": "ADP 32001's home tether to the target 15 units off is 13.9 units long, drawn in pieces under alpha17 "
+    "and alpha18: ruled policy, home tethers are unpriced (plan 11; A20 bounds tethers to other chains only)",
+}
+
 LINE_EPS = 1e-9  # page units: a box holding less of a line than this holds none
 
 
@@ -77,10 +88,34 @@ def marks_of(i: str) -> dict:
     drawn = app_jobs.draw_settings(path, settings)[0]
     look = app.spec_of(path, settings).look
     lay, loops = drawn.layout, drawn.loops
+    place, off_c9 = render._place_mark, {}
+
+    def placed(
+        anchor, half, targets, taken, lines, texts, tethers, bodies=(), runs=(), na=None, retarget=None, bound=()
+    ):
+        """The real placement; for a mark left on a loop line, also the C9 of the spot clear of the lines further
+        out that _place_mark weighed it against (None: there is none), keyed by the mark's place."""
+        spot = place(anchor, half, targets, taken, lines, texts, tethers, bodies, runs, na, retarget, bound)
+        box = (spot[0] - half[0], spot[1] - half[1], spot[0] + half[0], spot[1] + half[1])
+        if any(box[0] < t[2] and t[0] < box[2] and box[1] < t[3] and t[1] < box[3] for t in lines):
+            far = render._SPOT_FAR * render._SPOT_RADIUS
+            o = render._mark_spot(anchor, half, targets, taken + lines, texts, tethers, bodies, far, runs, na, retarget)
+            off_c9[(round(float(spot[0]), 3), round(float(spot[1]), 3))] = (
+                None
+                if o is None
+                else round(float(render._over_bodies(o, targets, bodies) + render._along_loops(o, targets, runs)), 3)
+            )
+        return spot
+
+    render._place_mark = placed
+    try:
+        marks = render.ligand_marks(lay, loops, drawn.sses, look)
+    finally:
+        render._place_mark = place
     segs = np.array([(*p, *q) for lp in loops for p, q in zip(lp.points, lp.points[1:])], float).reshape(-1, 4)
     bodies = [p.rect for p in lay.placed.values()] + [g.rect for g in lay.ghosts]  # as ligand_marks keeps them
     rows = []
-    for m in render.ligand_marks(lay, loops, drawn.sses, look):
+    for m in marks:
         g, (cx, cy), (hx, hy) = m["ligand"], m["centre"], m["half"]
         box = np.array([[cx - hx, cy - hy, cx + hx, cy + hy]])
         on = float(clip_lengths(segs, box).max()) if len(segs) else 0.0
@@ -93,6 +128,7 @@ def marks_of(i: str) -> dict:
                 "crowded": bool(m["crowded"]),
                 "over_bodies": round(float(render._over_bodies(m["centre"], m["targets"], bodies)), 3),  # C9
                 "along_loops": round(float(render._along_loops(m["centre"], m["targets"], segs)), 3),  # C9 (5HI7)
+                "off_line_c9": off_c9.get((round(float(cx), 3), round(float(cy), 3)), "not on a line"),
                 "tethers": [
                     [round(float(np.hypot(tx - cx, ty - cy)), 3), chains[0], c]
                     for (tx, ty), c in zip(m["targets"], chains)
@@ -393,6 +429,33 @@ def build(args) -> dict:
         "marks_total": marks_total,
         "marks_elsewhere": marks_elsewhere,
         "marks_elsewhere_total": marks_elsewhere_total,
+        "not_changed": [
+            {
+                "id": i,
+                "mark": r["mark"],
+                "on_line_c9": round(r["over_bodies"] + r["along_loops"], 3),
+                "off_line_c9": r.get("off_line_c9"),
+            }
+            for i in every
+            for r in ma["entries"][i]
+            if r["on_loop"] > LINE_EPS
+        ],
+        "look_concerns": [
+            {
+                "id": i,
+                "seen": LOOK_CONCERNS[i],
+                "moves": [
+                    {
+                        "mark": x["mark"],
+                        "moved": round(float(sum((p - q) ** 2 for p, q in zip(x["from"], x["to"])) ** 0.5), 3),
+                        "tethers": x["tethers"],
+                    }
+                    for x in (marks.get(i) or marks_elsewhere.get(i) or {"moved": []})["moved"]
+                ],
+            }
+            for i in LOOK_CONCERNS
+            if i in marks or i in marks_elsewhere
+        ],
         "pngs": pngs,
         "worse": worse,
         "better": better,
@@ -496,6 +559,34 @@ def render(doc: dict) -> str:
                 f"{_pair(x['over_bodies'])}; along loop lines {_pair(x['along_loops'])}; tethers {x['tethers'][0]} -> "
                 f"{x['tethers'][1]}"
             )
+    lines += ["", "## Not changed, by design", ""]
+    lines.append(
+        "Tune marks still on a loop line: the spot clear of the lines further out (to _SPOT_FAR x _SPOT_RADIUS) would "
+        "run its tethers over more bodies and along more loop lines (C9) than the spot on the line, or there is none "
+        "('none'). C9 in page units, on the line -> the best off the line:"
+    )
+    lines.append("")
+    for x in doc["not_changed"]:
+        off = "none" if x["off_line_c9"] is None else x["off_line_c9"]
+        lines.append(f"- `{x['id']}` {x['mark']}: C9 {x['on_line_c9']} on the line, {off} off it")
+    lines += [
+        "",
+        "## Precedence, step by step",
+        "",
+        "- `chosen` (a spot found after the first layer, against the spot clear of the lines further out): a spot "
+        "that met the text and reach gates beats one returned for want of any; then C9 (within 1e-9, a tie to the "
+        "spot off the lines); then the line. A bound target left beyond _TETHER_REACH by the spot off the lines, "
+        "and kept within it by the other, keeps the other (A20 before a line).",
+        "- `kept` (the bound's reach): the layers' order, the line first; then C9 within a layer.",
+        "",
+        "## Look concerns (no key judges them)",
+        "",
+    ]
+    for x in doc["look_concerns"]:
+        moves = "; ".join(
+            f"{m['mark']} moved {m['moved']}, tethers {m['tethers'][0]} -> {m['tethers'][1]}" for m in x["moves"]
+        )
+        lines.append(f"- `{x['id']}`: {x['seen']}. {moves}")
     lines += ["", "## Pictures (gitignored, for looking)", ""]
     for i, p in doc["pngs"].items():
         lines.append(f"- `{i}`: " + ", ".join(f"{k} {v}" for k, v in p.items()))

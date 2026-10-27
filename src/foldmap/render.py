@@ -1667,6 +1667,8 @@ def _mark_spot(
     na=None,
     retarget=None,
     bound=(),
+    crossing=None,
+    said=None,
 ):
     """The first spot on rings round the anchor whose mark (grown by 0.08) is clear of `taken` and of the tethers
     drawn before, and whose own tethers cross no text, lengthening none past the first clear spot's (the plan-11
@@ -1686,7 +1688,11 @@ def _mark_spot(
     longest tether from the first clear spot): they are drawn whatever their length (the plan-11 ruling), and 8ESZ's
     3PE 5604 has no spot keeping its B2 target within _TETHER_REACH and its far home target within that reach
     (18.8 apart > 12.10 + 6.5). None is returned when no spot within `radius` meets the bound (never the first clear
-    spot)."""
+    spot).
+    `crossing`: the targets whose tethers are judged against text, when not all of them (_place_mark's relaxed reach
+    step: the bound's alone); the ranking (C9) is over every tether still. `said` (a list, _place_mark's): gains
+    whether the spot returned met the text and reach gates (True) or is the first clear spot returned for want of
+    any (False)."""
     spot = free = None
     best, last_ring = None, None
     for n, ring in enumerate(np.arange(0.0, radius, 0.35)):
@@ -1704,8 +1710,9 @@ def _mark_spot(
                     reach = max(_TETHER_REACH, *(np.hypot(*(np.subtract(t, c))) for t in ts))
             if _beyond_reach(c, bound):
                 continue
+            judged = ts if crossing is None else crossing
             if (na is not None or bound or all(np.hypot(*(np.subtract(t, c))) <= reach for t in ts)) and not any(
-                clip_len(c, t, b) > 1e-9 for t in ts for b in texts
+                clip_len(c, t, b) > 1e-9 for t in judged for b in texts
             ):
                 over = _over_bodies(c, ts, bodies) + _along_loops(c, ts, runs)
                 if na is not None:  # a tuple, compared in order, each part on a fixed grid (determinism)
@@ -1728,6 +1735,8 @@ def _mark_spot(
         if best is not None and na is None and best[0] <= 1e-9:
             break
     spot = best[1] if best is not None else None
+    if said is not None:
+        said.append(spot is not None)
     return spot if spot is not None or bound else free
 
 
@@ -1741,29 +1750,38 @@ def _place_mark(
     one with nothing clear within _SPOT_RADIUS). Every spot of the layers after the first lies on a loop line (or a
     disulfide bar), the first having found none clear of them within _SPOT_RADIUS, so a mark given them up sat on a
     line that seemed to end at it (plan 29 Task 4, triage proposal 1: 9SXF's A1JRG; docs/validation/app29/fix-ligand).
-    A spot clear of them further out, to _SPOT_FAR times _SPOT_RADIUS, is taken over the spot the later steps find
-    only when its tethers run over no more of the bodies and along no more of the loops' lines (C9's measure, as
-    _mark_spot ranks spots): further out, they lengthen and can cross more (1GOX-A's FMN, tests/test_ligands.py), and
-    neither fault is the lesser.
+    A spot clear of them further out, to _SPOT_FAR times _SPOT_RADIUS (`off`, looked for only then), is weighed
+    against the spot the later steps find (`chosen`): a spot that met _mark_spot's text and reach gates (ranked)
+    beats one returned for want of any (its first clear spot); between two alike, `off` is taken when its tethers run
+    over no more of the bodies and along no more of the loops' lines (C9's measure, as _mark_spot ranks spots,
+    within its 1e-9; a tie goes to `off`): further out, they lengthen and can cross more (1GOX-A's FMN,
+    tests/test_ligands.py), and neither fault is the lesser. A criterion comes before a look: when `off`, kept for
+    `bound` (below), still leaves a bound target beyond _TETHER_REACH and the later step's spot, kept so, does not,
+    that spot is taken (A20 before a line; plan 29 Task 4 fix round 1, review I1).
     `bound`: the home chain's main contact (its heaviest target), then its targets on other chains. Each of those lies
     within _TETHER_REACH of the main contact (_local_targets), but the anchor, the mean of all its targets, follows
-    home contacts drawn far from it: a spot that leaves one of them farther than _TETHER_REACH gives way to the first
-    spot, kept off as much (the same keep-outs, or stricter), out to _SPOT_FAR times _SPOT_RADIUS, that keeps them
-    and the main contact within it, so the mark stays in its pocket (random-100 C2b-5: 6JLN's CLA B609 drawn 10.15
-    from H's helix, 3.80 from the main contact; held to the other chains alone, 1SLV's Cu went 7.35 from its anchor,
-    7.67 from its main contact, in the beta view); else the first such spot whose tethers to `bound` alone cross no
-    text, under the same keep-outs: the other home tethers, drawn whatever their length, may then pass under a text
-    (drawn in pieces round it, visible_pieces; plan 29 Task 4, triage proposal 5: 9X4L's ADP 32001, whose home
-    target 15 units off crossed a name from every spot keeping chain 5's within reach); else the spot stays."""
+    home contacts drawn far from it: a spot that leaves one of them farther than _TETHER_REACH gives way to the spot,
+    kept off as much (the same keep-outs, or stricter), out to _SPOT_FAR times _SPOT_RADIUS, that keeps them and the
+    main contact within it (the first such, or the one within _SPOT_MORE_RINGS rings further whose tethers C9 ranks
+    best), so the mark stays in its pocket (random-100 C2b-5: 6JLN's CLA B609 drawn 10.15 from H's helix, 3.80 from
+    the main contact; held to the other chains alone, 1SLV's Cu went 7.35 from its anchor, 7.67 from its main
+    contact, in the beta view); else, under the same keep-outs, such a spot whose tethers to `bound` alone cross no
+    text, ranked by C9 over all its tethers: the other home tethers, drawn whatever their length, may then pass under
+    a text (drawn in pieces round it, visible_pieces; plan 29 Task 4, triage proposal 5: 9X4L's ADP 32001, whose home
+    target 15 units off crossed a name from every spot keeping chain 5's within reach); else the spot stays.
+    Precedence, step by step: `chosen` ranks by C9, then the line; `kept` keeps the layers' order, the line first,
+    then C9 within a layer."""
     layers = ((taken + lines, tethers), (taken, tethers), (taken, ()))
     far = _SPOT_FAR * _SPOT_RADIUS
 
     def kept(spot, upto: int):
         if not _beyond_reach(spot, bound[1:]):
             return spot
-        for judged in (targets, bound):  # every tether kept off text, then the bound's alone
+        for crossing in (None, bound):  # every tether kept off text, then the bound's alone
             for blocked, drawn in layers[: upto + 1]:
-                near = _mark_spot(anchor, half, judged, blocked, texts, drawn, bodies, far, runs, na, retarget, bound)
+                near = _mark_spot(
+                    anchor, half, targets, blocked, texts, drawn, bodies, far, runs, na, retarget, bound, crossing
+                )
                 if near is not None:
                     return near
         return spot
@@ -1773,23 +1791,43 @@ def _place_mark(
         over = _over_bodies(c, ts, bodies) + _along_loops(c, ts, runs)
         return (_stems_crossed(c, ts, na[0]), _strands_crossed(c, ts, na[1]), over) if na is not None else (over,)
 
-    def chosen(spot, k: int):  # a spot the later steps found: the one off the lines instead, unless its tethers
-        if off is not None and cost(off) <= cost(spot):  # cross more (C9)
-            return kept(off, 0)
-        return kept(spot, k)
+    def search(*args, **kw):  # _mark_spot's spot, and whether it met its gates (ranked)
+        said: list = []
+        found = _mark_spot(*args, said=said, **kw)
+        return found, bool(said and said[0])
+
+    def no_worse(a, b) -> bool:  # C9 a no worse than b, within _mark_spot's 1e-9 (counts first, exactly)
+        return a[:-1] < b[:-1] or (a[:-1] == b[:-1] and a[-1] <= b[-1] + 1e-9)
 
     lined, drawn = layers[0]
+    off: list = []  # the spot clear of the lines further out, and whether it was ranked: looked for once, when needed
+
+    def chosen(spot, ranked: bool, k: int):  # a spot a later step found, or the one off the lines instead
+        if not off:
+            off.extend(search(anchor, half, targets, lined, texts, drawn, bodies, far, runs, na, retarget))
+        far_spot, far_ranked = off
+        if far_spot is None or (ranked and not far_ranked):
+            return kept(spot, k)
+        if far_ranked == ranked and not no_worse(cost(far_spot), cost(spot)):
+            return kept(spot, k)
+        moved = kept(far_spot, 0)
+        if _beyond_reach(moved, bound[1:]):  # a criterion (A20) before a look (a line)
+            held = kept(spot, k)
+            if not _beyond_reach(held, bound[1:]):
+                return held
+        return moved
+
     spot = _mark_spot(anchor, half, targets, lined, texts, drawn, bodies, runs=runs, na=na, retarget=retarget)
     if spot is not None:
         return kept(spot, 0)
-    # nothing clear of the loop lines within _SPOT_RADIUS: a spot clear of them further out
-    off = _mark_spot(anchor, half, targets, lined, texts, drawn, bodies, far, runs, na, retarget)
-    for k, (blocked, drawn) in enumerate(layers[1:], 1):
-        spot = _mark_spot(anchor, half, targets, blocked, texts, drawn, bodies, runs=runs, na=na, retarget=retarget)
+    for k, (blocked, drawn_k) in enumerate(layers[1:], 1):
+        spot, ranked = search(
+            anchor, half, targets, blocked, texts, drawn_k, bodies, runs=runs, na=na, retarget=retarget
+        )
         if spot is not None:
-            return chosen(spot, k)
+            return chosen(spot, ranked, k)
     # nothing clear within _SPOT_RADIUS (7QUP's crowded page dropped GTP:9E500): further out, else the least bad
-    spot = _mark_spot(
+    spot, ranked = search(
         anchor,
         half,
         targets,
@@ -1802,9 +1840,8 @@ def _place_mark(
         na=na,
         retarget=retarget,
     )
-    if spot is not None:
-        return chosen(spot, 2)
-    return kept(off, 0) if off is not None else _least_bad_spot(anchor, half, taken, bodies)
+    # (a spot clear of the lines further out is clear of `taken` too: this step finds one whenever it exists)
+    return chosen(spot, ranked, 2) if spot is not None else _least_bad_spot(anchor, half, taken, bodies)
 
 
 def _least_bad_spot(anchor, half, taken, bodies) -> np.ndarray:

@@ -82,11 +82,11 @@ every correction of a rule are by hand.
 | constant | 588 | 62 | 25 | 28 | 34 | 102 | 337 |
 | default | 33 | 0 | 0 | 0 | 0 | 3 | 30 |
 | local | 1 | 0 | 0 | 0 | 0 | 0 | 1 |
-| comparison | 299 | 0 | 0 | 0 | 0 | 157 | 142 |
+| comparison | 300 | 0 | 0 | 0 | 0 | 158 | 142 |
 | argument | 672 | 0 | 1 | 0 | 0 | 191 | 480 |
 | fallback | 24 | 0 | 0 | 0 | 4 | 1 | 19 |
 | fallback-marker | 29 | 0 | 0 | 0 | 3 | 0 | 26 |
-| all | 1646 | 62 | 26 | 28 | 41 | 454 | 1035 |
+| all | 1647 | 62 | 26 | 28 | 41 | 455 | 1035 |
 
 Of the 41 named-entry rows, 30 rest on the comment at the item and 11 on git (evidence starting `git:`: a commit whose message ties the value to the entries).
 
@@ -244,7 +244,7 @@ Of the 41 named-entry rows, 30 rest on the comment at the item and 11 on git (ev
 | `app_jobs:BUSY_WAIT` | constant | 30.0 | BUSY_WAIT = 30.0 # seconds a job waits for a free slot before the app says it is busy | convention | a timeout; earliest in this file: e68ea41 2026-10-12 app_jobs: render jobs with time, memory and concurrency limits; failures remembe… | app_jobs | - |
 | `app_jobs:ISOLATED_TIMEOUT` | constant | 90.0 | ISOLATED_TIMEOUT = 90.0 # the timeout of a job given a memory cap and no timeout: an isolated job is always timed | convention | a timeout; earliest in this file: 183b4ff 2026-10-12 app_jobs: isolated jobs always timed, deaths told apart, results bounded, missin… | app_jobs | - |
 | `app_jobs:RESULT_MAX` | constant | 100_000_000 | RESULT_MAX = 100_000_000 # bytes a job process may hand back (a giant's 3D page is 20-48 MB) | convention | a size limit; earliest in this file: 183b4ff 2026-10-12 app_jobs: isolated jobs always timed, deaths told apart, results bounded, missin… | app_jobs | - |
-| `app_jobs:HOSTED` | constant | Limits(timeout=90, memory_mb=1024, max_residues=30_000, jobs=2) | HOSTED = Limits(timeout=90, memory_mb=1024, max_residues=30_000, jobs=2) # Q-A11; memory: 2 jobs x 1 GB and the | convention | the hosted limits (ruling Q-A11); earliest in this file: e68ea41 2026-10-12 app_jobs: render jobs with time, memory and concurrency limits; failures remembe… | app, app_jobs | - |
+| `app_jobs:HOSTED` | constant | Limits(timeout=90, memory_mb=1024, max_residues=30_000, jobs=2) | HOSTED = Limits(timeout=90, memory_mb=1024, max_residues=30_000, jobs=2) # Q-A11; memory: 2 jobs x 1 GB and the | convention | the hosted limits (ruling Q-A11); earliest in this file: e68ea41 2026-10-12 app_jobs: render jobs with time, memory and concurrency limits; failures remembe… | app, app_jobs, app_paths | - |
 | `app_jobs:_DRAWN_MAX` | constant | 4 | _DRAWN_MAX = 4 | convention | a cache size; earliest in this file: e68ea41 2026-10-12 app_jobs: render jobs with time, memory and concurrency limits; failures remembe… | - | - |
 | `app_jobs:_FAILED_MAX` | constant | 256 | _FAILED_MAX = 256 | convention | a cache size; earliest in this file: e68ea41 2026-10-12 app_jobs: render jobs with time, memory and concurrency limits; failures remembe… | - | - |
 | `app_jobs:_isolated:argument:5@23e7a8e9` | argument | 5 | proc.join(5) | unknown | - | - | - |
@@ -303,8 +303,8 @@ Of the 41 named-entry rows, 30 rest on the comment at the item and 11 on git (ev
 | `cli:_in_sequence:argument:181@6d2655ae` | argument | 181 | turns = sorted(range(-180 + AZIMUTH_STEP, 181, AZIMUTH_STEP), key=lambda a: (abs(a), a < 0)) | unknown | - | membrane | - |
 | `cli:_face_medians.page_y:comparison:1e-9@0f0573ec` | comparison | 1e-9 | elif abs(slope) > 1e-9: | convention | a floating-point tolerance | - | - |
 | `cli:_one_of_each:comparison:0.9@92fb00cc` | comparison | 0.9 | if SequenceMatcher(None, seq[g[0]], seq[c], autojunk=False).ratio() > 0.9: | unknown | - | - | - |
-| `cli:build_parser:argument:60@29d007de` | argument | 60 | sq.add_argument("--columns", type=int, default=60, help="residues (alignment columns) per row (default 60)") | unknown | - | cli, elstyle, names, science | - |
-| `cli:build_parser:argument:0.7@afd84f49` | argument | 0.7 | default=0.7, | unknown | - | cli, elstyle, names, science | - |
+| `cli:build_parser:argument:60@29d007de` | argument | 60 | sq.add_argument("--columns", type=int, default=60, help="residues (alignment columns) per row (default 60)") | unknown | - | cli, domain_confidence, elstyle, names +1 | - |
+| `cli:build_parser:argument:0.7@afd84f49` | argument | 0.7 | default=0.7, | unknown | - | cli, domain_confidence, elstyle, names +1 | - |
 
 ## compare
 
@@ -326,7 +326,7 @@ Of the 41 named-entry rows, 30 rest on the comment at the item and 11 on git (ev
 
 | id | kind | value | at | origin | evidence | tests naming it | check |
 |---|---|---|---|---|---|---|---|
-| `criteria:LIMITS` | constant | { "view_timeout_s": 900, # a view's process is killed after this many seconds (A1 then fails) "default_s": 60, # A2: wa… | LIMITS = { | unknown | cites Q-R3; Q-R7; Q-R12; earliest in this file: 55d0e3b 2026-10-17 The figure criteria A1-A20 live in the package (foldmap.criteria), and `foldmap … | random100 | - |
+| `criteria:LIMITS` | constant | { "view_timeout_s": 900, # a view's process is killed after this many seconds (A1 then fails) "default_s": 60, # A2: wa… | LIMITS = { | unknown | cites Q-R3; Q-R7; Q-R12; earliest in this file: 55d0e3b 2026-10-17 The figure criteria A1-A20 live in the package (foldmap.criteria), and `foldmap … | ligands, model_docs, random100 | - |
 | `criteria:MEMBRANE_SHOWN` | constant | 4 | MEMBRANE_SHOWN = 4 # findings A18's detail shows per part, the rest counted (as the tethers' detail does) | convention | how many findings a detail shows; earliest in this file: b3657c8 2026-10-25 A18 fix round 1: every loop held to its residues, rules shared in membrane.py (p… | membrane | - |
 | `criteria:_BLOCK_NAME_EM` | constant | 0.9 | _BLOCK_NAME_EM = 0.9 # render._draw_block draws a stem's name on its block at this many ems of the figure's text | geometry | "render._draw_block draws a stem's name on its block at this many ems" (a copy of render's); earliest in this file: 55d0e3b 2026-10-17 The figure criteria A1-A20 live in the package (foldmap.criteria), and `foldmap … | - | - |
 | `criteria:PAIR_IDENTITY` | constant | 0.9 | PAIR_IDENTITY = 0.9 # A19: two entries' first chains are one protein at this identity over their aligned residues | unknown | earliest in this file: 44a1c1b 2026-10-17 F1 fix round 1: equal names always match (A19); a pair of two proteins is not ju… | random100 | - |
@@ -334,7 +334,7 @@ Of the 41 named-entry rows, 30 rest on the comment at the item and 11 on git (ev
 | `criteria:LIKE_MIN_MATES` | constant | 3 | LIKE_MIN_MATES = 3 # H2, H3: judged on this many mates drawn at least (as figcheck.COPY_MIN_MATCHED: 2 always fit) | unknown | earliest in this file: a1c3bdf 2026-10-21 Checks H1-H5: a structure drawn like a reference, judged (plan 13a Task 9) | diff | - |
 | `criteria:LIKE_APART` | constant | 1.0 | LIKE_APART = 1.0 # H3: two mates more than this many page units apart, in both figures, are compared ... | unknown | earliest in this file: a1c3bdf 2026-10-21 Checks H1-H5: a structure drawn like a reference, judged (plan 13a Task 9) | - | - |
 | `criteria:LIKE_AXIS` | constant | 0.5 | LIKE_AXIS = 0.5 # ... on each page axis that parts them by more than this in both figures | unknown | earliest in this file: a1c3bdf 2026-10-21 Checks H1-H5: a structure drawn like a reference, judged (plan 13a Task 9) | - | - |
-| `criteria:tether_lengths:argument:3@d48b8088` | argument | 3 | gid, length = f"ligand-tether:{g.name}:{g.chain}{g.seq}:{k}", round(float(np.hypot(tx - cx, ty - cy)), 3) | convention | rounding digits | random100 | - |
+| `criteria:tether_lengths:argument:3@d48b8088` | argument | 3 | gid, length = f"ligand-tether:{g.name}:{g.chain}{g.seq}:{k}", round(float(np.hypot(tx - cx, ty - cy)), 3) | convention | rounding digits | ligands, random100 | - |
 | `criteria:dssp_agreement:argument:4@6cb5d594` | argument | 4 | near = {keys[j] for k in bb.linked for j in range(k - 4, k + 5) if 0 <= j < len(keys)} - stood_in | unknown | - | random100 | - |
 | `criteria:dssp_agreement:argument:5@6cb5d594` | argument | 5 | near = {keys[j] for k in bb.linked for j in range(k - 4, k + 5) if 0 <= j < len(keys)} - stood_in | unknown | - | random100 | - |
 | `criteria:dssp_agreement:argument:4@b45e2c6f` | argument | 4 | "agree": round(1 - len(differ) / len(compared), 4), | convention | rounding digits | random100 | - |
@@ -535,8 +535,8 @@ Of the 41 named-entry rows, 30 rest on the comment at the item and 11 on git (ev
 
 | id | kind | value | at | origin | evidence | tests naming it | check |
 |---|---|---|---|---|---|---|---|
-| `floor:measures:argument:3@ead16c7c` | argument | 3 | "text_pt": None if text is None else round(text, 3), | convention | rounding digits | floor | - |
-| `floor:measures:argument:3@11773890` | argument | 3 | "smallest_pt": None if smallest is None else round(smallest, 3), | convention | rounding digits | floor | - |
+| `floor:measures:argument:3@ead16c7c` | argument | 3 | "text_pt": None if text is None else round(text, 3), | convention | rounding digits | app29, floor | - |
+| `floor:measures:argument:3@11773890` | argument | 3 | "smallest_pt": None if smallest is None else round(smallest, 3), | convention | rounding digits | app29, floor | - |
 | `floor:reasons_of:comparison:1e-6@027f97a0` | comparison | 1e-6 | if text is not None and text < MIN_TEXT_PT - 1e-6: | convention | a floating-point tolerance | floor | - |
 
 ## frame
@@ -617,7 +617,7 @@ Of the 41 named-entry rows, 30 rest on the comment at the item and 11 on git (ev
 
 | id | kind | value | at | origin | evidence | tests naming it | check |
 |---|---|---|---|---|---|---|---|
-| `io:_PEPTIDE_BOND_MAX` | constant | 2.5 | _PEPTIDE_BOND_MAX = 2.5 # Å, C(i-1)-N(i), as in DSSP | biology | "C(i-1)-N(i), as in DSSP"; earliest in this file: 0438931 2026-10-09 Rename to foldmap; add README | - | - |
+| `io:_PEPTIDE_BOND_MAX` | constant | 2.5 | _PEPTIDE_BOND_MAX = 2.5 # Å, C(i-1)-N(i), as in DSSP | biology | "C(i-1)-N(i), as in DSSP"; earliest in this file: 0438931 2026-10-09 Rename to foldmap; add README | model_docs | - |
 | `io:_CO_BOND` | constant | 1.231 | _CO_BOND = 1.231 # Å, carbonyl C=O | biology | "carbonyl C=O" bond length; earliest in this file: 824fbad 2026-10-09 Rebuild missing carbonyl oxygens; explain CA-only models | - | - |
 | `io:_CO_MAX` | constant | 1.5 | _CO_MAX = 1.5 # Å, the farthest an oxygen still counts as the carbonyl one | biology | the carbonyl oxygen's reach; earliest in this file: 4fda3ae 2026-10-11 Peptide-linked residues without N/CA/C names (GFP's CRO66) stay in the chain and… | - | - |
 | `io:AUTO_MAX` | constant | 24 | AUTO_MAX = 24 # `auto` builds assemblies up to this many chains (a capsid is better asked for by name) | convention | an assembly size limit; earliest in this file: 0438931 2026-10-09 Rename to foldmap; add README | - | - |
@@ -675,7 +675,7 @@ Of the 41 named-entry rows, 30 rest on the comment at the item and 11 on git (ev
 | `layout:IN_PER_UNIT` | constant | 0.30 | IN_PER_UNIT = 0.30 # render: inches per page unit, at most | unknown | earliest in this file: 7104faa 2026-10-11 C6/C10 follow-ups from the rerun: a gap the grid cannot route is curved before i… | page_text | - |
 | `layout:MAX_WIDTH_IN` | constant | 7.2 | MAX_WIDTH_IN = 7.2 # render: a figure is drawn at most this wide (double column), inches, while its text stays ... | convention | "double column" page width; earliest in this file: 7104faa 2026-10-11 C6/C10 follow-ups from the rerun: a gap the grid cannot route is curved before i… | page_text | - |
 | `layout:MIN_TEXT_PT` | constant | 6.0 | MIN_TEXT_PT = 6.0 # ... this size or larger: a wider page grows past MAX_WIDTH_IN instead (random-100 C4 ruling) | convention | the smallest text size printed (random-100 C4 ruling); earliest in this file: a3cf24d 2026-10-15 C4 (random-100, batch C1): text has a 6 pt floor and the page grows instead; leg… | floor, page_text | - |
-| `layout:MAX_PAGE_IN` | constant | 48.0 | MAX_PAGE_IN = 48.0 # render: the longest side a page grows to (A0's, about); past it the whole figure, its text | convention | "A0's, about"; earliest in this file: a3cf24d 2026-10-15 C4 (random-100, batch C1): text has a 6 pt floor and the page grows instead; leg… | app_jobs, floor, heldout_budgets, mcp +1 | - |
+| `layout:MAX_PAGE_IN` | constant | 48.0 | MAX_PAGE_IN = 48.0 # render: the longest side a page grows to (A0's, about); past it the whole figure, its text | convention | "A0's, about"; earliest in this file: a3cf24d 2026-10-15 C4 (random-100, batch C1): text has a 6 pt floor and the page grows instead; leg… | app_jobs, app_paths, floor, heldout_budgets +2 | - |
 | `layout:_MAX_ROW` | constant | 30.0 | _MAX_ROW = 30.0 | unknown | earliest in this file: 0438931 2026-10-09 Rename to foldmap; add README | membrane, route | - |
 | `layout:_MIN_STRAND` | constant | 1.0 | _MIN_STRAND = 1.0 # shortest drawn strand (room for the arrow head) | unknown | earliest in this file: 0438931 2026-10-09 Rename to foldmap; add README | - | - |
 | `layout:_PAIR_ENERGY_ABOVE` | constant | 200 | _PAIR_ENERGY_ABOVE = 200 | unknown | earliest in this file: d1fa11e 2026-10-10 Tests compare the pair-list energy with the production dense energy | optimiser, perf | - |
@@ -727,7 +727,7 @@ Of the 41 named-entry rows, 30 rest on the comment at the item and 11 on git (ev
 | `layout:_JOINT_OVERLAP` | constant | 0.25 | _JOINT_OVERLAP = 0.25 # widths two joined pieces' bodies may overlap and still be moved together | unknown | earliest in this file: 5377142 2026-10-11 C3 fix: move joined pieces together only in chains of at most four; gate straigh… | na_layout | - |
 | `layout:_STEM_ROOM` | constant | 1.5 | _STEM_ROOM = 1.5 # the room a nucleic acid's stems take on the page: their footprints' area (with half a MARGIN round | measured | "Measured on the NA-only entries of the NA campaign and random-100" (3OWW, 1GID, 3IGI, 4LVV, 4P9R); earliest in this file: ea0765b 2026-10-17 A nucleic acid drawn without protein is spread by one factor to the room its ste… | - | - |
 | `layout:_MIN_RISE` | constant | 2.6 | _MIN_RISE = 2.6 # Å per base pair, the least a stem is drawn with (A-form rises 2.8, B-form 3.4) | unknown | earliest in this file: 72ceeed 2026-10-10 Stems placed as layout elements from the 3D structure and drawn as ladders | na_layout | - |
-| `layout:_SIDE_CLEAR` | constant | 2.75 | _SIDE_CLEAR = 2.75 | measured | "On the test structures every stem below it fits its projection about as well turned round; the closest one that does not is 4YBB P5 at 2.81 Å"; earliest in this file: a287c05 2026-10-10 fix: stems the projection cannot side keep strands uncrossed; short runs hold st… | na_layout | - |
+| `layout:_SIDE_CLEAR` | constant | 2.75 | _SIDE_CLEAR = 2.75 | measured | "On the test structures every stem below it fits its projection about as well turned round; the closest one that does not is 4YBB P5 at 2.81 Å"; earliest in this file: a287c05 2026-10-10 fix: stems the projection cannot side keep strands uncrossed; short runs hold st… | model_docs, na_layout | - |
 | `layout:_CYCLE_MAX` | constant | 12 | _CYCLE_MAX = 12 # unclear stems linked round a cycle: up to this many are settled by trying every turning | unknown | earliest in this file: 03d6d23 2026-10-10 fix: strand-exchange springs only; hairpin room holds its letters; exact side co… | - | - |
 | `layout:_TRACE_HALF` | constant | 0.45 | _TRACE_HALF = ( | unknown | earliest in this file: 334ee0b 2026-10-11 C9 revised: each trace nucleotide is a fixed obstacle, and an element touching t… | na_layout, na_text_keepoff | - |
 | `layout:_WALL_MIN` | constant | 3 | _WALL_MIN = 3 # a trace of fewer nucleotides (a dinucleotide ligand-like oligo) is drawn but is no wall | unknown | earliest in this file: 996b6f6 2026-10-11 Trace walls only for traces of at least 3 nucleotides | - | - |
@@ -794,14 +794,14 @@ Of the 41 named-entry rows, 30 rest on the comment at the item and 11 on git (ev
 | `layout:PlacedStem.hairpin_circle:argument:1.02@a34d9b16` | argument | 1.02 | r = max(half * 1.02, (m + 1) * NT_STEP / (1.6 * np.pi)) | unknown | - | na_layout | - |
 | `layout:PlacedStem.hairpin_circle:argument:1.6@a34d9b16` | argument | 1.6 | r = max(half * 1.02, (m + 1) * NT_STEP / (1.6 * np.pi)) | unknown | - | na_layout | - |
 | `layout:PlacedStem.hairpin_circle:argument:0.01@cfc56112` | argument | 0.01 | r = float(_snap(r + 0.01)) | unknown | line last changed by ed8d7f2 A hairpin loop's circle grows until its nucleotides stand at least a contact bead apart (C2b-4 cause B: 7Y7C … (git blame; evidence only) | na_layout | - |
-| `layout:_sheet_order:comparison:1e-6@d2a4ba49` | comparison | 1e-6 | right = np.array([up2d[1], -up2d[0]]) if np.linalg.norm(up2d) > 1e-6 else np.array([1.0, 0.0]) | convention | a floating-point tolerance | copies | - |
+| `layout:_sheet_order:comparison:1e-6@d2a4ba49` | comparison | 1e-6 | right = np.array([up2d[1], -up2d[0]]) if np.linalg.norm(up2d) > 1e-6 else np.array([1.0, 0.0]) | convention | a floating-point tolerance | copies, model_docs | - |
 | `layout:_stack_gaps:comparison:1e-6@bab5b4aa` | comparison | 1e-6 | above = [q for q in strands if q is not p and abs(q.cx - p.cx) < 1e-6 and q.cy > p.cy] | convention | a floating-point tolerance | - | - |
 | `layout:_column_heights.way_out:comparison:1e-9@b6c36b98` | comparison | 1e-9 | if min(hi, b) - max(lo, a) < need - 1e-9: | convention | a floating-point tolerance | - | - |
 | `layout:_column_heights.shut:comparison:1e-9@f92b269f` | comparison | 1e-9 | if 0 < (y - half) - top <= room(q, k) + _STACK_NUDGE + 1e-9: | convention | a floating-point tolerance | route | - |
 | `layout:_column_heights.shut:comparison:1e-9@9513ea38` | comparison | 1e-9 | elif 0 < bottom - (y + half) <= room(k, q) + _STACK_NUDGE + 1e-9: | convention | a floating-point tolerance | route | - |
-| `layout:_column_heights.meets:comparison:1e-9@14fab0f5` | comparison | 1e-9 | height[q] - length(q) / 2 - room(k, q) - half + 1e-9 | convention | a floating-point tolerance | app, domains, elstyle, links +8 | - |
-| `layout:_column_heights.meets:comparison:1e-9@31e056c7` | comparison | 1e-9 | < height[q] + length(q) / 2 + room(q, k) + half - 1e-9 | convention | a floating-point tolerance | app, domains, elstyle, links +8 | - |
-| `layout:_open_at_ends:comparison:3@8f5bc337` | comparison | 3 | if not sheet.closed or n < 3 or len({s.chain for s in sheet.strands}) != 1: | unknown | - | template | - |
+| `layout:_column_heights.meets:comparison:1e-9@14fab0f5` | comparison | 1e-9 | height[q] - length(q) / 2 - room(k, q) - half + 1e-9 | convention | a floating-point tolerance | app, app_paths, domains, elstyle +9 | - |
+| `layout:_column_heights.meets:comparison:1e-9@31e056c7` | comparison | 1e-9 | < height[q] + length(q) / 2 + room(q, k) + half - 1e-9 | convention | a floating-point tolerance | app, app_paths, domains, elstyle +9 | - |
+| `layout:_open_at_ends:comparison:3@8f5bc337` | comparison | 3 | if not sheet.closed or n < 3 or len({s.chain for s in sheet.strands}) != 1: | unknown | - | model_docs, template | - |
 | `layout:can_be_row:comparison:4@66f511f3` | comparison | 4 | return 4 <= len(sheet.strands) <= _BA_MAX and not sheet.ambiguous and all(k == "P" for k in sheet.pair_kinds) | unknown | - | template | - |
 | `layout:_kink_item:comparison:-0.5@5e4070af` | comparison | -0.5 | if turn < -0.5: # turned back: a hairpin beside the last piece, on the side the piece turns to | unknown | - | - | - |
 | `layout:_kink_item:comparison:1e-9@326ce42a` | comparison | 1e-9 | if back > 1e-9: | convention | a floating-point tolerance | - | - |
@@ -822,7 +822,7 @@ Of the 41 named-entry rows, 30 rest on the comment at the item and 11 on git (ev
 | `layout:_off_walls:comparison:1e-9@5d0a7078#2` | comparison | 1e-9 | hits = np.argwhere((pen[..., 0] > 1e-9) & (pen[..., 1] > 1e-9) & walls.hard) | convention | a floating-point tolerance | membrane, na_curve | - |
 | `layout:_off_walls:comparison:1e-9@15c144c6` | comparison | 1e-9 | if px <= 1e-9 or py <= 1e-9: | convention | a floating-point tolerance | membrane, na_curve | - |
 | `layout:_off_walls:comparison:1e-9@15c144c6#2` | comparison | 1e-9 | if px <= 1e-9 or py <= 1e-9: | convention | a floating-point tolerance | membrane, na_curve | - |
-| `layout:_slide_clear.meets:comparison:4@05f1e9ad` | comparison | 4 | if len(o) < 4: | unknown | - | app, domains, elstyle, links +8 | - |
+| `layout:_slide_clear.meets:comparison:4@05f1e9ad` | comparison | 4 | if len(o) < 4: | unknown | - | app, app_paths, domains, elstyle +9 | - |
 | `layout:_mass:argument:4@3d2e2b08` | argument | 4 | return sum(len(m.axial) / 4 if isinstance(m, PlacedStem) else 1 for m in it.members) | unknown | - | - | - |
 | `layout:_energy:argument:1e-12@cbf7475b` | argument | 1e-12 | dist = np.maximum(np.sqrt(g[:, 0] * g[:, 0] + g[:, 1] * g[:, 1]), 1e-12) | convention | a floating-point tolerance | optimiser, perf | - |
 | `layout:_energy_dense:argument:1e-12@cbf7475b` | argument | 1e-12 | dist = np.maximum(np.sqrt(g[:, 0] * g[:, 0] + g[:, 1] * g[:, 1]), 1e-12) | convention | a floating-point tolerance | na_layout, optimiser, perf | - |
@@ -894,7 +894,7 @@ Of the 41 named-entry rows, 30 rest on the comment at the item and 11 on git (ev
 | `layout:_name_spots:argument:0.05@1e78927a#2` | argument | 0.05 | ends = (max(sx.min() + _NAME_INSET, box[0] + 0.05), min(sx.max() - _NAME_INSET, box[2] - 0.05)) | unknown | - | domains | - |
 | `layout:_name_spots:comparison:1e-6@421ef3f6` | comparison | 1e-6 | if abs(x - mid) > 1e-6 and ends[0] <= ends[1]: | convention | a floating-point tolerance | domains | - |
 | `layout:_ink_line:fallback:glyph_width_guessed` | fallback | glyph_width_guessed | fallback.note("glyph_width_guessed") | unknown | _FALLBACK_WIDTH: "a character the metric table lacks (about a bold lower-case letter)" | - | none |
-| `layout:_reach:argument:4@4ae348b6` | argument | 4 | return np.zeros(4) | convention | an array's shape | na_curve, na_layout, na_text_keepoff, text_clear | - |
+| `layout:_reach:argument:4@4ae348b6` | argument | 4 | return np.zeros(4) | convention | an array's shape | freeze, na_curve, na_layout, na_text_keepoff +1 | - |
 | `layout:upright_deg:comparison:90@c1899080` | comparison | 90 | return rot - 180 if rot > 90 else rot + 180 if rot < -90 else rot | unknown | - | - | - |
 | `layout:upright_deg:comparison:-90@c1899080` | comparison | -90 | return rot - 180 if rot > 90 else rot + 180 if rot < -90 else rot | unknown | - | - | - |
 | `layout:_text_width:fallback:glyph_width_guessed` | fallback | glyph_width_guessed | fallback.note("glyph_width_guessed") | unknown | _FALLBACK_WIDTH: "a character the metric table lacks (about a bold lower-case letter)" | - | none |
@@ -1222,7 +1222,7 @@ Of the 41 named-entry rows, 30 rest on the comment at the item and 11 on git (ev
 
 | id | kind | value | at | origin | evidence | tests naming it | check |
 |---|---|---|---|---|---|---|---|
-| `nacheck:THRESHOLDS` | constant | { "pair_f1": 0.95, # canonical + wobble pairs against RNApolis (final campaign: 0.96-1.00; started at 0.90) "stem_recal… | THRESHOLDS = { | unknown | earliest in this file: 473f099 2026-10-11 nacheck: shape, contact and rendering fidelity of nucleic-acid figures; fixture … | na_layout, na_validation | - |
+| `nacheck:THRESHOLDS` | constant | { "pair_f1": 0.95, # canonical + wobble pairs against RNApolis (final campaign: 0.96-1.00; started at 0.90) "stem_recal… | THRESHOLDS = { | unknown | earliest in this file: 473f099 2026-10-11 nacheck: shape, contact and rendering fidelity of nucleic-acid figures; fixture … | model_docs, na_layout, na_validation | - |
 | `nacheck:SIDE_SEEN` | constant | 2.75 | SIDE_SEEN = 2.75 | geometry | "Equal to the layout's own cut, layout._SIDE_CLEAR"; earliest in this file: 473f099 2026-10-11 nacheck: shape, contact and rendering fidelity of nucleic-acid figures; fixture … | na_validation | - |
 | `nacheck:_heavy:argument:3@773a76ee` | argument | 3 | return np.array(xyz).reshape(-1, 3), np.array(owner, int), names | convention | an array's shape | - | - |
 | `nacheck:_similarity_rmsd:argument:1e-12@83c6c6d2` | argument | 1e-12 | residual = max(aa - (dot * dot + cross * cross) / max(bb, 1e-12), 0.0) | convention | a floating-point tolerance | na_validation | - |
@@ -1258,7 +1258,7 @@ Of the 41 named-entry rows, 30 rest on the comment at the item and 11 on git (ev
 |---|---|---|---|---|---|---|---|
 | `nucleic:HBOND_MAX` | constant | 3.8 | HBOND_MAX = 3.8 # Å, donor-acceptor distance of a base-pair hydrogen bond (stretched pairs at 2-3 Å resolution) | biology | "donor-acceptor distance of a base-pair hydrogen bond (stretched pairs at 2-3 Å resolution)"; earliest in this file: 9dc5dfc 2026-10-10 Base pairs from hydrogen bonds and base geometry, checked against RNApolis | independent_kernels | T7 finding MF2: the base-pair kernel holds the bonds to 3.5 Å (tests/test_independent_kernels.py, xfail strict) |
 | `nucleic:HBOND_STRETCH` | constant | 4.0 | HBOND_STRETCH = 4.0 # Å, the one longer bond a pair stacked in register on a strict pair may have (1HYS, 1AOI) | named-entry:1HYS,1AOI | "… bond a pair stacked in register on a strict pair may have (1HYS, 1AOI)"; earliest in this file: 5b20853 2026-10-11 C11: a pair stacked in register on a strict pair is accepted with its second hyd… | independent_kernels | T7 finding MF2: the base-pair kernel holds the bonds to 3.5 Å (tests/test_independent_kernels.py, xfail strict) |
-| `nucleic:C1_PAIR` | constant | (9.0, 12.0) | C1_PAIR = (9.0, 12.0) # Å, C1'-C1' across a Watson-Crick or wobble pair (10.5 +- 1.5) | biology | "C1'-C1' across a Watson-Crick or wobble pair (10.5 +- 1.5)"; earliest in this file: 9dc5dfc 2026-10-10 Base pairs from hydrogen bonds and base geometry, checked against RNApolis | independent_kernels | T7 finding MF3: the kernel takes 9.5-11.5 Å (tests/test_independent_kernels.py, xfail strict) |
+| `nucleic:C1_PAIR` | constant | (9.0, 12.0) | C1_PAIR = (9.0, 12.0) # Å, C1'-C1' across a Watson-Crick or wobble pair (10.5 +- 1.5) | biology | "C1'-C1' across a Watson-Crick or wobble pair (10.5 +- 1.5)"; earliest in this file: 9dc5dfc 2026-10-10 Base pairs from hydrogen bonds and base geometry, checked against RNApolis | independent_kernels, model_docs | T7 finding MF3: the kernel takes 9.5-11.5 Å (tests/test_independent_kernels.py, xfail strict) |
 | `nucleic:PLANE_MAX` | constant | 45.0 | PLANE_MAX = 45.0 # degrees between the two base planes (TBP and nucleosome DNA reach 40 of propeller twist) | biology | "TBP and nucleosome DNA reach 40 of propeller twist"; earliest in this file: 9dc5dfc 2026-10-10 Base pairs from hydrogen bonds and base geometry, checked against RNApolis | independent_kernels, na_pairs | T7 finding MF4: the kernel has no planarity bound (tests/test_independent_kernels.py, xfail strict) |
 | `nucleic:MIN_LOOP` | constant | 3 | MIN_LOOP = 3 # a hairpin closes at least this many unpaired nucleotides | biology | a hairpin loop closes at least three unpaired nucleotides; earliest in this file: 9dc5dfc 2026-10-10 Base pairs from hydrogen bonds and base geometry, checked against RNApolis | na_validation | - |
 | `nucleic:SEGMENT_TURN` | constant | 25.0 | SEGMENT_TURN = 25.0 # degrees the duplex axis may turn before a new straight piece starts | unknown | earliest in this file: 8f3f2b7 2026-10-10 Stem axes; bent duplexes cut into straight pieces | - | - |
@@ -1333,7 +1333,7 @@ Of the 41 named-entry rows, 30 rest on the comment at the item and 11 on git (ev
 | `panels:GUTTER` | constant | 0.3 | GUTTER = 0.3 # clear space kept between two domains' panels, where their elements leave room for it | unknown | earliest in this file: 498a910 2026-10-12 Domain panels follow their elements and keep apart; names on clear plates (4OO8,… | perf | - |
 | `panels:NAME_PAD` | constant | 0.15 | NAME_PAD = 0.15 # a name's box is wrapped this far | unknown | earliest in this file: 498a910 2026-10-12 Domain panels follow their elements and keep apart; names on clear plates (4OO8,… | perf | - |
 | `panels:EDGE` | constant | 0.05 | EDGE = 0.05 # each element's own box, grown this far (never past half way to another's), is inside its panel | unknown | earliest in this file: 498a910 2026-10-12 Domain panels follow their elements and keep apart; names on clear plates (4OO8,… | - | - |
-| `panels:panel_fields.window:argument:4@9776f952` | argument | 4 | b = np.asarray(list(owned[d]) + ([names[d]] if d in names else []), float).reshape(-1, 4) | convention | an array's shape | membrane, perf | - |
+| `panels:panel_fields.window:argument:4@9776f952` | argument | 4 | b = np.asarray(list(owned[d]) + ([names[d]] if d in names else []), float).reshape(-1, 4) | convention | an array's shape | membrane, perf, random100 | - |
 
 ## provenance
 
@@ -1496,12 +1496,13 @@ Of the 41 named-entry rows, 30 rest on the comment at the item and 11 on git (ev
 | `render:_mark_spot:argument:0.35@762e4173` | argument | 0.35 | for n, ring in enumerate(np.arange(0.0, radius, 0.35)): | unknown | line last changed by b98171e C9 (random-100, follow-up): a ligand with nothing clear near it is marked further out, else on its anchor (7Q… (git blame; evidence only) | na_layout | - |
 | `render:_mark_spot:argument:10@277fa249` | argument | 10 | for angle in np.linspace(0, 2 * np.pi, max(1, int(ring * 10)), endpoint=False): | unknown | line last changed by cae6ae1 C5 (random-100): ligand marks keep off loop lines, counts, earlier tethers and names (1BXI, 1A0Z, 5SB5, 2HHB … (git blame; evidence only) | na_layout | - |
 | `render:_mark_spot:comparison:1e-9@4097f1e5` | comparison | 1e-9 | if overlaps_any(box, taken) or any(clip_len(a, b, box) > 1e-9 for a, b in tethers): | convention | a floating-point tolerance | na_layout | - |
-| `render:_mark_spot:comparison:1e-9@c8844eae` | comparison | 1e-9 | clip_len(c, t, b) > 1e-9 for t in ts for b in texts | convention | a floating-point tolerance | na_layout | - |
+| `render:_mark_spot:comparison:1e-9@cc26062a` | comparison | 1e-9 | clip_len(c, t, b) > 1e-9 for t in judged for b in texts | convention | a floating-point tolerance | na_layout | - |
 | `render:_mark_spot:argument:4@9679854b` | argument | 4 | round(over, 4), | convention | rounding digits | na_layout | - |
 | `render:_mark_spot:argument:4@0843070d` | argument | 4 | round(length, 4), | convention | rounding digits | na_layout | - |
 | `render:_mark_spot:comparison:1e-9@59447e8d` | comparison | 1e-9 | if best is None or over < best[0] - 1e-9: | convention | a floating-point tolerance | na_layout | - |
 | `render:_mark_spot:comparison:1e-9@e03c15f2` | comparison | 1e-9 | if over <= 1e-9: | convention | a floating-point tolerance | na_layout | - |
 | `render:_mark_spot:comparison:1e-9@9091e225` | comparison | 1e-9 | if best is not None and na is None and best[0] <= 1e-9: | convention | a floating-point tolerance | na_layout | - |
+| `render:_place_mark.no_worse:comparison:1e-9@a94c3325` | comparison | 1e-9 | return a[:-1] < b[:-1] or (a[:-1] == b[:-1] and a[-1] <= b[-1] + 1e-9) | convention | a floating-point tolerance | - | - |
 | `render:_least_bad_spot:argument:4@0dc5edc0` | argument | 4 | body = np.asarray(bodies, float).reshape(-1, 4) | convention | an array's shape | - | - |
 | `render:_least_bad_spot:argument:4@53a718a6` | argument | 4 | other = np.asarray(taken, float).reshape(-1, 4) | convention | an array's shape | - | - |
 | `render:_least_bad_spot:argument:0.35@812d8b4f` | argument | 0.35 | for ring in np.arange(0.0, _SPOT_FAR * _SPOT_RADIUS, 0.35): | unknown | - | - | - |
@@ -1560,7 +1561,7 @@ Of the 41 named-entry rows, 30 rest on the comment at the item and 11 on git (ev
 | `render:_chevron:argument:0.8@ae6cfe83#2` | argument | 0.8 | np.array([m - u * size + n * size * 0.8, m + u * size * 0.6, m - u * size - n * size * 0.8]), | unknown | - | - | - |
 | `render:_flatten:default:per_curve` | default | 12 | def _flatten(path: Path, per_curve: int = 12) -> np.ndarray: | unknown | - | - | - |
 | `render:grade_colour:argument:9@b686040c` | argument | 9 | return CONSURF[int(np.clip(grade, 1, 9)) - 1] if grade else NO_DATA | unknown | - | conservation | - |
-| `render:_by_data.element:argument:9@a4b4b17e` | argument | 9 | return scale.colour(round(math.fsum(mine) / len(mine), 9)) if mine else DATA_NONE | convention | rounding digits | 310, app, app_controls, app_jobs +28 | - |
+| `render:_by_data.element:argument:9@a4b4b17e` | argument | 9 | return scale.colour(round(math.fsum(mine) / len(mine), 9)) if mine else DATA_NONE | convention | rounding digits | 310, app, app_controls, app_jobs +29 | - |
 | `render:_draw_data_marks:argument:0.6@82c41a8d` | argument | 0.6 | ring = Circle(m["at"], _DATA_RING, fc=background, ec=legible("#1d1d1f"), lw=lw * 0.6, zorder=Z["data-ring"]) | unknown | - | - | - |
 | `render:_draw_lines:argument:1.9@83c79263` | argument | 1.9 | c.ax.plot(*xy, color=_BACKGROUND.get(), lw=lw * 1.9, solid_capstyle="butt", zorder=Z["xl-over"] - 0.01) | unknown | - | - | - |
 | `render:_draw_lines:argument:0.01@83c79263` | argument | 0.01 | c.ax.plot(*xy, color=_BACKGROUND.get(), lw=lw * 1.9, solid_capstyle="butt", zorder=Z["xl-over"] - 0.01) | convention | drawing order | - | - |
@@ -1731,7 +1732,7 @@ Of the 41 named-entry rows, 30 rest on the comment at the item and 11 on git (ev
 | `route:_SLAB_COST` | constant | 3.0 | _SLAB_COST = 3.0 # extra cost for a cell inside the membrane slab: loops between TM helices go round it | unknown | earliest in this file: bd3e716 2026-10-11 Loops pay to cross the membrane slab: connections between TM helices stay on the… | - | - |
 | `route:_SLAB_RUN` | constant | 12.0 | _SLAB_RUN = 12.0 # ... a step along the slab, not across it: a loop leaves the slab at a face (random-100 C26) | named-entry:7SMR | git: 2a9da2a's message (the value's last change): "_SLAB_RUN 12, not 24 (7SMR) ... At 12 that loop runs along the face line" | route | - |
 | `route:_PAD` | constant | 3.0 | _PAD = 3.0 | unknown | cites plan 27 Task 5; final review M6; earliest in this file: 0438931 2026-10-09 Rename to foldmap; add README | - | - |
-| `route:_MAX_NODES` | constant | 200_000 | _MAX_NODES = 200_000 | unknown | earliest in this file: 0438931 2026-10-09 Rename to foldmap; add README | heldout_budgets, route | - |
+| `route:_MAX_NODES` | constant | 200_000 | _MAX_NODES = 200_000 | unknown | earliest in this file: 0438931 2026-10-09 Rename to foldmap; add README | heldout_budgets, model_docs, route | - |
 | `route:_MAX_NODES_WIDE` | constant | 1_600_000 | _MAX_NODES_WIDE = 1_600_000 | measured | "Measured on the batch's pages: 7JU4's, 7QUP's and 8QEM's stuck loops ... need at most 800 000; 8VWQ's and 7Y7C's longest nucleic-acid runs 1 600 000"; earliest in this file: 79adc49 2026-10-16 A search out of A* budget runs again wider when free cells join its ends (C2b-2,… | route | - |
 | `route:_MAX_NODES_PAGE` | constant | 8_000_000 | _MAX_NODES_PAGE = 8_000_000 | named-entry:7QUP | "…t runs out of _MAX_NODES falls back as before (fix round 1: 7QUP's focus view took 158 s of its 180). About 25 s at most on a large page"; earliest in this file: 1253bbb 2026-10-16 The second A* searches of one figure share a node budget (C2b-2 fix round 1) | heldout_budgets, route | - |
 | `route:_MAX_NODES_WINDOWS` | constant | 8_000_000 | _MAX_NODES_WINDOWS = 8_000_000 | named-entry:7NZ2,9FZL | "…ent its budget (plan 15 final review: drawing them from it, 7NZ2's domains view went from 0 to 3 fallback curves, 9FZL's had 5), and a fresh budget …"; earliest in this file: e5b4bae 2026-10-18 Plan 15 final fix round: a coarse page's fine windows share a pool of their own … | heldout_budgets, sensitivity | - |
@@ -1765,8 +1766,8 @@ Of the 41 named-entry rows, 30 rest on the comment at the item and 11 on git (ev
 | `route:_Wall.depth_rows:argument:1e-9@72bc1277` | argument | 1e-9 | scale = 2 * self.half / np.maximum(b1 - b0, 1e-9) | convention | a floating-point tolerance | - | - |
 | `route:_Wall.room:comparison:1e-9@7736f6ec` | comparison | 1e-9 | if abs(out[0]) > 1e-9 or out[1] * self.side * self.up >= 0 or not self.reaches(port): | convention | a floating-point tolerance | - | - |
 | `route:_walls:comparison:1e-6@baef1a44` | comparison | 1e-6 | stub = s.id in band and abs(out_vec[0]) < 1e-6 and out_vec[1] * side * up > 0 | convention | a floating-point tolerance | membrane, route | - |
-| `route:clip_lengths:argument:4@a9e132e9` | argument | 4 | seg = np.asarray(segments, float).reshape(-1, 4) | convention | an array's shape | na_layout, route | - |
-| `route:clip_lengths:argument:4@69a6a215` | argument | 4 | box = np.asarray(boxes, float).reshape(-1, 4) | convention | an array's shape | na_layout, route | - |
+| `route:clip_lengths:argument:4@a9e132e9` | argument | 4 | seg = np.asarray(segments, float).reshape(-1, 4) | convention | an array's shape | ligands, na_layout, route | - |
+| `route:clip_lengths:argument:4@69a6a215` | argument | 4 | box = np.asarray(boxes, float).reshape(-1, 4) | convention | an array's shape | ligands, na_layout, route | - |
 | `route:boxes_meeting:argument:4@c905b135` | argument | 4 | b = np.asarray(boxes, float).reshape(-1, 4) | convention | an array's shape | route | - |
 | `route:_crosses_body:comparison:1e-9@e7148cf1` | comparison | 1e-9 | return clip_len((u0, v0), (u1, v1), (-hl, -hw, hl, hw)) > 1e-9 | convention | a floating-point tolerance | perf, route | - |
 | `route:_clear:comparison:1e-9@76cae61c` | comparison | 1e-9 | and clip_len(p, q, box) > 1e-9 | convention | a floating-point tolerance | heldout_copies, na_layout, route | - |
