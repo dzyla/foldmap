@@ -1,12 +1,12 @@
 {
  "source_stamp": {
   "foldmap": "0.1.0",
-  "code_fingerprint": "43e1d11adf24d91b",
+  "code_fingerprint": "372baafb4776372e",
   "package": "checkout",
-  "checkout_fingerprint": "43e1d11adf24d91b",
+  "checkout_fingerprint": "372baafb4776372e",
   "installed_matches_checkout": true,
   "git": {
-   "commit": "6ebc5c847704ae8ba9734708b6bdd3fc300125e3",
+   "commit": "9560be793b255cfd524e313c91f4efdde095ab72",
    "dirty": false,
    "source": "asserted by runner"
   },
@@ -32,7 +32,7 @@
   }
  },
  "entry_code": {
-  "43e1d11adf24d91b+cdf60fa1e05239c2": 126
+  "372baafb4776372e+cdf60fa1e05239c2": 126
  },
  "mixed_code": false,
  "sample": {
@@ -186,15 +186,15 @@
    "criteria_detail": {},
    "floor_ok": true,
    "floor_reasons": [],
-   "seconds": 0.25,
-   "draw_seconds": 0.22,
+   "seconds": 0.27,
+   "draw_seconds": 0.24,
    "peak_mb": "not measured",
    "svg_bytes": 89076,
    "png_bytes": 275479,
    "process": {
     "exit": 0,
-    "seconds": 2.01,
-    "max_rss_mb": 137.4,
+    "seconds": 2.05,
+    "max_rss_mb": 137.2,
     "timed_out": false
    },
    "files": {
@@ -252,8 +252,8 @@
     "harness_error": null,
     "process": {
      "exit": 0,
-     "seconds": 3.71,
-     "max_rss_mb": 227.8,
+     "seconds": 3.66,
+     "max_rss_mb": 226.9,
      "timed_out": false
     }
    }
@@ -272,15 +272,15 @@
    "criteria_detail": {},
    "floor_ok": true,
    "floor_reasons": [],
-   "seconds": 0.25,
-   "draw_seconds": 0.23,
+   "seconds": 0.28,
+   "draw_seconds": 0.25,
    "peak_mb": "not measured",
    "svg_bytes": 88824,
    "png_bytes": 248813,
    "process": {
     "exit": 0,
-    "seconds": 2.0,
-    "max_rss_mb": 138.4,
+    "seconds": 2.1,
+    "max_rss_mb": 139.1,
     "timed_out": false
    },
    "files": {
@@ -339,7 +339,7 @@
     "process": {
      "exit": 0,
      "seconds": 3.71,
-     "max_rss_mb": 224.7,
+     "max_rss_mb": 227.8,
      "timed_out": false
     }
    }
@@ -358,15 +358,15 @@
    "criteria_detail": {},
    "floor_ok": true,
    "floor_reasons": [],
-   "seconds": 0.24,
-   "draw_seconds": 0.21,
+   "seconds": 0.25,
+   "draw_seconds": 0.22,
    "peak_mb": "not measured",
    "svg_bytes": 78393,
    "png_bytes": 267929,
    "process": {
     "exit": 0,
-    "seconds": 1.95,
-    "max_rss_mb": 136.0,
+    "seconds": 2.05,
+    "max_rss_mb": 138.0,
     "timed_out": false
    },
    "files": {
@@ -424,7 +424,7 @@
     "harness_error": null,
     "process": {
      "exit": 0,
-     "seconds": 3.56,
+     "seconds": 3.51,
      "max_rss_mb": 227.4,
      "timed_out": false
     }
@@ -444,15 +444,15 @@
    "criteria_detail": {},
    "floor_ok": true,
    "floor_reasons": [],
-   "seconds": 0.25,
-   "draw_seconds": 0.22,
+   "seconds": 0.26,
+   "draw_seconds": 0.23,
    "peak_mb": "not measured",
    "svg_bytes": 77809,
    "png_bytes": 284020,
    "process": {
     "exit": 0,
-    "seconds": 2.0,
-    "max_rss_mb": 136.8,
+    "seconds": 2.06,
+    "max_rss_mb": 135.7,
     "timed_out": false
    },
    "files": {
@@ -510,8 +510,8 @@
     "harness_error": null,
     "process": {
      "exit": 0,
-     "seconds": 3.66,
-     "max_rss_mb": 226.8,
+     "seconds": 3.61,
+     "max_rss_mb": 226.0,
      "timed_out": false
     }
    }
@@ -530,15 +530,15 @@
    "criteria_detail": {},
    "floor_ok": true,
    "floor_reasons": [],
-   "seconds": 0.23,
-   "draw_seconds": 0.2,
+   "seconds": 0.24,
+   "draw_seconds": 0.21,
    "peak_mb": "not measured",
    "svg_bytes": 65177,
    "png_bytes": 204001,
    "process": {
     "exit": 0,
-    "seconds": 1.8,
-    "max_rss_mb": 138.8,
+    "seconds": 1.95,
+    "max_rss_mb": 138.6,
     "timed_out": false
    },
    "files": {
@@ -596,8 +596,8 @@
     "harness_error": null,
     "process": {
      "exit": 0,
-     "seconds": 3.51,
-     "max_rss_mb": 227.1,
+     "seconds": 3.41,
+     "max_rss_mb": 228.4,
      "timed_out": false
     }
    }
@@ -616,15 +616,15 @@
    "criteria_detail": {},
    "floor_ok": true,
    "floor_reasons": [],
-   "seconds": 0.35,
-   "draw_seconds": 0.32,
+   "seconds": 0.36,
+   "draw_seconds": 0.33,
    "peak_mb": "not measured",
    "svg_bytes": 50500,
    "png_bytes": 191279,
    "process": {
     "exit": 0,
-    "seconds": 2.25,
-    "max_rss_mb": 136.7,
+    "seconds": 2.35,
+    "max_rss_mb": 136.9,
     "timed_out": false
    },
    "files": {
@@ -683,7 +683,7 @@
     "process": {
      "exit": 0,
      "seconds": 3.91,
-     "max_rss_mb": 225.8,
+     "max_rss_mb": 226.9,
      "timed_out": false
     }
    }
@@ -702,15 +702,15 @@
    "criteria_detail": {},
    "floor_ok": true,
    "floor_reasons": [],
-   "seconds": 0.34,
-   "draw_seconds": 0.31,
+   "seconds": 0.36,
+   "draw_seconds": 0.33,
    "peak_mb": "not measured",
    "svg_bytes": 47906,
    "png_bytes": 174937,
    "process": {
     "exit": 0,
-    "seconds": 2.2,
-    "max_rss_mb": 137.6,
+    "seconds": 2.1,
+    "max_rss_mb": 135.9,
     "timed_out": false
    },
    "files": {
@@ -768,8 +768,8 @@
     "harness_error": null,
     "process": {
      "exit": 0,
-     "seconds": 3.86,
-     "max_rss_mb": 227.1,
+     "seconds": 3.61,
+     "max_rss_mb": 227.6,
      "timed_out": false
     }
    }
@@ -788,15 +788,15 @@
    "criteria_detail": {},
    "floor_ok": true,
    "floor_reasons": [],
-   "seconds": 0.61,
-   "draw_seconds": 0.57,
+   "seconds": 0.57,
+   "draw_seconds": 0.53,
    "peak_mb": "not measured",
    "svg_bytes": 182092,
    "png_bytes": 501597,
    "process": {
     "exit": 0,
-    "seconds": 3.16,
-    "max_rss_mb": 199.2,
+    "seconds": 3.06,
+    "max_rss_mb": 196.1,
     "timed_out": false
    },
    "files": {
@@ -854,8 +854,8 @@
     "harness_error": null,
     "process": {
      "exit": 0,
-     "seconds": 6.31,
-     "max_rss_mb": 256.4,
+     "seconds": 6.16,
+     "max_rss_mb": 255.0,
      "timed_out": false
     }
    }
@@ -874,15 +874,15 @@
    "criteria_detail": {},
    "floor_ok": true,
    "floor_reasons": [],
-   "seconds": 1.28,
-   "draw_seconds": 1.15,
+   "seconds": 1.24,
+   "draw_seconds": 1.13,
    "peak_mb": "not measured",
    "svg_bytes": 526697,
    "png_bytes": 1958736,
    "process": {
     "exit": 0,
-    "seconds": 5.96,
-    "max_rss_mb": 212.7,
+    "seconds": 5.81,
+    "max_rss_mb": 212.1,
     "timed_out": false
    },
    "files": {
@@ -940,8 +940,8 @@
     "harness_error": null,
     "process": {
      "exit": 0,
-     "seconds": 10.17,
-     "max_rss_mb": 266.6,
+     "seconds": 9.87,
+     "max_rss_mb": 268.8,
      "timed_out": false
     }
    }
@@ -960,15 +960,15 @@
    "criteria_detail": {},
    "floor_ok": true,
    "floor_reasons": [],
-   "seconds": 0.96,
-   "draw_seconds": 0.92,
+   "seconds": 0.93,
+   "draw_seconds": 0.89,
    "peak_mb": "not measured",
    "svg_bytes": 200135,
    "png_bytes": 557739,
    "process": {
     "exit": 0,
-    "seconds": 4.26,
-    "max_rss_mb": 181.0,
+    "seconds": 4.06,
+    "max_rss_mb": 181.2,
     "timed_out": false
    },
    "files": {
@@ -1026,8 +1026,8 @@
     "harness_error": null,
     "process": {
      "exit": 0,
-     "seconds": 8.06,
-     "max_rss_mb": 254.7,
+     "seconds": 7.91,
+     "max_rss_mb": 255.7,
      "timed_out": false
     }
    }
@@ -1046,15 +1046,15 @@
    "criteria_detail": {},
    "floor_ok": true,
    "floor_reasons": [],
-   "seconds": 1.24,
-   "draw_seconds": 1.2,
+   "seconds": 1.17,
+   "draw_seconds": 1.13,
    "peak_mb": "not measured",
    "svg_bytes": 185362,
    "png_bytes": 633639,
    "process": {
     "exit": 0,
-    "seconds": 5.16,
-    "max_rss_mb": 191.1,
+    "seconds": 5.06,
+    "max_rss_mb": 188.8,
     "timed_out": false
    },
    "files": {
@@ -1112,8 +1112,8 @@
     "harness_error": null,
     "process": {
      "exit": 0,
-     "seconds": 10.07,
-     "max_rss_mb": 257.1,
+     "seconds": 9.72,
+     "max_rss_mb": 255.7,
      "timed_out": false
     }
    }
@@ -1132,15 +1132,15 @@
    "criteria_detail": {},
    "floor_ok": true,
    "floor_reasons": [],
-   "seconds": 0.65,
-   "draw_seconds": 0.62,
+   "seconds": 0.63,
+   "draw_seconds": 0.6,
    "peak_mb": "not measured",
    "svg_bytes": 242387,
    "png_bytes": 629321,
    "process": {
     "exit": 0,
-    "seconds": 3.26,
-    "max_rss_mb": 169.5,
+    "seconds": 3.01,
+    "max_rss_mb": 169.8,
     "timed_out": false
    },
    "files": {
@@ -1198,8 +1198,8 @@
     "harness_error": null,
     "process": {
      "exit": 0,
-     "seconds": 6.46,
-     "max_rss_mb": 254.3,
+     "seconds": 6.26,
+     "max_rss_mb": 255.7,
      "timed_out": false
     }
    }
@@ -1218,15 +1218,15 @@
    "criteria_detail": {},
    "floor_ok": true,
    "floor_reasons": [],
-   "seconds": 0.73,
+   "seconds": 0.74,
    "draw_seconds": 0.7,
    "peak_mb": "not measured",
    "svg_bytes": 231065,
    "png_bytes": 694189,
    "process": {
     "exit": 0,
-    "seconds": 3.66,
-    "max_rss_mb": 180.8,
+    "seconds": 3.61,
+    "max_rss_mb": 180.7,
     "timed_out": false
    },
    "files": {
@@ -1284,8 +1284,8 @@
     "harness_error": null,
     "process": {
      "exit": 0,
-     "seconds": 7.16,
-     "max_rss_mb": 254.8,
+     "seconds": 6.96,
+     "max_rss_mb": 255.4,
      "timed_out": false
     }
    }
@@ -1305,14 +1305,14 @@
    "floor_ok": true,
    "floor_reasons": [],
    "seconds": 0.29,
-   "draw_seconds": 0.25,
+   "draw_seconds": 0.26,
    "peak_mb": "not measured",
    "svg_bytes": 99467,
    "png_bytes": 299471,
    "process": {
     "exit": 0,
-    "seconds": 2.1,
-    "max_rss_mb": 135.9,
+    "seconds": 2.05,
+    "max_rss_mb": 138.1,
     "timed_out": false
    },
    "files": {
@@ -1370,8 +1370,8 @@
     "harness_error": null,
     "process": {
      "exit": 0,
-     "seconds": 3.86,
-     "max_rss_mb": 227.3,
+     "seconds": 3.71,
+     "max_rss_mb": 227.9,
      "timed_out": false
     }
    }
@@ -1390,15 +1390,15 @@
    "criteria_detail": {},
    "floor_ok": true,
    "floor_reasons": [],
-   "seconds": 1.31,
-   "draw_seconds": 1.27,
+   "seconds": 1.25,
+   "draw_seconds": 1.21,
    "peak_mb": "not measured",
    "svg_bytes": 80192,
    "png_bytes": 260883,
    "process": {
     "exit": 0,
-    "seconds": 5.11,
-    "max_rss_mb": 167.5,
+    "seconds": 4.91,
+    "max_rss_mb": 168.8,
     "timed_out": false
    },
    "files": {
@@ -1456,8 +1456,8 @@
     "harness_error": null,
     "process": {
      "exit": 0,
-     "seconds": 11.82,
-     "max_rss_mb": 243.2,
+     "seconds": 11.72,
+     "max_rss_mb": 242.0,
      "timed_out": false
     }
    }
@@ -1476,15 +1476,15 @@
    "criteria_detail": {},
    "floor_ok": true,
    "floor_reasons": [],
-   "seconds": 0.94,
-   "draw_seconds": 0.89,
+   "seconds": 0.91,
+   "draw_seconds": 0.85,
    "peak_mb": "not measured",
    "svg_bytes": 467290,
    "png_bytes": 1285043,
    "process": {
     "exit": 0,
-    "seconds": 4.41,
-    "max_rss_mb": 175.9,
+    "seconds": 4.31,
+    "max_rss_mb": 176.8,
     "timed_out": false
    },
    "files": {
@@ -1542,8 +1542,8 @@
     "harness_error": null,
     "process": {
      "exit": 0,
-     "seconds": 8.11,
-     "max_rss_mb": 255.6,
+     "seconds": 7.96,
+     "max_rss_mb": 254.5,
      "timed_out": false
     }
    }
@@ -1562,14 +1562,14 @@
    "criteria_detail": {},
    "floor_ok": true,
    "floor_reasons": [],
-   "seconds": 3.63,
-   "draw_seconds": 3.58,
+   "seconds": 3.61,
+   "draw_seconds": 3.56,
    "peak_mb": "not measured",
    "svg_bytes": 220279,
    "png_bytes": 690556,
    "process": {
     "exit": 0,
-    "seconds": 12.37,
+    "seconds": 12.22,
     "max_rss_mb": 172.0,
     "timed_out": false
    },
@@ -1628,8 +1628,8 @@
     "harness_error": null,
     "process": {
      "exit": 0,
-     "seconds": 29.55,
-     "max_rss_mb": 247.9,
+     "seconds": 29.1,
+     "max_rss_mb": 248.1,
      "timed_out": false
     }
    }
@@ -1648,15 +1648,15 @@
    "criteria_detail": {},
    "floor_ok": true,
    "floor_reasons": [],
-   "seconds": 0.27,
+   "seconds": 0.28,
    "draw_seconds": 0.24,
    "peak_mb": "not measured",
    "svg_bytes": 165513,
    "png_bytes": 480918,
    "process": {
     "exit": 0,
-    "seconds": 2.0,
-    "max_rss_mb": 146.3,
+    "seconds": 1.95,
+    "max_rss_mb": 147.1,
     "timed_out": false
    },
    "files": {
@@ -1714,8 +1714,8 @@
     "harness_error": null,
     "process": {
      "exit": 0,
-     "seconds": 3.76,
-     "max_rss_mb": 235.1,
+     "seconds": 3.61,
+     "max_rss_mb": 236.6,
      "timed_out": false
     }
    }
@@ -1735,14 +1735,14 @@
    "floor_ok": true,
    "floor_reasons": [],
    "seconds": 17.24,
-   "draw_seconds": 8.83,
+   "draw_seconds": 8.76,
    "peak_mb": "not measured",
    "svg_bytes": 29346,
    "png_bytes": 123908,
    "process": {
     "exit": 0,
-    "seconds": 27.45,
-    "max_rss_mb": 217.1,
+    "seconds": 27.29,
+    "max_rss_mb": 217.4,
     "timed_out": false
    },
    "files": {
@@ -1800,8 +1800,8 @@
     "harness_error": null,
     "process": {
      "exit": 0,
-     "seconds": 54.44,
-     "max_rss_mb": 263.7,
+     "seconds": 53.79,
+     "max_rss_mb": 262.6,
      "timed_out": false
     }
    }
@@ -1822,15 +1822,15 @@
    "floor_reasons": [
     "its text is 5.0 pt, under 6 pt, on its 48 x 9 in page (its smallest text 3.0 pt)"
    ],
-   "seconds": 13.05,
-   "draw_seconds": 11.55,
+   "seconds": 12.97,
+   "draw_seconds": 11.53,
    "peak_mb": "not measured",
    "svg_bytes": 1413884,
    "png_bytes": 4244687,
    "process": {
     "exit": 0,
-    "seconds": 27.85,
-    "max_rss_mb": 249.7,
+    "seconds": 27.44,
+    "max_rss_mb": 250.1,
     "timed_out": false
    },
    "files": {
@@ -1897,8 +1897,8 @@
     "harness_error": null,
     "process": {
      "exit": 0,
-     "seconds": 53.94,
-     "max_rss_mb": 299.3,
+     "seconds": 53.79,
+     "max_rss_mb": 299.8,
      "timed_out": false
     }
    }
@@ -1917,15 +1917,15 @@
    "criteria_detail": {},
    "floor_ok": true,
    "floor_reasons": [],
-   "seconds": 1.51,
-   "draw_seconds": 1.4,
+   "seconds": 1.52,
+   "draw_seconds": 1.41,
    "peak_mb": "not measured",
    "svg_bytes": 547962,
    "png_bytes": 1605883,
    "process": {
     "exit": 0,
-    "seconds": 6.36,
-    "max_rss_mb": 269.6,
+    "seconds": 6.41,
+    "max_rss_mb": 267.8,
     "timed_out": false
    },
    "files": {
@@ -1983,8 +1983,8 @@
     "harness_error": null,
     "process": {
      "exit": 0,
-     "seconds": 12.57,
-     "max_rss_mb": 303.8,
+     "seconds": 12.22,
+     "max_rss_mb": 303.6,
      "timed_out": false
     }
    }
@@ -2003,15 +2003,15 @@
    "criteria_detail": {},
    "floor_ok": true,
    "floor_reasons": [],
-   "seconds": 1.2,
-   "draw_seconds": 1.14,
+   "seconds": 1.18,
+   "draw_seconds": 1.13,
    "peak_mb": "not measured",
    "svg_bytes": 447659,
    "png_bytes": 1322868,
    "process": {
     "exit": 0,
-    "seconds": 5.16,
-    "max_rss_mb": 209.6,
+    "seconds": 5.06,
+    "max_rss_mb": 209.9,
     "timed_out": false
    },
    "files": {
@@ -2069,8 +2069,8 @@
     "harness_error": null,
     "process": {
      "exit": 0,
-     "seconds": 9.66,
-     "max_rss_mb": 265.3,
+     "seconds": 9.51,
+     "max_rss_mb": 264.9,
      "timed_out": false
     }
    }
@@ -2089,15 +2089,15 @@
    "criteria_detail": {},
    "floor_ok": true,
    "floor_reasons": [],
-   "seconds": 1.14,
-   "draw_seconds": 1.09,
+   "seconds": 1.16,
+   "draw_seconds": 1.11,
    "peak_mb": "not measured",
    "svg_bytes": 522066,
    "png_bytes": 1563299,
    "process": {
     "exit": 0,
-    "seconds": 5.21,
-    "max_rss_mb": 173.4,
+    "seconds": 5.16,
+    "max_rss_mb": 174.6,
     "timed_out": false
    },
    "files": {
@@ -2155,8 +2155,8 @@
     "harness_error": null,
     "process": {
      "exit": 0,
-     "seconds": 8.96,
-     "max_rss_mb": 249.2,
+     "seconds": 9.01,
+     "max_rss_mb": 247.9,
      "timed_out": false
     }
    }
@@ -2182,8 +2182,8 @@
    "png_bytes": 805969,
    "process": {
     "exit": 0,
-    "seconds": 5.11,
-    "max_rss_mb": 154.9,
+    "seconds": 5.16,
+    "max_rss_mb": 154.7,
     "timed_out": false
    },
    "files": {
@@ -2241,8 +2241,8 @@
     "harness_error": null,
     "process": {
      "exit": 0,
-     "seconds": 11.42,
-     "max_rss_mb": 234.6,
+     "seconds": 11.17,
+     "max_rss_mb": 235.2,
      "timed_out": false
     }
    }
@@ -2261,15 +2261,15 @@
    "criteria_detail": {},
    "floor_ok": true,
    "floor_reasons": [],
-   "seconds": 0.47,
+   "seconds": 0.46,
    "draw_seconds": 0.42,
    "peak_mb": "not measured",
    "svg_bytes": 320908,
    "png_bytes": 1015796,
    "process": {
     "exit": 0,
-    "seconds": 2.7,
-    "max_rss_mb": 167.6,
+    "seconds": 2.65,
+    "max_rss_mb": 168.0,
     "timed_out": false
    },
    "files": {
@@ -2327,8 +2327,8 @@
     "harness_error": null,
     "process": {
      "exit": 0,
-     "seconds": 5.11,
-     "max_rss_mb": 243.6,
+     "seconds": 4.96,
+     "max_rss_mb": 244.5,
      "timed_out": false
     }
    }
@@ -2347,15 +2347,15 @@
    "criteria_detail": {},
    "floor_ok": true,
    "floor_reasons": [],
-   "seconds": 1.63,
-   "draw_seconds": 1.43,
+   "seconds": 1.57,
+   "draw_seconds": 1.38,
    "peak_mb": "not measured",
    "svg_bytes": 265384,
    "png_bytes": 933004,
    "process": {
     "exit": 0,
-    "seconds": 6.91,
-    "max_rss_mb": 292.5,
+    "seconds": 6.66,
+    "max_rss_mb": 292.3,
     "timed_out": false
    },
    "files": {
@@ -2413,8 +2413,8 @@
     "harness_error": null,
     "process": {
      "exit": 0,
-     "seconds": 13.07,
-     "max_rss_mb": 309.1,
+     "seconds": 12.82,
+     "max_rss_mb": 309.5,
      "timed_out": false
     }
    }
@@ -2433,15 +2433,15 @@
    "criteria_detail": {},
    "floor_ok": true,
    "floor_reasons": [],
-   "seconds": 16.52,
-   "draw_seconds": 14.31,
+   "seconds": 16.46,
+   "draw_seconds": 14.18,
    "peak_mb": "not measured",
    "svg_bytes": 2383468,
    "png_bytes": 5100177,
    "process": {
     "exit": 0,
-    "seconds": 34.41,
-    "max_rss_mb": 353.6,
+    "seconds": 34.1,
+    "max_rss_mb": 352.1,
     "timed_out": false
    },
    "files": {
@@ -2499,8 +2499,8 @@
     "harness_error": null,
     "process": {
      "exit": 0,
-     "seconds": 64.61,
-     "max_rss_mb": 368.7,
+     "seconds": 64.56,
+     "max_rss_mb": 368.8,
      "timed_out": false
     }
    }
@@ -2526,8 +2526,8 @@
    "png_bytes": 79775,
    "process": {
     "exit": 0,
-    "seconds": 1.5,
-    "max_rss_mb": 136.6,
+    "seconds": 1.4,
+    "max_rss_mb": 136.7,
     "timed_out": false
    },
    "files": {
@@ -2585,8 +2585,8 @@
     "harness_error": null,
     "process": {
      "exit": 0,
-     "seconds": 2.75,
-     "max_rss_mb": 227.3,
+     "seconds": 2.6,
+     "max_rss_mb": 227.1,
      "timed_out": false
     }
    }
@@ -2605,15 +2605,15 @@
    "criteria_detail": {},
    "floor_ok": true,
    "floor_reasons": [],
-   "seconds": 0.11,
-   "draw_seconds": 0.08,
+   "seconds": 0.1,
+   "draw_seconds": 0.07,
    "peak_mb": "not measured",
    "svg_bytes": 6090,
    "png_bytes": 12829,
    "process": {
     "exit": 0,
-    "seconds": 1.35,
-    "max_rss_mb": 143.4,
+    "seconds": 1.25,
+    "max_rss_mb": 143.7,
     "timed_out": false
    },
    "files": {
@@ -2671,8 +2671,8 @@
     "harness_error": null,
     "process": {
      "exit": 0,
-     "seconds": 2.45,
-     "max_rss_mb": 230.8,
+     "seconds": 2.35,
+     "max_rss_mb": 231.0,
      "timed_out": false
     }
    }
@@ -2699,7 +2699,7 @@
    "process": {
     "exit": 0,
     "seconds": 1.4,
-    "max_rss_mb": 157.7,
+    "max_rss_mb": 157.1,
     "timed_out": false
    },
    "files": {
@@ -2757,8 +2757,8 @@
     "harness_error": null,
     "process": {
      "exit": 0,
-     "seconds": 2.65,
-     "max_rss_mb": 239.7,
+     "seconds": 2.6,
+     "max_rss_mb": 239.8,
      "timed_out": false
     }
    }
@@ -2785,7 +2785,7 @@
    "process": {
     "exit": 0,
     "seconds": 1.1,
-    "max_rss_mb": 133.4,
+    "max_rss_mb": 133.6,
     "timed_out": false
    },
    "files": {
@@ -2843,8 +2843,8 @@
     "harness_error": null,
     "process": {
      "exit": 0,
-     "seconds": 2.05,
-     "max_rss_mb": 225.5,
+     "seconds": 1.95,
+     "max_rss_mb": 226.7,
      "timed_out": false
     }
    }
@@ -2863,15 +2863,15 @@
    "criteria_detail": {},
    "floor_ok": true,
    "floor_reasons": [],
-   "seconds": 2.64,
-   "draw_seconds": 2.58,
+   "seconds": 2.66,
+   "draw_seconds": 2.59,
    "peak_mb": "not measured",
    "svg_bytes": 463545,
    "png_bytes": 1810603,
    "process": {
     "exit": 0,
     "seconds": 9.96,
-    "max_rss_mb": 217.7,
+    "max_rss_mb": 217.9,
     "timed_out": false
    },
    "files": {
@@ -2929,8 +2929,8 @@
     "harness_error": null,
     "process": {
      "exit": 0,
-     "seconds": 21.99,
-     "max_rss_mb": 266.4,
+     "seconds": 21.69,
+     "max_rss_mb": 266.8,
      "timed_out": false
     }
    }
@@ -2949,15 +2949,15 @@
    "criteria_detail": {},
    "floor_ok": true,
    "floor_reasons": [],
-   "seconds": 23.77,
-   "draw_seconds": 21.39,
+   "seconds": 23.51,
+   "draw_seconds": 21.11,
    "peak_mb": "not measured",
    "svg_bytes": 1732439,
    "png_bytes": 5186408,
    "process": {
     "exit": 0,
-    "seconds": 49.13,
-    "max_rss_mb": 377.3,
+    "seconds": 48.28,
+    "max_rss_mb": 376.7,
     "timed_out": false
    },
    "files": {
@@ -3015,8 +3015,8 @@
     "harness_error": null,
     "process": {
      "exit": 0,
-     "seconds": 60.2,
-     "max_rss_mb": 355.8,
+     "seconds": 58.84,
+     "max_rss_mb": 354.9,
      "timed_out": false
     }
    }
@@ -3035,15 +3035,15 @@
    "criteria_detail": {},
    "floor_ok": true,
    "floor_reasons": [],
-   "seconds": 20.87,
-   "draw_seconds": 18.57,
+   "seconds": 20.49,
+   "draw_seconds": 18.2,
    "peak_mb": "not measured",
    "svg_bytes": 1676095,
    "png_bytes": 4342283,
    "process": {
     "exit": 0,
-    "seconds": 43.07,
-    "max_rss_mb": 385.9,
+    "seconds": 42.62,
+    "max_rss_mb": 384.7,
     "timed_out": false
    },
    "files": {
@@ -3101,8 +3101,8 @@
     "harness_error": null,
     "process": {
      "exit": 0,
-     "seconds": 54.19,
-     "max_rss_mb": 350.4,
+     "seconds": 53.79,
+     "max_rss_mb": 350.6,
      "timed_out": false
     }
    }
@@ -3121,15 +3121,15 @@
    "criteria_detail": {},
    "floor_ok": true,
    "floor_reasons": [],
-   "seconds": 1.48,
-   "draw_seconds": 1.44,
+   "seconds": 1.44,
+   "draw_seconds": 1.4,
    "peak_mb": "not measured",
    "svg_bytes": 394625,
    "png_bytes": 1274386,
    "process": {
     "exit": 0,
-    "seconds": 6.16,
-    "max_rss_mb": 165.5,
+    "seconds": 6.01,
+    "max_rss_mb": 164.3,
     "timed_out": false
    },
    "files": {
@@ -3187,8 +3187,8 @@
     "harness_error": null,
     "process": {
      "exit": 0,
-     "seconds": 11.72,
-     "max_rss_mb": 237.5,
+     "seconds": 11.52,
+     "max_rss_mb": 237.7,
      "timed_out": false
     }
    }
@@ -3207,15 +3207,15 @@
    "criteria_detail": {},
    "floor_ok": true,
    "floor_reasons": [],
-   "seconds": 0.43,
-   "draw_seconds": 0.41,
+   "seconds": 0.42,
+   "draw_seconds": 0.39,
    "peak_mb": "not measured",
    "svg_bytes": 46851,
    "png_bytes": 280260,
    "process": {
     "exit": 0,
-    "seconds": 2.65,
-    "max_rss_mb": 135.8,
+    "seconds": 2.6,
+    "max_rss_mb": 134.3,
     "timed_out": false
    },
    "files": {
@@ -3273,8 +3273,8 @@
     "harness_error": null,
     "process": {
      "exit": 0,
-     "seconds": 4.16,
-     "max_rss_mb": 227.4,
+     "seconds": 4.01,
+     "max_rss_mb": 225.7,
      "timed_out": false
     }
    }
@@ -3293,15 +3293,15 @@
    "criteria_detail": {},
    "floor_ok": true,
    "floor_reasons": [],
-   "seconds": 9.65,
-   "draw_seconds": 8.72,
+   "seconds": 9.53,
+   "draw_seconds": 8.61,
    "peak_mb": "not measured",
    "svg_bytes": 355515,
    "png_bytes": 1182331,
    "process": {
     "exit": 0,
     "seconds": 19.73,
-    "max_rss_mb": 230.6,
+    "max_rss_mb": 228.7,
     "timed_out": false
    },
    "files": {
@@ -3359,8 +3359,8 @@
     "harness_error": null,
     "process": {
      "exit": 0,
-     "seconds": 44.68,
-     "max_rss_mb": 270.6,
+     "seconds": 44.22,
+     "max_rss_mb": 268.2,
      "timed_out": false
     }
    }
@@ -3379,15 +3379,15 @@
    "criteria_detail": {},
    "floor_ok": true,
    "floor_reasons": [],
-   "seconds": 3.4,
-   "draw_seconds": 3.34,
+   "seconds": 3.41,
+   "draw_seconds": 3.35,
    "peak_mb": "not measured",
    "svg_bytes": 214675,
    "png_bytes": 703525,
    "process": {
     "exit": 0,
-    "seconds": 11.67,
-    "max_rss_mb": 182.2,
+    "seconds": 11.57,
+    "max_rss_mb": 181.6,
     "timed_out": false
    },
    "files": {
@@ -3445,8 +3445,8 @@
     "harness_error": null,
     "process": {
      "exit": 0,
-     "seconds": 27.74,
-     "max_rss_mb": 245.4,
+     "seconds": 27.34,
+     "max_rss_mb": 244.4,
      "timed_out": false
     }
    }
@@ -3466,14 +3466,14 @@
    "floor_ok": true,
    "floor_reasons": [],
    "seconds": 0.78,
-   "draw_seconds": 0.75,
+   "draw_seconds": 0.74,
    "peak_mb": "not measured",
    "svg_bytes": 133177,
    "png_bytes": 367586,
    "process": {
     "exit": 0,
-    "seconds": 3.61,
-    "max_rss_mb": 145.0,
+    "seconds": 3.56,
+    "max_rss_mb": 145.7,
     "timed_out": false
    },
    "files": {
@@ -3531,8 +3531,8 @@
     "harness_error": null,
     "process": {
      "exit": 0,
-     "seconds": 7.36,
-     "max_rss_mb": 232.1,
+     "seconds": 7.21,
+     "max_rss_mb": 232.6,
      "timed_out": false
     }
    }
@@ -3558,8 +3558,8 @@
    "png_bytes": 1003083,
    "process": {
     "exit": 0,
-    "seconds": 6.06,
-    "max_rss_mb": 165.2,
+    "seconds": 5.96,
+    "max_rss_mb": 164.3,
     "timed_out": false
    },
    "files": {
@@ -3617,8 +3617,8 @@
     "harness_error": null,
     "process": {
      "exit": 0,
-     "seconds": 11.97,
-     "max_rss_mb": 237.0,
+     "seconds": 11.72,
+     "max_rss_mb": 237.6,
      "timed_out": false
     }
    }
@@ -3637,15 +3637,15 @@
    "criteria_detail": {},
    "floor_ok": true,
    "floor_reasons": [],
-   "seconds": 0.94,
-   "draw_seconds": 0.9,
+   "seconds": 0.96,
+   "draw_seconds": 0.91,
    "peak_mb": "not measured",
    "svg_bytes": 201653,
    "png_bytes": 544105,
    "process": {
     "exit": 0,
-    "seconds": 4.21,
-    "max_rss_mb": 191.5,
+    "seconds": 4.16,
+    "max_rss_mb": 191.7,
     "timed_out": false
    },
    "files": {
@@ -3703,8 +3703,8 @@
     "harness_error": null,
     "process": {
      "exit": 0,
-     "seconds": 8.26,
-     "max_rss_mb": 255.1,
+     "seconds": 8.01,
+     "max_rss_mb": 255.6,
      "timed_out": false
     }
    }
@@ -3723,15 +3723,15 @@
    "criteria_detail": {},
    "floor_ok": true,
    "floor_reasons": [],
-   "seconds": 1.03,
-   "draw_seconds": 0.98,
+   "seconds": 1.0,
+   "draw_seconds": 0.96,
    "peak_mb": "not measured",
    "svg_bytes": 208806,
    "png_bytes": 616032,
    "process": {
     "exit": 0,
-    "seconds": 4.46,
-    "max_rss_mb": 194.3,
+    "seconds": 4.36,
+    "max_rss_mb": 193.5,
     "timed_out": false
    },
    "files": {
@@ -3789,8 +3789,8 @@
     "harness_error": null,
     "process": {
      "exit": 0,
-     "seconds": 8.51,
-     "max_rss_mb": 256.4,
+     "seconds": 8.41,
+     "max_rss_mb": 255.2,
      "timed_out": false
     }
    }
@@ -3809,15 +3809,15 @@
    "criteria_detail": {},
    "floor_ok": true,
    "floor_reasons": [],
-   "seconds": 0.69,
-   "draw_seconds": 0.66,
+   "seconds": 0.68,
+   "draw_seconds": 0.64,
    "peak_mb": "not measured",
    "svg_bytes": 248132,
    "png_bytes": 656919,
    "process": {
     "exit": 0,
-    "seconds": 3.46,
-    "max_rss_mb": 168.6,
+    "seconds": 3.3,
+    "max_rss_mb": 168.9,
     "timed_out": false
    },
    "files": {
@@ -3875,8 +3875,8 @@
     "harness_error": null,
     "process": {
      "exit": 0,
-     "seconds": 6.71,
-     "max_rss_mb": 255.3,
+     "seconds": 6.56,
+     "max_rss_mb": 254.7,
      "timed_out": false
     }
    }
@@ -3895,15 +3895,15 @@
    "criteria_detail": {},
    "floor_ok": true,
    "floor_reasons": [],
-   "seconds": 0.69,
-   "draw_seconds": 0.66,
+   "seconds": 0.66,
+   "draw_seconds": 0.63,
    "peak_mb": "not measured",
    "svg_bytes": 254072,
    "png_bytes": 709047,
    "process": {
     "exit": 0,
-    "seconds": 3.46,
-    "max_rss_mb": 167.6,
+    "seconds": 3.3,
+    "max_rss_mb": 169.1,
     "timed_out": false
    },
    "files": {
@@ -3961,8 +3961,8 @@
     "harness_error": null,
     "process": {
      "exit": 0,
-     "seconds": 6.71,
-     "max_rss_mb": 255.4,
+     "seconds": 6.51,
+     "max_rss_mb": 257.1,
      "timed_out": false
     }
    }
@@ -3988,8 +3988,8 @@
    "png_bytes": 101974,
    "process": {
     "exit": 0,
-    "seconds": 1.65,
-    "max_rss_mb": 138.6,
+    "seconds": 1.6,
+    "max_rss_mb": 140.1,
     "timed_out": false
    },
    "files": {
@@ -4048,7 +4048,7 @@
     "process": {
      "exit": 0,
      "seconds": 3.05,
-     "max_rss_mb": 228.6,
+     "max_rss_mb": 227.8,
      "timed_out": false
     }
    }
@@ -4074,7 +4074,7 @@
    "png_bytes": 307203,
    "process": {
     "exit": 0,
-    "seconds": 2.0,
+    "seconds": 1.9,
     "max_rss_mb": 155.3,
     "timed_out": false
    },
@@ -4133,8 +4133,8 @@
     "harness_error": null,
     "process": {
      "exit": 0,
-     "seconds": 3.66,
-     "max_rss_mb": 243.6,
+     "seconds": 3.6,
+     "max_rss_mb": 243.7,
      "timed_out": false
     }
    }
@@ -4154,14 +4154,14 @@
    "floor_ok": true,
    "floor_reasons": [],
    "seconds": 0.26,
-   "draw_seconds": 0.23,
+   "draw_seconds": 0.24,
    "peak_mb": "not measured",
    "svg_bytes": 127693,
    "png_bytes": 380430,
    "process": {
     "exit": 0,
-    "seconds": 1.95,
-    "max_rss_mb": 135.5,
+    "seconds": 1.9,
+    "max_rss_mb": 135.9,
     "timed_out": false
    },
    "files": {
@@ -4219,7 +4219,7 @@
     "harness_error": null,
     "process": {
      "exit": 0,
-     "seconds": 3.61,
+     "seconds": 3.4,
      "max_rss_mb": 226.7,
      "timed_out": false
     }

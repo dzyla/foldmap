@@ -1,19 +1,19 @@
 {
  "source_stamp": {
   "foldmap": "0.1.0",
-  "code_fingerprint": "43e1d11adf24d91b",
+  "code_fingerprint": "372baafb4776372e",
   "package": "checkout",
-  "checkout_fingerprint": "43e1d11adf24d91b",
+  "checkout_fingerprint": "372baafb4776372e",
   "installed_matches_checkout": true,
   "git": {
-   "commit": "552687f251ea5267724c253c1e74778ce4bee5e0",
+   "commit": "7f14eaf53d8baa28d6839537de5ea0577d4bac45",
    "dirty": false,
    "dirty_paths": [],
    "source": "git"
   },
   "script": {
    "name": "scripts/app29_fix.py",
-   "sha256": "f9ba7e369dccc0d5ef1a6763bb8fce3b36a65cac0dc449951f6eca392389e537"
+   "sha256": "5501bb48c86170693fd634bb5c34a5dd25da73870df6c30c17a5c65c74d24fdf"
   },
   "python": {
    "version": "3.12.9",
@@ -70,12 +70,12 @@
   "after_record": "docs/validation/app29/fix-ligand/run",
   "after_stamp": {
    "foldmap": "0.1.0",
-   "code_fingerprint": "43e1d11adf24d91b",
+   "code_fingerprint": "372baafb4776372e",
    "package": "checkout",
-   "checkout_fingerprint": "43e1d11adf24d91b",
+   "checkout_fingerprint": "372baafb4776372e",
    "installed_matches_checkout": true,
    "git": {
-    "commit": "6ebc5c847704ae8ba9734708b6bdd3fc300125e3",
+    "commit": "9560be793b255cfd524e313c91f4efdde095ab72",
     "dirty": false,
     "source": "asserted by runner"
    },
@@ -134,12 +134,12 @@
   },
   "runs_after_stamp": {
    "foldmap": "0.1.0",
-   "code_fingerprint": "43e1d11adf24d91b",
+   "code_fingerprint": "372baafb4776372e",
    "package": "checkout",
-   "checkout_fingerprint": "43e1d11adf24d91b",
+   "checkout_fingerprint": "372baafb4776372e",
    "installed_matches_checkout": true,
    "git": {
-    "commit": "6ebc5c847704ae8ba9734708b6bdd3fc300125e3",
+    "commit": "9560be793b255cfd524e313c91f4efdde095ab72",
     "dirty": false,
     "source": "asserted by runner"
    },
@@ -164,21 +164,21 @@
     "PyYAML": "6.0.3"
    }
   },
-  "marks_before_foldmap": "/tmp/claude-1000/-home-dzyla-foldmap/23e71d62-5b86-4ba7-832d-8711a9baf021/scratchpad/t4/base/src/foldmap",
+  "marks_before_foldmap": "/tmp/claude-1000/-home-dzyla-foldmap/23e71d62-5b86-4ba7-832d-8711a9baf021/scratchpad/t4/base2/src/foldmap",
   "marks_before_stamp": {
    "foldmap": "0.1.0",
    "code_fingerprint": "f624dcc2403b2888",
    "package": "installed",
-   "checkout_fingerprint": "43e1d11adf24d91b",
+   "checkout_fingerprint": "372baafb4776372e",
    "installed_matches_checkout": false,
    "git": {
-    "commit": "552687f251ea5267724c253c1e74778ce4bee5e0",
+    "commit": "7f14eaf53d8baa28d6839537de5ea0577d4bac45",
     "dirty": false,
     "source": "asserted by runner"
    },
    "script": {
     "name": "scripts/app29_fix.py",
-    "sha256": "f9ba7e369dccc0d5ef1a6763bb8fce3b36a65cac0dc449951f6eca392389e537"
+    "sha256": "5501bb48c86170693fd634bb5c34a5dd25da73870df6c30c17a5c65c74d24fdf"
    },
    "python": {
     "version": "3.13.13",
@@ -200,18 +200,18 @@
   "marks_after_foldmap": "/home/dzyla/foldmap/src/foldmap",
   "marks_after_stamp": {
    "foldmap": "0.1.0",
-   "code_fingerprint": "43e1d11adf24d91b",
+   "code_fingerprint": "372baafb4776372e",
    "package": "checkout",
-   "checkout_fingerprint": "43e1d11adf24d91b",
+   "checkout_fingerprint": "372baafb4776372e",
    "installed_matches_checkout": true,
    "git": {
-    "commit": "552687f251ea5267724c253c1e74778ce4bee5e0",
+    "commit": "7f14eaf53d8baa28d6839537de5ea0577d4bac45",
     "dirty": false,
     "source": "asserted by runner"
    },
    "script": {
     "name": "scripts/app29_fix.py",
-    "sha256": "f9ba7e369dccc0d5ef1a6763bb8fce3b36a65cac0dc449951f6eca392389e537"
+    "sha256": "5501bb48c86170693fd634bb5c34a5dd25da73870df6c30c17a5c65c74d24fdf"
    },
    "python": {
     "version": "3.13.13",
@@ -270,7 +270,7 @@
     ],
     "seconds": [
      0.27,
-     0.25
+     0.27
     ]
    },
    {
@@ -302,7 +302,7 @@
     ],
     "seconds": [
      0.28,
-     0.25
+     0.28
     ]
    },
    {
@@ -334,7 +334,7 @@
     ],
     "seconds": [
      0.25,
-     0.24
+     0.25
     ]
    },
    {
@@ -366,7 +366,7 @@
     ],
     "seconds": [
      0.27,
-     0.25
+     0.26
     ]
    },
    {
@@ -398,7 +398,7 @@
     ],
     "seconds": [
      0.24,
-     0.23
+     0.24
     ]
    },
    {
@@ -430,7 +430,7 @@
     ],
     "seconds": [
      0.36,
-     0.35
+     0.36
     ]
    },
    {
@@ -462,7 +462,7 @@
     ],
     "seconds": [
      0.34,
-     0.34
+     0.36
     ]
    },
    {
@@ -494,7 +494,7 @@
     ],
     "seconds": [
      0.61,
-     0.61
+     0.57
     ]
    },
    {
@@ -526,7 +526,7 @@
     ],
     "seconds": [
      1.26,
-     1.28
+     1.24
     ]
    },
    {
@@ -558,7 +558,7 @@
     ],
     "seconds": [
      0.94,
-     0.96
+     0.93
     ]
    },
    {
@@ -590,7 +590,7 @@
     ],
     "seconds": [
      1.22,
-     1.24
+     1.17
     ]
    },
    {
@@ -622,7 +622,7 @@
     ],
     "seconds": [
      0.64,
-     0.65
+     0.63
     ]
    },
    {
@@ -654,7 +654,7 @@
     ],
     "seconds": [
      0.75,
-     0.73
+     0.74
     ]
    },
    {
@@ -718,7 +718,7 @@
     ],
     "seconds": [
      1.32,
-     1.31
+     1.25
     ]
    },
    {
@@ -750,7 +750,7 @@
     ],
     "seconds": [
      0.92,
-     0.94
+     0.91
     ]
    },
    {
@@ -782,7 +782,7 @@
     ],
     "seconds": [
      3.68,
-     3.63
+     3.61
     ]
    },
    {
@@ -814,7 +814,7 @@
     ],
     "seconds": [
      0.28,
-     0.27
+     0.28
     ]
    },
    {
@@ -878,7 +878,7 @@
     ],
     "seconds": [
      13.14,
-     13.05
+     12.97
     ]
    },
    {
@@ -910,7 +910,7 @@
     ],
     "seconds": [
      1.52,
-     1.51
+     1.52
     ]
    },
    {
@@ -942,7 +942,7 @@
     ],
     "seconds": [
      1.19,
-     1.2
+     1.18
     ]
    },
    {
@@ -974,7 +974,7 @@
     ],
     "seconds": [
      1.01,
-     1.14
+     1.16
     ]
    },
    {
@@ -1038,7 +1038,7 @@
     ],
     "seconds": [
      0.47,
-     0.47
+     0.46
     ]
    },
    {
@@ -1070,7 +1070,7 @@
     ],
     "seconds": [
      1.59,
-     1.63
+     1.57
     ]
    },
    {
@@ -1104,7 +1104,7 @@
     ],
     "seconds": [
      16.83,
-     16.52
+     16.46
     ]
    },
    {
@@ -1168,7 +1168,7 @@
     ],
     "seconds": [
      0.11,
-     0.11
+     0.1
     ]
    },
    {
@@ -1264,7 +1264,7 @@
     ],
     "seconds": [
      2.7,
-     2.64
+     2.66
     ]
    },
    {
@@ -1296,7 +1296,7 @@
     ],
     "seconds": [
      23.66,
-     23.77
+     23.51
     ]
    },
    {
@@ -1328,7 +1328,7 @@
     ],
     "seconds": [
      20.87,
-     20.87
+     20.49
     ]
    },
    {
@@ -1360,7 +1360,7 @@
     ],
     "seconds": [
      1.47,
-     1.48
+     1.44
     ]
    },
    {
@@ -1392,7 +1392,7 @@
     ],
     "seconds": [
      0.36,
-     0.43
+     0.42
     ]
    },
    {
@@ -1424,7 +1424,7 @@
     ],
     "seconds": [
      9.77,
-     9.65
+     9.53
     ]
    },
    {
@@ -1456,7 +1456,7 @@
     ],
     "seconds": [
      3.37,
-     3.4
+     3.41
     ]
    },
    {
@@ -1552,7 +1552,7 @@
     ],
     "seconds": [
      0.95,
-     0.94
+     0.96
     ]
    },
    {
@@ -1584,7 +1584,7 @@
     ],
     "seconds": [
      1.01,
-     1.03
+     1.0
     ]
    },
    {
@@ -1616,7 +1616,7 @@
     ],
     "seconds": [
      0.68,
-     0.69
+     0.68
     ]
    },
    {
@@ -1648,7 +1648,7 @@
     ],
     "seconds": [
      0.68,
-     0.69
+     0.66
     ]
    },
    {
@@ -1783,12 +1783,14 @@
   "better": [],
   "moved": [],
   "svg_moved": [
+   "1NID",
    "3ABR",
    "3G6E",
    "3WAU",
+   "4GWY",
    "5S4U",
    "6IZP",
-   "6QIK",
+   "6PO4",
    "6VBG",
    "7F5S",
    "7XBK",
@@ -1817,8 +1819,7 @@
   "moved": [],
   "svg_moved": [
    "1KX5",
-   "6IZP",
-   "6QIK"
+   "6IZP"
   ],
   "entries": 46
  },
@@ -1848,6 +1849,10 @@
    "c9": [
     4.6,
     4.435
+   ],
+   "text_crossings": [
+    0,
+    0
    ],
    "on_loop": [
     [
@@ -1924,6 +1929,10 @@
     14.378,
     13.368
    ],
+   "text_crossings": [
+    2,
+    0
+   ],
    "on_loop": [
     [
      "A1J4K:A306"
@@ -1998,6 +2007,10 @@
    "c9": [
     318.723,
     313.709
+   ],
+   "text_crossings": [
+    60,
+    60
    ],
    "on_loop": [
     [
@@ -2520,6 +2533,10 @@
     41.962,
     41.284
    ],
+   "text_crossings": [
+    15,
+    14
+   ],
    "on_loop": [
     [],
     []
@@ -2592,6 +2609,10 @@
    "c9": [
     2.23,
     2.23
+   ],
+   "text_crossings": [
+    0,
+    0
    ],
    "on_loop": [
     [
@@ -2666,6 +2687,10 @@
    594.605,
    587.131
   ],
+  "text_crossings": [
+   121,
+   118
+  ],
   "c9": [
    625.147,
    618.28
@@ -2689,6 +2714,10 @@
    "c9": [
     0.0,
     0.0
+   ],
+   "text_crossings": [
+    0,
+    0
    ],
    "on_loop": [
     [
@@ -2742,6 +2771,120 @@
     }
    ]
   },
+  "1NID": {
+   "marks": [
+    9,
+    9
+   ],
+   "over_bodies": [
+    13.984,
+    16.304
+   ],
+   "along_loops": [
+    0.0,
+    0.0
+   ],
+   "c9": [
+    13.984,
+    16.304
+   ],
+   "text_crossings": [
+    3,
+    2
+   ],
+   "on_loop": [
+    [
+     "NO2:A1503"
+    ],
+    []
+   ],
+   "crowded": [
+    0,
+    0
+   ],
+   "longest_cross_chain_tether": [
+    null,
+    null
+   ],
+   "moved": [
+    {
+     "mark": "NO2:A1503",
+     "from": [
+      -25.874,
+      0.145
+     ],
+     "to": [
+      -22.48,
+      3.3
+     ],
+     "on_loop": [
+      0.54,
+      0.0
+     ],
+     "over_bodies": [
+      1.645,
+      3.971
+     ],
+     "along_loops": [
+      0.0,
+      0.0
+     ],
+     "longest_tether": [
+      2.138,
+      5.992
+     ],
+     "tethers": [
+      [
+       0.757,
+       2.138,
+       1.78
+      ],
+      [
+       4.738,
+       5.992,
+       2.959
+      ]
+     ]
+    },
+    {
+     "mark": "CU:A1502",
+     "from": [
+      -26.329,
+      -1.411
+     ],
+     "to": [
+      -26.329,
+      0.432
+     ],
+     "on_loop": [
+      0.0,
+      0.0
+     ],
+     "over_bodies": [
+      1.531,
+      1.525
+     ],
+     "along_loops": [
+      0.0,
+      0.0
+     ],
+     "longest_tether": [
+      3.126,
+      2.549
+     ],
+     "tethers": [
+      [
+       1.076,
+       3.126
+      ],
+      [
+       2.549,
+       2.105
+      ]
+     ]
+    }
+   ]
+  },
   "3ABR": {
    "marks": [
     1,
@@ -2758,6 +2901,10 @@
    "c9": [
     7.466,
     5.989
+   ],
+   "text_crossings": [
+    1,
+    1
    ],
    "on_loop": [
     [
@@ -2833,6 +2980,10 @@
    "c9": [
     19.022,
     9.601
+   ],
+   "text_crossings": [
+    7,
+    7
    ],
    "on_loop": [
     [
@@ -3017,6 +3168,10 @@
     5.049,
     3.014
    ],
+   "text_crossings": [
+    0,
+    0
+   ],
    "on_loop": [
     [
      "M1P:A1404"
@@ -3075,6 +3230,128 @@
     }
    ]
   },
+  "4GWY": {
+   "marks": [
+    20,
+    20
+   ],
+   "over_bodies": [
+    79.808,
+    79.81
+   ],
+   "along_loops": [
+    2.786,
+    2.786
+   ],
+   "c9": [
+    82.594,
+    82.596
+   ],
+   "text_crossings": [
+    20,
+    16
+   ],
+   "on_loop": [
+    [
+     "MG:A1404",
+     "MG:A2404",
+     "MG:A3404",
+     "MG:A4404"
+    ],
+    [
+     "MG:A1404",
+     "MG:A2404"
+    ]
+   ],
+   "crowded": [
+    0,
+    0
+   ],
+   "longest_cross_chain_tether": [
+    null,
+    null
+   ],
+   "moved": [
+    {
+     "mark": "MG:A3404",
+     "from": [
+      -12.11,
+      8.797
+     ],
+     "to": [
+      -13.261,
+      10.732
+     ],
+     "on_loop": [
+      0.6,
+      0.0
+     ],
+     "over_bodies": [
+      4.437,
+      4.438
+     ],
+     "along_loops": [
+      0.0,
+      0.0
+     ],
+     "longest_tether": [
+      7.032,
+      7.115
+     ],
+     "tethers": [
+      [
+       3.004,
+       4.868,
+       7.032
+      ],
+      [
+       5.21,
+       7.115,
+       5.731
+      ]
+     ]
+    },
+    {
+     "mark": "MG:A4404",
+     "from": [
+      3.135,
+      8.797
+     ],
+     "to": [
+      1.984,
+      10.732
+     ],
+     "on_loop": [
+      0.6,
+      0.0
+     ],
+     "over_bodies": [
+      4.437,
+      4.438
+     ],
+     "along_loops": [
+      0.0,
+      0.0
+     ],
+     "longest_tether": [
+      7.032,
+      7.115
+     ],
+     "tethers": [
+      [
+       3.004,
+       4.868,
+       7.032
+      ],
+      [
+       5.21,
+       7.115,
+       5.731
+      ]
+     ]
+    }
+   ]
+  },
   "5S4U": {
    "marks": [
     12,
@@ -3091,6 +3368,10 @@
    "c9": [
     21.882,
     20.989
+   ],
+   "text_crossings": [
+    4,
+    3
    ],
    "on_loop": [
     [
@@ -3167,6 +3448,10 @@
     0.0,
     0.0
    ],
+   "text_crossings": [
+    0,
+    0
+   ],
    "on_loop": [
     [],
     []
@@ -3221,26 +3506,31 @@
     }
    ]
   },
-  "6QIK": {
+  "6PO4": {
    "marks": [
-    7,
-    7
+    6,
+    6
    ],
    "over_bodies": [
-    6.529,
-    7.354
+    38.937,
+    44.182
    ],
    "along_loops": [
-    6.288,
-    0.242
+    0.498,
+    0.498
    ],
    "c9": [
-    12.817,
-    7.596
+    39.435,
+    44.68
+   ],
+   "text_crossings": [
+    7,
+    5
    ],
    "on_loop": [
     [
-     "ZN:g201"
+     "ADE:A302",
+     "ADE:B301"
     ],
     []
    ],
@@ -3254,43 +3544,84 @@
    ],
    "moved": [
     {
-     "mark": "ZN:g201",
+     "mark": "ADE:A302",
      "from": [
-      47.978,
-      -24.861
+      -7.99,
+      4.507
      ],
      "to": [
-      44.368,
-      -25.588
+      -1.452,
+      2.884
      ],
      "on_loop": [
-      0.6,
+      0.397,
       0.0
      ],
      "over_bodies": [
-      0.63,
-      1.455
+      11.111,
+      13.729
      ],
      "along_loops": [
-      6.288,
-      0.242
+      0.0,
+      0.0
      ],
      "longest_tether": [
-      7.433,
-      7.545
+      6.633,
+      8.041
      ],
      "tethers": [
       [
-       3.894,
-       2.394,
-       6.751,
-       7.433
+       2.127,
+       6.633,
+       5.711,
+       0.545
       ],
       [
-       7.545,
-       6.055,
-       4.159,
-       5.06
+       8.041,
+       7.947,
+       4.912,
+       7.052
+      ]
+     ]
+    },
+    {
+     "mark": "ADE:B301",
+     "from": [
+      7.697,
+      4.507
+     ],
+     "to": [
+      1.473,
+      2.884
+     ],
+     "on_loop": [
+      0.54,
+      0.0
+     ],
+     "over_bodies": [
+      11.102,
+      13.729
+     ],
+     "along_loops": [
+      0.0,
+      0.0
+     ],
+     "longest_tether": [
+      6.623,
+      8.041
+     ],
+     "tethers": [
+      [
+       2.359,
+       6.623,
+       5.558,
+       0.805
+      ],
+      [
+       8.041,
+       7.947,
+       4.912,
+       7.052
       ]
      ]
     }
@@ -3312,6 +3643,10 @@
    "c9": [
     20.134,
     19.823
+   ],
+   "text_crossings": [
+    4,
+    4
    ],
    "on_loop": [
     [
@@ -3429,6 +3764,10 @@
     13.993,
     13.993
    ],
+   "text_crossings": [
+    8,
+    8
+   ],
    "on_loop": [
     [
      "MG:LV201",
@@ -3491,15 +3830,19 @@
    ],
    "over_bodies": [
     48.148,
-    43.086
+    45.863
    ],
    "along_loops": [
     3.59,
-    0.985
+    2.329
    ],
    "c9": [
     51.738,
-    44.071
+    48.192
+   ],
+   "text_crossings": [
+    3,
+    2
    ],
    "on_loop": [
     [
@@ -3512,7 +3855,6 @@
     ],
     [
      "ATP:A701",
-     "ATP:G702",
      "MG:G701",
      "MG:H701"
     ]
@@ -3603,6 +3945,47 @@
      ]
     },
     {
+     "mark": "ATP:G702",
+     "from": [
+      -17.052,
+      -14.139
+     ],
+     "to": [
+      -20.057,
+      -15.082
+     ],
+     "on_loop": [
+      0.54,
+      0.0
+     ],
+     "over_bodies": [
+      5.835,
+      8.612
+     ],
+     "along_loops": [
+      0.0,
+      1.344
+     ],
+     "longest_tether": [
+      8.698,
+      8.438
+     ],
+     "tethers": [
+      [
+       4.416,
+       4.594,
+       4.794,
+       8.698
+      ],
+      [
+       6.416,
+       6.129,
+       4.457,
+       8.438
+      ]
+     ]
+    },
+    {
      "mark": "ATP:H702",
      "from": [
       -2.435,
@@ -3661,6 +4044,10 @@
    "c9": [
     96.301,
     95.832
+   ],
+   "text_crossings": [
+    34,
+    32
    ],
    "on_loop": [
     [
@@ -3724,28 +4111,134 @@
   }
  },
  "marks_elsewhere_total": {
-  "entries": 11,
+  "entries": 13,
   "marks": [
-   184,
-   184
+   212,
+   212
   ],
   "on_loop": [
-   19,
-   5
+   25,
+   6
   ],
   "crowded": [
    0,
    0
   ],
   "over_bodies": [
-   209.243,
-   200.269
+   335.443,
+   335.988
+  ],
+  "text_crossings": [
+   91,
+   80
   ],
   "c9": [
-   248.402,
-   220.908
+   371.598,
+   361.013
   ]
  },
+ "not_changed": [
+  {
+   "id": "9T57",
+   "mark": "A1JTO:AAA304",
+   "on_line_c9": 5.204,
+   "off_line_c9": 12.383
+  },
+  {
+   "id": "9YOA",
+   "mark": "NAG:A618",
+   "on_line_c9": 0.0,
+   "off_line_c9": 3.448
+  },
+  {
+   "id": "9YOA",
+   "mark": "NAG:B501",
+   "on_line_c9": 3.992,
+   "off_line_c9": 5.318
+  },
+  {
+   "id": "35VC",
+   "mark": "CMP:B501",
+   "on_line_c9": 3.416,
+   "off_line_c9": 4.051
+  },
+  {
+   "id": "35VC",
+   "mark": "CMP:C501",
+   "on_line_c9": 3.449,
+   "off_line_c9": 4.165
+  },
+  {
+   "id": "35VC",
+   "mark": "CMP:D502",
+   "on_line_c9": 3.481,
+   "off_line_c9": 4.23
+  }
+ ],
+ "look_concerns": [
+  {
+   "id": "9WNE",
+   "seen": "the Mg's two tethers, to R's and W's tips, which lie level, run along one line, one over the other: the far step's first zero-C9 spot is at angle 0 on its ring, and no check sees tethers drawn along each other (C9 counts loop lines only; parked by ruling P29-10 for the Task N+1 look test)",
+   "moves": [
+    {
+     "mark": "MG:A1302",
+     "moved": 4.409,
+     "tethers": [
+      [
+       0.788,
+       0.982
+      ],
+      [
+       4.75,
+       3.65
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "id": "1KX5",
+   "seen": "the Mn left a loop line for a spot further out; its tether is several times longer (the move below), won on a C9 tie (0 against 0)",
+   "moves": [
+    {
+     "mark": "MN:E3132",
+     "moved": 3.953,
+     "tethers": [
+      [
+       1.05
+      ],
+      [
+       3.5
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "id": "9X4L",
+   "seen": "ADP 32001's home tether to the target 15 units off is 13.9 units long, drawn in pieces under alpha17 and alpha18: ruled policy, home tethers are unpriced (plan 11; A20 bounds tethers to other chains only)",
+   "moves": [
+    {
+     "mark": "ADP:32001",
+     "moved": 5.777,
+     "tethers": [
+      [
+       2.418,
+       8.493,
+       8.218,
+       7.885
+      ],
+      [
+       4.467,
+       13.881,
+       2.919,
+       3.115
+      ]
+     ]
+    }
+   ]
+  }
+ ],
  "pngs": {
   "9SXF": {
    "before": "docs/superpowers/work/app29/fix-ligand/png/9SXF-before.png",
@@ -3779,10 +4272,7 @@
   "third": [],
   "na": [],
   "bench": [],
-  "marks_on_loop": [],
-  "marks_crowded": [],
-  "marks_c9": [],
-  "marks_elsewhere": []
+  "marks": []
  },
  "better": {
   "tune": [
@@ -3791,17 +4281,24 @@
   "check": [],
   "third": [],
   "na": [],
-  "marks_on_loop": [
+  "marks": [
    "9SXF",
    "29TB",
    "31FD",
-   "9WNE"
-  ],
-  "marks_c9": [
-   "9SXF",
-   "29TB",
-   "31FD",
-   "9X4L"
+   "9X4L",
+   "9WNE",
+   "1KX5",
+   "1NID",
+   "3ABR",
+   "3G6E",
+   "3WAU",
+   "4GWY",
+   "5S4U",
+   "6PO4",
+   "6VBG",
+   "7F5S",
+   "7XBK",
+   "8EM7"
   ]
  },
  "verdict": "better",
