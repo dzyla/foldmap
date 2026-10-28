@@ -1,0 +1,143 @@
+{
+ "name": "fix-screw",
+ "source_stamp": {
+  "foldmap": "0.1.0",
+  "code_fingerprint": "79fd1bbcb0016900",
+  "package": "checkout",
+  "checkout_fingerprint": "79fd1bbcb0016900",
+  "installed_matches_checkout": true,
+  "git": {
+   "commit": "4ccb38fac4ea26ec2ba976e1bf90e44a35f72c85",
+   "dirty": false,
+   "dirty_paths": [],
+   "source": "git"
+  },
+  "script": {
+   "name": "scripts/app29_light.py",
+   "sha256": "58d476266ef781ab12fc04204545de95bbbe991bc23cd8248507347930be9b8f"
+  },
+  "python": {
+   "version": "3.12.9",
+   "implementation": "CPython"
+  },
+  "platform": {
+   "platform": "Linux-6.18.33.1-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+   "machine": "x86_64"
+  },
+  "packages": {
+   "gemmi": "0.7.5",
+   "numpy": "2.5.3",
+   "scipy": "1.18.1",
+   "networkx": "3.7",
+   "matplotlib": "3.11.2",
+   "PyYAML": "6.0.3"
+  }
+ },
+ "fix": {
+  "title": "Plan 29 Task 6: the screw search without n^4 pair fits (triage proposal 3, ruling P29-7)",
+  "mechanism": "symmetry._helical tried every pair of copies as the screw and tested each on every copy against every member of its cluster: n^4/2 pair fits (23FR's 42 copies: 1.26 million _Assembly.pair calls). A fit's RMSD is at least the distance between the moved and the target centroids of its matched atoms, so a member whose centroid lands farther than the tolerance (plus 1e-6 \u00c5 for rounding) is passed over unfitted; the first member within the tolerance, in cluster order, is the one the full search took.",
+  "named": [
+   "23FR"
+  ],
+  "expected": "23FR's time only; every figure byte-identical"
+ },
+ "before": "docs/validation/app29/fix-floor/run",
+ "after": "docs/validation/app29/fix-screw/run",
+ "tune": {
+  "entries": [
+   47,
+   47
+  ],
+  "missing": [],
+  "svg_changed": [],
+  "png_changed": [],
+  "criteria_changed": [],
+  "named_seconds": {
+   "23FR": {
+    "draw": [
+     8.82,
+     0.69
+    ],
+    "entry": [
+     17.2,
+     0.98
+    ]
+   }
+  },
+  "draw_seconds_total": [
+   118.76,
+   109.75
+  ],
+  "stamps": [
+   {
+    "commit": "975f33637ebbe8fa4c6ed861d8b95844f0cf5313",
+    "dirty": false,
+    "source": "asserted by runner"
+   },
+   {
+    "commit": "9fd9c0e01b9177fb2a64ab1afad76fc9dcb3460b",
+    "dirty": false,
+    "source": "asserted by runner"
+   }
+  ]
+ },
+ "bench": {
+  "exit": 0,
+  "entries": 22,
+  "identical": 22,
+  "notes": {
+   "1BL8": "identical",
+   "1C3W": "identical",
+   "1EMA": "identical",
+   "1LMB": "identical",
+   "1TIM": "identical",
+   "1UBQ": "identical",
+   "1ZAA": "identical",
+   "25IN": "identical",
+   "2HHB": "identical",
+   "2JTY": "identical",
+   "2LZM": "identical",
+   "4CH9": "identical",
+   "5NKT": "identical",
+   "6R74": "identical",
+   "6Y7S": "identical",
+   "6ZS5": "identical",
+   "6ZYA": "identical",
+   "8UTF": "identical",
+   "8UUP": "identical",
+   "9TX7": "identical",
+   "AF-P04637": "identical",
+   "big32": "identical"
+  }
+ },
+ "measure": {
+  "file": "helical.json",
+  "kind": "helical",
+  "summary": {
+   "structures": 664,
+   "measured": 664,
+   "skipped": [],
+   "differ": [],
+   "helical_found": {
+    "min4": 20,
+    "min3": 20
+   },
+   "pair_calls": [
+    7690410,
+    47790
+   ],
+   "seconds": [
+    51.38,
+    3.6
+   ],
+   "more_pair_calls": [
+    "6TIK"
+   ],
+   "slowest_by": [
+    0.007,
+    "8FZN"
+   ]
+  }
+ },
+ "verdict": "kept"
+}
