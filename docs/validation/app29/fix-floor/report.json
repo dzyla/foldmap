@@ -1,0 +1,2456 @@
+{
+ "source_stamp": {
+  "foldmap": "0.1.0",
+  "code_fingerprint": "5ef865ec11fd82a1",
+  "package": "checkout",
+  "checkout_fingerprint": "5ef865ec11fd82a1",
+  "installed_matches_checkout": true,
+  "git": {
+   "commit": "9869e37568f4cbbb9d2c47397ea93bfd35f15d03",
+   "dirty": false,
+   "dirty_paths": [],
+   "source": "git"
+  },
+  "script": {
+   "name": "scripts/app29_fix.py",
+   "sha256": "f554f34e1941b32e0502f81f37449cb99f1a39ce9c89a3e2d94486aadb06a2d5"
+  },
+  "python": {
+   "version": "3.12.9",
+   "implementation": "CPython"
+  },
+  "platform": {
+   "platform": "Linux-6.18.33.1-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+   "machine": "x86_64"
+  },
+  "packages": {
+   "gemmi": "0.7.5",
+   "numpy": "2.5.3",
+   "scipy": "1.18.1",
+   "networkx": "3.7",
+   "matplotlib": "3.11.2",
+   "PyYAML": "6.0.3"
+  }
+ },
+ "name": "fix-floor",
+ "inputs": {
+  "before_record": "docs/validation/app29/fix-ligand/run",
+  "before_stamp": {
+   "foldmap": "0.1.0",
+   "code_fingerprint": "372baafb4776372e",
+   "package": "checkout",
+   "checkout_fingerprint": "372baafb4776372e",
+   "installed_matches_checkout": true,
+   "git": {
+    "commit": "9560be793b255cfd524e313c91f4efdde095ab72",
+    "dirty": false,
+    "source": "asserted by runner"
+   },
+   "script": {
+    "name": "scripts/app29.py",
+    "sha256": "cdf60fa1e05239c2d5fcd93ce5d5945f8e260122ff9af7ed8a25b61ffa6f605e"
+   },
+   "python": {
+    "version": "3.13.13",
+    "implementation": "CPython"
+   },
+   "platform": {
+    "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+    "machine": "x86_64"
+   },
+   "packages": {
+    "gemmi": "0.7.5",
+    "numpy": "2.5.4",
+    "scipy": "1.18.1",
+    "networkx": "3.7",
+    "matplotlib": "3.11.2",
+    "PyYAML": "6.0.3"
+   }
+  },
+  "after_record": "docs/validation/app29/fix-floor/run",
+  "after_stamp": {
+   "foldmap": "0.1.0",
+   "code_fingerprint": "5ef865ec11fd82a1",
+   "package": "checkout",
+   "checkout_fingerprint": "5ef865ec11fd82a1",
+   "installed_matches_checkout": true,
+   "git": {
+    "commit": "76fbad7c760cc54b45b5a9d2a85ff5043d37b70b",
+    "dirty": false,
+    "source": "asserted by runner"
+   },
+   "script": {
+    "name": "scripts/app29.py",
+    "sha256": "cdf60fa1e05239c2d5fcd93ce5d5945f8e260122ff9af7ed8a25b61ffa6f605e"
+   },
+   "python": {
+    "version": "3.13.13",
+    "implementation": "CPython"
+   },
+   "platform": {
+    "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+    "machine": "x86_64"
+   },
+   "packages": {
+    "gemmi": "0.7.5",
+    "numpy": "2.5.4",
+    "scipy": "1.18.1",
+    "networkx": "3.7",
+    "matplotlib": "3.11.2",
+    "PyYAML": "6.0.3"
+   }
+  },
+  "runs_before_stamp": {
+   "foldmap": "0.1.0",
+   "code_fingerprint": "372baafb4776372e",
+   "package": "checkout",
+   "checkout_fingerprint": "372baafb4776372e",
+   "installed_matches_checkout": true,
+   "git": {
+    "commit": "9560be793b255cfd524e313c91f4efdde095ab72",
+    "dirty": false,
+    "source": "asserted by runner"
+   },
+   "script": {
+    "name": "scripts/random100.py",
+    "sha256": "b552d3c3d4b358ca960e55c1a684f2dd5f20d9e863b3efac735b9a9ba6d89aff"
+   },
+   "python": {
+    "version": "3.13.13",
+    "implementation": "CPython"
+   },
+   "platform": {
+    "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+    "machine": "x86_64"
+   },
+   "packages": {
+    "gemmi": "0.7.5",
+    "numpy": "2.5.4",
+    "scipy": "1.18.1",
+    "networkx": "3.7",
+    "matplotlib": "3.11.2",
+    "PyYAML": "6.0.3"
+   }
+  },
+  "runs_after_stamp": {
+   "foldmap": "0.1.0",
+   "code_fingerprint": "5ef865ec11fd82a1",
+   "package": "checkout",
+   "checkout_fingerprint": "5ef865ec11fd82a1",
+   "installed_matches_checkout": true,
+   "git": {
+    "commit": "76fbad7c760cc54b45b5a9d2a85ff5043d37b70b",
+    "dirty": false,
+    "source": "asserted by runner"
+   },
+   "script": {
+    "name": "scripts/random100.py",
+    "sha256": "b552d3c3d4b358ca960e55c1a684f2dd5f20d9e863b3efac735b9a9ba6d89aff"
+   },
+   "python": {
+    "version": "3.13.13",
+    "implementation": "CPython"
+   },
+   "platform": {
+    "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+    "machine": "x86_64"
+   },
+   "packages": {
+    "gemmi": "0.7.5",
+    "numpy": "2.5.4",
+    "scipy": "1.18.1",
+    "networkx": "3.7",
+    "matplotlib": "3.11.2",
+    "PyYAML": "6.0.3"
+   }
+  },
+  "leads_before_foldmap": "/tmp/claude-1000/-home-dzyla-foldmap/23e71d62-5b86-4ba7-832d-8711a9baf021/scratchpad/t5/base/src/foldmap",
+  "leads_after_foldmap": "/home/dzyla/foldmap/src/foldmap",
+  "tune_flags": "/tmp/claude-1000/-home-dzyla-foldmap/23e71d62-5b86-4ba7-832d-8711a9baf021/scratchpad/t5/m-after/tune-flags.json"
+ },
+ "tune": {
+  "entries": 47,
+  "svg_changed": [
+   "31FD"
+  ],
+  "rows": [
+   {
+    "id": "9SXY",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     0.27,
+     0.26
+    ]
+   },
+   {
+    "id": "9SXU",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     0.28,
+     0.27
+    ]
+   },
+   {
+    "id": "9SXF",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     0.25,
+     0.24
+    ]
+   },
+   {
+    "id": "9SXG",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     0.26,
+     0.25
+    ]
+   },
+   {
+    "id": "29LB",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     0.24,
+     0.24
+    ]
+   },
+   {
+    "id": "29TB",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     0.36,
+     0.34
+    ]
+   },
+   {
+    "id": "9T57",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     0.36,
+     0.34
+    ]
+   },
+   {
+    "id": "9ZFX",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     0.57,
+     0.59
+    ]
+   },
+   {
+    "id": "14CU",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     1.24,
+     1.22
+    ]
+   },
+   {
+    "id": "30CY",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     0.93,
+     0.92
+    ]
+   },
+   {
+    "id": "44LS",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     1.17,
+     1.21
+    ]
+   },
+   {
+    "id": "9YL9",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     0.63,
+     0.62
+    ]
+   },
+   {
+    "id": "20XT",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     0.74,
+     0.73
+    ]
+   },
+   {
+    "id": "9WVR",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     0.29,
+     0.27
+    ]
+   },
+   {
+    "id": "9Z0S",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     1.25,
+     1.28
+    ]
+   },
+   {
+    "id": "9TCF",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     0.91,
+     0.89
+    ]
+   },
+   {
+    "id": "9YOA",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     3.61,
+     3.63
+    ]
+   },
+   {
+    "id": "38NR",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     0.28,
+     0.27
+    ]
+   },
+   {
+    "id": "23FR",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     17.24,
+     16.99
+    ]
+   },
+   {
+    "id": "31FD",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     false,
+     true
+    ],
+    "svg_changed": true,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     12.97,
+     15.09
+    ]
+   },
+   {
+    "id": "22VF",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     1.52,
+     1.49
+    ]
+   },
+   {
+    "id": "12XK",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     1.18,
+     1.13
+    ]
+   },
+   {
+    "id": "35VC",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     1.16,
+     1.11
+    ]
+   },
+   {
+    "id": "23CX",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     1.28,
+     1.27
+    ]
+   },
+   {
+    "id": "28HY",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     0.46,
+     0.45
+    ]
+   },
+   {
+    "id": "26EL",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     1.57,
+     1.54
+    ]
+   },
+   {
+    "id": "9X4L",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     16.46,
+     16.46
+    ]
+   },
+   {
+    "id": "9NYA",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     0.14,
+     0.13
+    ]
+   },
+   {
+    "id": "45JF",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     0.1,
+     0.1
+    ]
+   },
+   {
+    "id": "34XH",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     0.13,
+     0.13
+    ]
+   },
+   {
+    "id": "9WXY",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     0.05,
+     0.05
+    ]
+   },
+   {
+    "id": "9ZSJ",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     2.66,
+     2.64
+    ]
+   },
+   {
+    "id": "9YPK",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     23.51,
+     23.33
+    ]
+   },
+   {
+    "id": "9YPN",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     20.49,
+     20.42
+    ]
+   },
+   {
+    "id": "9WNE",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     1.44,
+     1.45
+    ]
+   },
+   {
+    "id": "22MZ",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     0.42,
+     0.43
+    ]
+   },
+   {
+    "id": "9XIC",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     9.53,
+     9.51
+    ]
+   },
+   {
+    "id": "9TMF",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     3.41,
+     3.33
+    ]
+   },
+   {
+    "id": "34QD",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     0.78,
+     0.79
+    ]
+   },
+   {
+    "id": "12KF",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     1.48,
+     1.46
+    ]
+   },
+   {
+    "id": "30CU",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     0.96,
+     0.95
+    ]
+   },
+   {
+    "id": "30CV",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     1.0,
+     1.0
+    ]
+   },
+   {
+    "id": "9YLA",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     0.68,
+     0.68
+    ]
+   },
+   {
+    "id": "9YLG",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     0.66,
+     0.65
+    ]
+   },
+   {
+    "id": "32IL",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     0.17,
+     0.17
+    ]
+   },
+   {
+    "id": "9SXD",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     0.27,
+     0.26
+    ]
+   },
+   {
+    "id": "9YLD",
+    "criteria": [
+     [],
+     []
+    ],
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "refused": [
+     null,
+     null
+    ],
+    "error": [
+     null,
+     null
+    ],
+    "ui_errors": [
+     0,
+     0
+    ],
+    "ui_exception": [
+     null,
+     null
+    ],
+    "seconds": [
+     0.26,
+     0.26
+    ]
+   }
+  ]
+ },
+ "check": {
+  "before": {
+   "entries": 32,
+   "drawn": 31,
+   "refused": 1,
+   "error": 0,
+   "not_measured": 0,
+   "png_error": 0,
+   "criteria_failed": 3,
+   "floor_failed": 1,
+   "ui_run": 0,
+   "ui_failed": 0
+  },
+  "after": {
+   "entries": 32,
+   "drawn": 31,
+   "refused": 1,
+   "error": 0,
+   "not_measured": 0,
+   "png_error": 0,
+   "criteria_failed": 3,
+   "floor_failed": 0,
+   "ui_run": 0,
+   "ui_failed": 0
+  },
+  "worse": [],
+  "better": [
+   "floor_failed"
+  ]
+ },
+ "third": {
+  "verdict": "moved",
+  "worse": [],
+  "better": [
+   "9FZL: fallback counts_hidden 2 -> 1",
+   "9FZL: fallback helix_name_moved 22 -> 0",
+   "9FZL: fallback page_text_small 1 -> 0"
+  ],
+  "moved": [
+   "9FZL: area 65458.72 -> 14561.27"
+  ],
+  "svg_moved": [
+   "9FZL"
+  ],
+  "entries": 100,
+  "passed": [
+   82,
+   82
+  ],
+  "committed_reference": {
+   "note": "the committed report (views all, an older code) against the after run, default view: for reference",
+   "passed": [
+    83,
+    82
+   ],
+   "worse": 34,
+   "better": 18,
+   "moved": 11
+  }
+ },
+ "na": {
+  "verdict": "identical",
+  "worse": [],
+  "better": [],
+  "moved": [],
+  "svg_moved": [],
+  "entries": 46
+ },
+ "bench": {
+  "exit": [
+   0,
+   0
+  ],
+  "entries": 22,
+  "changed": [],
+  "worse": []
+ },
+ "floor": {
+  "inputs": {
+   "leads_before_foldmap": "/tmp/claude-1000/-home-dzyla-foldmap/23e71d62-5b86-4ba7-832d-8711a9baf021/scratchpad/t5/base/src/foldmap",
+   "leads_after_foldmap": "/home/dzyla/foldmap/src/foldmap",
+   "tune_flags": "/tmp/claude-1000/-home-dzyla-foldmap/23e71d62-5b86-4ba7-832d-8711a9baf021/scratchpad/t5/m-after/tune-flags.json"
+  },
+  "tune_floor_failed": [
+   1,
+   0
+  ],
+  "tune_whole_of_two": [
+   {
+    "id": "12XK",
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "chains": 2
+   },
+   {
+    "id": "20XT",
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "chains": 2
+   },
+   {
+    "id": "30CU",
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "chains": 2
+   },
+   {
+    "id": "30CV",
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "chains": 2
+   },
+   {
+    "id": "30CY",
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "chains": 2
+   },
+   {
+    "id": "31FD",
+    "floor_ok": [
+     false,
+     true
+    ],
+    "svg_changed": true,
+    "chains": 30
+   },
+   {
+    "id": "44LS",
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "chains": 2
+   },
+   {
+    "id": "9X4L",
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "chains": 15
+   },
+   {
+    "id": "9YL9",
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "chains": 2
+   },
+   {
+    "id": "9YLA",
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "chains": 2
+   },
+   {
+    "id": "9YLG",
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "chains": 2
+   },
+   {
+    "id": "9ZFX",
+    "floor_ok": [
+     true,
+     true
+    ],
+    "svg_changed": false,
+    "chains": 2
+   }
+  ],
+  "entries": {
+   "31FD": {
+    "role": "lead",
+    "app": [
+     {
+      "refused": null,
+      "error": null,
+      "floor": {
+       "ok": false,
+       "reasons": [
+        "its text is 5.0 pt, under 6 pt, on its 48 x 9 in page (its smallest text 3.0 pt)"
+       ]
+      },
+      "seconds": 13.17,
+      "draw_seconds": 11.7,
+      "residues": 4174
+     },
+     {
+      "refused": null,
+      "error": null,
+      "floor": {
+       "ok": true,
+       "reasons": []
+      },
+      "seconds": 14.62,
+      "draw_seconds": 13.59,
+      "residues": 4174
+     }
+    ],
+    "auto": [
+     {
+      "seconds": 10.71,
+      "floor": [
+       "its text is 5.0 pt, under 6 pt, on its 48 x 9 in page (its smallest text 3.0 pt)"
+      ],
+      "page_in": [
+       48.0,
+       8.6
+      ],
+      "text_pt": 5.026,
+      "predicted_pt": 5.04,
+      "predicted_below": true,
+      "route_refused": 0,
+      "subunits": null,
+      "focus_chains": 0,
+      "chains": 30,
+      "elements": 233,
+      "whole_of_two": null,
+      "context": null
+     },
+     {
+      "seconds": 13.75,
+      "floor": [],
+      "page_in": [
+       20.52,
+       12.27
+      ],
+      "text_pt": 6.0,
+      "predicted_pt": 6.0,
+      "predicted_below": false,
+      "route_refused": 0,
+      "subunits": [
+       2,
+       "C2"
+      ],
+      "focus_chains": 15,
+      "chains": 30,
+      "elements": 116,
+      "whole_of_two": false,
+      "context": "1 of 2 subunits shown \u00b7 C2 symmetry \u00b7 grey: neighbouring subunits completing its fold"
+     }
+    ],
+    "none": {
+     "seconds": 11.73,
+     "floor": [
+      "its text is 5.0 pt, under 6 pt, on its 48 x 9 in page (its smallest text 3.0 pt)"
+     ],
+     "page_in": [
+      48.0,
+      8.6
+     ],
+     "text_pt": 5.026,
+     "predicted_pt": 5.04,
+     "predicted_below": true,
+     "route_refused": 0,
+     "subunits": null,
+     "focus_chains": 0,
+     "chains": 30,
+     "elements": 233,
+     "whole_of_two": false,
+     "context": null
+    },
+    "protomer": {
+     "seconds": 2.62,
+     "floor": [],
+     "page_in": [
+      20.52,
+      12.27
+     ],
+     "text_pt": 6.0,
+     "predicted_pt": 6.0,
+     "predicted_below": false,
+     "route_refused": 0,
+     "subunits": [
+      2,
+      "C2"
+     ],
+     "focus_chains": 15,
+     "chains": 30,
+     "elements": 116,
+     "whole_of_two": false,
+     "context": "1 of 2 subunits shown \u00b7 C2 symmetry \u00b7 grey: neighbouring subunits completing its fold"
+    }
+   },
+   "6JLN": {
+    "role": "lead",
+    "app": [
+     {
+      "refused": null,
+      "error": null,
+      "floor": {
+       "ok": false,
+       "reasons": [
+        "its text is 4.5 pt, under 6 pt, on its 48 x 9 in page (its smallest text 2.7 pt)"
+       ]
+      },
+      "seconds": 19.4,
+      "draw_seconds": 17.48,
+      "residues": 5293
+     },
+     {
+      "refused": null,
+      "error": null,
+      "floor": {
+       "ok": true,
+       "reasons": []
+      },
+      "seconds": 21.4,
+      "draw_seconds": 20.25,
+      "residues": 5293
+     }
+    ],
+    "auto": [
+     {
+      "seconds": 17.89,
+      "floor": [
+       "its text is 4.5 pt, under 6 pt, on its 48 x 9 in page (its smallest text 2.7 pt)"
+      ],
+      "page_in": [
+       48.0,
+       9.34
+      ],
+      "text_pt": 4.528,
+      "predicted_pt": 4.543,
+      "predicted_below": true,
+      "route_refused": 0,
+      "subunits": null,
+      "focus_chains": 0,
+      "chains": 39,
+      "elements": 309,
+      "whole_of_two": null,
+      "context": null
+     },
+     {
+      "seconds": 22.41,
+      "floor": [],
+      "page_in": [
+       26.37,
+       11.35
+      ],
+      "text_pt": 6.0,
+      "predicted_pt": 6.0,
+      "predicted_below": false,
+      "route_refused": 0,
+      "subunits": [
+       2,
+       "C2"
+      ],
+      "focus_chains": 19,
+      "chains": 39,
+      "elements": 156,
+      "whole_of_two": false,
+      "context": "1 of 2 subunits shown \u00b7 C2 symmetry \u00b7 grey: neighbouring subunits completing its fold"
+     }
+    ],
+    "none": {
+     "seconds": 17.82,
+     "floor": [
+      "its text is 4.5 pt, under 6 pt, on its 48 x 9 in page (its smallest text 2.7 pt)"
+     ],
+     "page_in": [
+      48.0,
+      9.34
+     ],
+     "text_pt": 4.528,
+     "predicted_pt": 4.543,
+     "predicted_below": true,
+     "route_refused": 0,
+     "subunits": null,
+     "focus_chains": 0,
+     "chains": 39,
+     "elements": 309,
+     "whole_of_two": false,
+     "context": null
+    },
+    "protomer": {
+     "seconds": 4.38,
+     "floor": [],
+     "page_in": [
+      26.37,
+      11.35
+     ],
+     "text_pt": 6.0,
+     "predicted_pt": 6.0,
+     "predicted_below": false,
+     "route_refused": 0,
+     "subunits": [
+      2,
+      "C2"
+     ],
+     "focus_chains": 19,
+     "chains": 39,
+     "elements": 156,
+     "whole_of_two": false,
+     "context": "1 of 2 subunits shown \u00b7 C2 symmetry \u00b7 grey: neighbouring subunits completing its fold"
+    }
+   },
+   "9FZL": {
+    "role": "lead",
+    "app": [
+     {
+      "refused": null,
+      "error": null,
+      "floor": {
+       "ok": false,
+       "reasons": [
+        "its text is 2.0 pt, under 6 pt, on its 48 x 10 in page (its smallest text 1.2 pt)"
+       ]
+      },
+      "seconds": 48.93,
+      "draw_seconds": 45.88,
+      "residues": 16196
+     },
+     {
+      "refused": null,
+      "error": null,
+      "floor": {
+       "ok": true,
+       "reasons": []
+      },
+      "seconds": 62.67,
+      "draw_seconds": 60.03,
+      "residues": 16196
+     }
+    ],
+    "auto": [
+     {
+      "seconds": 45.39,
+      "floor": [
+       "its text is 2.0 pt, under 6 pt, on its 48 x 10 in page (its smallest text 1.2 pt)"
+      ],
+      "page_in": [
+       48.0,
+       9.85
+      ],
+      "text_pt": 2.049,
+      "predicted_pt": 2.049,
+      "predicted_below": true,
+      "route_refused": 0,
+      "subunits": null,
+      "focus_chains": 0,
+      "chains": 98,
+      "elements": 976,
+      "whole_of_two": null,
+      "context": null
+     },
+     {
+      "seconds": 58.88,
+      "floor": [],
+      "page_in": [
+       45.54,
+       20.88
+      ],
+      "text_pt": 6.0,
+      "predicted_pt": 6.0,
+      "predicted_below": false,
+      "route_refused": 0,
+      "subunits": [
+       2,
+       "C2"
+      ],
+      "focus_chains": 49,
+      "chains": 98,
+      "elements": 511,
+      "whole_of_two": false,
+      "context": "1 of 2 subunits shown \u00b7 C2 symmetry \u00b7 grey: neighbouring subunits completing its fold"
+     }
+    ],
+    "none": {
+     "seconds": 47.33,
+     "floor": [
+      "its text is 2.0 pt, under 6 pt, on its 48 x 10 in page (its smallest text 1.2 pt)"
+     ],
+     "page_in": [
+      48.0,
+      9.85
+     ],
+     "text_pt": 2.049,
+     "predicted_pt": 2.049,
+     "predicted_below": true,
+     "route_refused": 0,
+     "subunits": null,
+     "focus_chains": 0,
+     "chains": 98,
+     "elements": 976,
+     "whole_of_two": false,
+     "context": null
+    },
+    "protomer": {
+     "seconds": 13.44,
+     "floor": [],
+     "page_in": [
+      45.54,
+      20.88
+     ],
+     "text_pt": 6.0,
+     "predicted_pt": 6.0,
+     "predicted_below": false,
+     "route_refused": 0,
+     "subunits": [
+      2,
+      "C2"
+     ],
+     "focus_chains": 49,
+     "chains": 98,
+     "elements": 511,
+     "whole_of_two": false,
+     "context": "1 of 2 subunits shown \u00b7 C2 symmetry \u00b7 grey: neighbouring subunits completing its fold"
+    }
+   },
+   "3UTB-protein": {
+    "role": "control",
+    "app": [
+     {},
+     {}
+    ],
+    "auto": [
+     {
+      "seconds": 0.33,
+      "floor": [],
+      "page_in": [
+       10.78,
+       8.07
+      ],
+      "text_pt": 6.0,
+      "predicted_pt": 6.0,
+      "predicted_below": false,
+      "route_refused": 0,
+      "subunits": null,
+      "focus_chains": 0,
+      "chains": 8,
+      "elements": 56,
+      "whole_of_two": null,
+      "context": null
+     },
+     {
+      "seconds": 0.32,
+      "floor": [],
+      "page_in": [
+       10.78,
+       8.07
+      ],
+      "text_pt": 6.0,
+      "predicted_pt": 6.0,
+      "predicted_below": false,
+      "route_refused": 0,
+      "subunits": null,
+      "focus_chains": 0,
+      "chains": 8,
+      "elements": 56,
+      "whole_of_two": true,
+      "context": null
+     }
+    ],
+    "none": {
+     "seconds": 0.32,
+     "floor": [],
+     "page_in": [
+      10.78,
+      8.07
+     ],
+     "text_pt": 6.0,
+     "predicted_pt": 6.0,
+     "predicted_below": false,
+     "route_refused": 0,
+     "subunits": null,
+     "focus_chains": 0,
+     "chains": 8,
+     "elements": 56,
+     "whole_of_two": false,
+     "context": null
+    },
+    "protomer": {
+     "seconds": 0.21,
+     "floor": [],
+     "page_in": [
+      9.37,
+      7.44
+     ],
+     "text_pt": 6.0,
+     "predicted_pt": 6.0,
+     "predicted_below": false,
+     "route_refused": 0,
+     "subunits": [
+      2,
+      "C2"
+     ],
+     "focus_chains": 4,
+     "chains": 8,
+     "elements": 32,
+     "whole_of_two": false,
+     "context": "1 of 2 subunits shown \u00b7 C2 symmetry \u00b7 grey: neighbouring subunits completing its fold"
+    }
+   },
+   "3UTB": {
+    "role": "control",
+    "app": [
+     {
+      "refused": null,
+      "error": null,
+      "floor": {
+       "ok": true,
+       "reasons": []
+      },
+      "seconds": 1.16,
+      "draw_seconds": 1.11,
+      "residues": 1049
+     },
+     {
+      "refused": null,
+      "error": null,
+      "floor": {
+       "ok": true,
+       "reasons": []
+      },
+      "seconds": 1.02,
+      "draw_seconds": 0.99,
+      "residues": 1049
+     }
+    ],
+    "auto": [
+     {
+      "seconds": 0.88,
+      "floor": [],
+      "page_in": [
+       18.25,
+       12.22
+      ],
+      "text_pt": 6.0,
+      "predicted_pt": 6.0,
+      "predicted_below": false,
+      "route_refused": 0,
+      "subunits": null,
+      "focus_chains": 0,
+      "chains": 8,
+      "elements": 56,
+      "whole_of_two": null,
+      "context": null
+     },
+     {
+      "seconds": 0.81,
+      "floor": [],
+      "page_in": [
+       18.25,
+       12.22
+      ],
+      "text_pt": 6.0,
+      "predicted_pt": 6.0,
+      "predicted_below": false,
+      "route_refused": 0,
+      "subunits": null,
+      "focus_chains": 0,
+      "chains": 8,
+      "elements": 56,
+      "whole_of_two": false,
+      "context": null
+     }
+    ],
+    "none": {
+     "seconds": 0.89,
+     "floor": [],
+     "page_in": [
+      18.25,
+      12.22
+     ],
+     "text_pt": 6.0,
+     "predicted_pt": 6.0,
+     "predicted_below": false,
+     "route_refused": 0,
+     "subunits": null,
+     "focus_chains": 0,
+     "chains": 8,
+     "elements": 56,
+     "whole_of_two": false,
+     "context": null
+    },
+    "protomer": {
+     "seconds": 0.69,
+     "floor": [],
+     "page_in": [
+      16.59,
+      11.54
+     ],
+     "text_pt": 6.0,
+     "predicted_pt": 6.0,
+     "predicted_below": false,
+     "route_refused": 0,
+     "subunits": [
+      2,
+      "C2"
+     ],
+     "focus_chains": 4,
+     "chains": 8,
+     "elements": 32,
+     "whole_of_two": false,
+     "context": "1 of 2 subunits shown \u00b7 C2 symmetry \u00b7 grey: neighbouring subunits completing its fold"
+    }
+   }
+  },
+  "prediction": {
+   "drawings": 20,
+   "agree": 20,
+   "largest_gap_pt": 0.015
+  },
+  "worse": [],
+  "better": [
+   "31FD: now above the floor",
+   "6JLN: now above the floor",
+   "9FZL: now above the floor"
+  ]
+ },
+ "pngs": {
+  "31FD": {
+   "before": "docs/superpowers/work/app29/fix-floor/png/31FD-before.png",
+   "after": "docs/superpowers/work/app29/fix-floor/png/31FD-after.png"
+  }
+ },
+ "worse": {
+  "tune": [],
+  "check": [],
+  "third": [],
+  "na": [],
+  "bench": [],
+  "floor": []
+ },
+ "better": {
+  "tune": [
+   "31FD: now above the floor"
+  ],
+  "check": [
+   "floor_failed"
+  ],
+  "third": [
+   "9FZL: fallback counts_hidden 2 -> 1",
+   "9FZL: fallback helix_name_moved 22 -> 0",
+   "9FZL: fallback page_text_small 1 -> 0"
+  ],
+  "na": [],
+  "floor": [
+   "31FD: now above the floor",
+   "6JLN: now above the floor",
+   "9FZL: now above the floor"
+  ]
+ },
+ "verdict": "better",
+ "patch": null
+}
