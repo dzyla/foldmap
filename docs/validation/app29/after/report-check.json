@@ -1,0 +1,1035 @@
+{
+ "source_stamp": {
+  "foldmap": "0.1.0",
+  "code_fingerprint": "893407124ec081be",
+  "package": "checkout",
+  "checkout_fingerprint": "893407124ec081be",
+  "installed_matches_checkout": true,
+  "git": {
+   "commit": "162e06751ebbc9dd183d3d0cfde1b82875fb4757",
+   "dirty": false,
+   "source": "asserted by runner"
+  },
+  "script": {
+   "name": "scripts/app29.py",
+   "sha256": "cdf60fa1e05239c2d5fcd93ce5d5945f8e260122ff9af7ed8a25b61ffa6f605e"
+  },
+  "python": {
+   "version": "3.13.2",
+   "implementation": "CPython"
+  },
+  "platform": {
+   "platform": "Linux-6.8.0-138-generic-x86_64-with-glibc2.35",
+   "machine": "x86_64"
+  },
+  "packages": {
+   "gemmi": "0.7.5",
+   "numpy": "2.5.4",
+   "scipy": "1.18.1",
+   "networkx": "3.7",
+   "matplotlib": "3.11.2",
+   "PyYAML": "6.0.3"
+  }
+ },
+ "what": "the check half's rows of report.json: for plan 29's before/after measure only (load_both)",
+ "entries": [
+  {
+   "id": "9SXL",
+   "dir": "sealed/1f91a81b8cf4",
+   "stratum": "S1",
+   "half": "check",
+   "residues": 346,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 1.03,
+   "draw_seconds": 0.93,
+   "peak_mb": "not measured",
+   "svg_bytes": 84932,
+   "png_bytes": 257270,
+   "process": {
+    "exit": 0,
+    "seconds": 8.73,
+    "max_rss_mb": 141.5,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "20cf6f71c81ddd40e6f0fc8cfd7e904ff0bcc194d6ca395bdf205f19fa822e46",
+    "app.svg": "f528a1134d0c60d304a67cb79befaec5e55b0deb9be505f6153a2e9f0027709b"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "27NV",
+   "dir": "sealed/3f5fc8c18340",
+   "stratum": "S1",
+   "half": "check",
+   "residues": 233,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 2.09,
+   "draw_seconds": 1.68,
+   "peak_mb": "not measured",
+   "svg_bytes": 64916,
+   "png_bytes": 218233,
+   "process": {
+    "exit": 0,
+    "seconds": 11.48,
+    "max_rss_mb": 164.0,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "96f7aa3f86820b80a7730a1f2a3f3f477db0cb8749955ec9615b46a82ac8493f",
+    "app.svg": "ec6a72b51d16602f5e6e7f4e3e076fbf1b298b6d51ce990c4e067c9a5703b570"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "9SVL",
+   "dir": "sealed/2558d2d623fd",
+   "stratum": "S1",
+   "half": "check",
+   "residues": 258,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 1.1,
+   "draw_seconds": 1.0,
+   "peak_mb": "not measured",
+   "svg_bytes": 51758,
+   "png_bytes": 204992,
+   "process": {
+    "exit": 0,
+    "seconds": 9.13,
+    "max_rss_mb": 134.4,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "fd8d233a7a9453a9bf4d126a745ba1ab31c1481db63a9f804be08daa6c719a78",
+    "app.svg": "dcdfab4be9bdca4883ade5f8428d0e1eb0c1e1d840fb14d9f32787ee560f5186"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "9QR0",
+   "dir": "sealed/7b4a8da370d3",
+   "stratum": "S1",
+   "half": "check",
+   "residues": 273,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 0.79,
+   "draw_seconds": 0.69,
+   "peak_mb": "not measured",
+   "svg_bytes": 78833,
+   "png_bytes": 223695,
+   "process": {
+    "exit": 0,
+    "seconds": 7.82,
+    "max_rss_mb": 137.4,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "8dec88428edad9e6b553837dfb55612c7be4ef6128c6222dcbd3cf15e65de55f",
+    "app.svg": "422a74faaa7dcef8316f7b4f931119e1c188b8735f08c89ebb1379b6c76cbeb1"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "9WVP",
+   "dir": "sealed/2ced207de659",
+   "stratum": "S1",
+   "half": "check",
+   "residues": 170,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 0.77,
+   "draw_seconds": 0.67,
+   "peak_mb": "not measured",
+   "svg_bytes": 86406,
+   "png_bytes": 254149,
+   "process": {
+    "exit": 0,
+    "seconds": 8.68,
+    "max_rss_mb": 134.3,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "e6d84cbcc734bee2d99131e43f9f30709fd7d83e93c8c3dd5791f4b6abab569b",
+    "app.svg": "54e3b5f4462a467397b573777b363a93600f1cf22091dfc581d62d821e2bdf50"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "9SWG",
+   "dir": "sealed/1320b42a51ba",
+   "stratum": "S2",
+   "half": "check",
+   "residues": 1678,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 3.49,
+   "draw_seconds": 3.32,
+   "peak_mb": "not measured",
+   "svg_bytes": 359645,
+   "png_bytes": 1171782,
+   "process": {
+    "exit": 0,
+    "seconds": 16.49,
+    "max_rss_mb": 182.5,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "25b4e594d9aecfb7642292b05c1272d143c77624fefbe057b2ce93ccd63ba8f9",
+    "app.svg": "b0e22ec2582f7600948ec03169c19e4f43c5758e6fc139a7a3ba853466c375bb"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "14CT",
+   "dir": "sealed/3fa5069de26c",
+   "stratum": "S2",
+   "half": "check",
+   "residues": 3401,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 8.39,
+   "draw_seconds": 6.04,
+   "peak_mb": "not measured",
+   "svg_bytes": 534097,
+   "png_bytes": 1774151,
+   "process": {
+    "exit": 0,
+    "seconds": 20.2,
+    "max_rss_mb": 208.6,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "15ade27e7bb0a23a6c7d5f562e99aa61fe25805b3d59863a9acf4fb8d99f53b1",
+    "app.svg": "a8c850f9f754eb17a0009fcb0a5d41787b1a9e96dddfc8193e29af6d22bf1851"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "12KM",
+   "dir": "sealed/0c177784724c",
+   "stratum": "S2",
+   "half": "check",
+   "residues": 136,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 0.45,
+   "draw_seconds": 0.33,
+   "peak_mb": "not measured",
+   "svg_bytes": 14117,
+   "png_bytes": 76954,
+   "process": {
+    "exit": 0,
+    "seconds": 6.32,
+    "max_rss_mb": 131.8,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "7c471d677894c21689033b1582d3dc28efde939ea1ee52e579760910e845baca",
+    "app.svg": "2abb542f922446e841c442884fae66b9b74035ea2fe67a4460ef4de57325e8cf"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "20ZY",
+   "dir": "sealed/5961bbaa7355",
+   "stratum": "S3",
+   "half": "check",
+   "residues": 2812,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 1.73,
+   "draw_seconds": 1.6,
+   "peak_mb": "not measured",
+   "svg_bytes": 185126,
+   "png_bytes": 520433,
+   "process": {
+    "exit": 0,
+    "seconds": 11.48,
+    "max_rss_mb": 167.8,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "7d5f05b89e87c689505a9721ff30b24b67b69b9776727fc55e722cecc7d71f4f",
+    "app.svg": "7c3d0ee22b15b86fc4eed284a03ec029235184da22ad3b2fa47b01fce3b86d2d"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "31VY",
+   "dir": "sealed/6a8a8967a690",
+   "stratum": "S3",
+   "half": "check",
+   "residues": 439,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 5.34,
+   "draw_seconds": 4.49,
+   "peak_mb": "not measured",
+   "svg_bytes": 74162,
+   "png_bytes": 231507,
+   "process": {
+    "exit": 0,
+    "seconds": 14.48,
+    "max_rss_mb": 135.8,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "02a650f4e2cc9061d544ff6a436075d6d075dc362de2af9a8ca075e8046a8296",
+    "app.svg": "a96249a75bab9700f42c6e93b426e14246738457a8e329d98c8f83fe564fbc55"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "9YN4",
+   "dir": "sealed/1903ac06f9c9",
+   "stratum": "S4",
+   "half": "check",
+   "residues": 17920,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 22.53,
+   "draw_seconds": 17.8,
+   "peak_mb": "not measured",
+   "svg_bytes": 1305169,
+   "png_bytes": 3787714,
+   "process": {
+    "exit": 0,
+    "seconds": 46.29,
+    "max_rss_mb": 413.3,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "9c4417d47fc47ff46e53fb7a4705bb5ffb208b6713986506083fdbacb89be59f",
+    "app.svg": "b07a3219e066decbab254a9f0ef0a7f60f6d643af664434615a8f19cc10fa928"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "9ZFT",
+   "dir": "sealed/1506a5305afc",
+   "stratum": "S4",
+   "half": "check",
+   "residues": 6415,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 21.16,
+   "draw_seconds": 16.77,
+   "peak_mb": "not measured",
+   "svg_bytes": 1957078,
+   "png_bytes": 4478322,
+   "process": {
+    "exit": 0,
+    "seconds": 43.48,
+    "max_rss_mb": 338.8,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "82ea216bbe73d7210ee63bc5b495eb7985b5d4fe9bdfe76540960ab79df19e14",
+    "app.svg": "03f92351c081ce15bb9ee94238c0a8878507bc0f672d5afcabf33d66dc49fc3a"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "9YN3",
+   "dir": "sealed/01f65d6970e1",
+   "stratum": "S4",
+   "half": "check",
+   "residues": 17920,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 20.48,
+   "draw_seconds": 15.74,
+   "peak_mb": "not measured",
+   "svg_bytes": 1309619,
+   "png_bytes": 3636164,
+   "process": {
+    "exit": 0,
+    "seconds": 42.93,
+    "max_rss_mb": 417.2,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "a264127a4eecc3f0305715fb2743582f7fbafc3fe910ad454203a4b190acc9e0",
+    "app.svg": "d4462c94c7e66aa0942f49b5c2543a3a5489818657be016db3006048ac576fcd"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "9ZFR",
+   "dir": "sealed/111dd5f9cc94",
+   "stratum": "S4",
+   "half": "check",
+   "residues": 6342,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 2.79,
+   "draw_seconds": 2.36,
+   "peak_mb": "not measured",
+   "svg_bytes": 150339,
+   "png_bytes": 451674,
+   "process": {
+    "exit": 0,
+    "seconds": 14.39,
+    "max_rss_mb": 269.3,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "7f9a2e9b6cd0df73b07230dccd249d82c1b8e23afdf8aaa2b319d5a18b66cef6",
+    "app.svg": "08583838091ec2799261b55e87164c9a7996584121137a189c647e697d8cc9ef"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "9SWW",
+   "dir": "sealed/56d16adf6b4e",
+   "stratum": "S4",
+   "half": "check",
+   "residues": 5130,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 9.81,
+   "draw_seconds": 5.97,
+   "peak_mb": "not measured",
+   "svg_bytes": 1690228,
+   "png_bytes": 5762194,
+   "process": {
+    "exit": 0,
+    "seconds": 21.04,
+    "max_rss_mb": 263.5,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "7cdecbc262d8b2fd5d41502f8fbbbca47ec04800963284fc6cbf6c717eac76bd",
+    "app.svg": "55375a27743a5ffa60716a969dbc358b1fac2349461b930010a626901b58795e"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "9X4M",
+   "dir": "sealed/5fa9828ab531",
+   "stratum": "S4",
+   "half": "check",
+   "residues": 7875,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 65.26,
+   "draw_seconds": 61.79,
+   "peak_mb": "not measured",
+   "svg_bytes": 1086427,
+   "png_bytes": 3411697,
+   "process": {
+    "exit": 0,
+    "seconds": 129.05,
+    "max_rss_mb": 349.3,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "d4866caedc2b236437785ad9ccfcabd38e27fda1a9da67b6524ae724f5ebf4ad",
+    "app.svg": "b775282bc7b7764c841a7c0c64fb5f9c6a05cd9c43caa40bb522c4ba0c028019"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "12EP",
+   "dir": "sealed/6a14ad59af8f",
+   "stratum": "S5",
+   "half": "check",
+   "residues": 74,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 0.58,
+   "draw_seconds": 0.42,
+   "peak_mb": "not measured",
+   "svg_bytes": 15598,
+   "png_bytes": 47953,
+   "process": {
+    "exit": 0,
+    "seconds": 7.02,
+    "max_rss_mb": 193.4,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "4a9e6687179245f175c92f5fc0fce5d1cbefc79f2d0b5ec3dd077ebc053e7c03",
+    "app.svg": "e75cddcc8278bfc82141eef3f889e527148ee6c733d9ad1296ab95661b01cf11"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "31DM",
+   "dir": "sealed/7986ad6a7adc",
+   "stratum": "S5",
+   "half": "check",
+   "residues": 153,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 0.86,
+   "draw_seconds": 0.66,
+   "peak_mb": "not measured",
+   "svg_bytes": 46111,
+   "png_bytes": 149216,
+   "process": {
+    "exit": 0,
+    "seconds": 8.12,
+    "max_rss_mb": 201.4,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "4ae4dd08cdc92bcc149999fbfe9de5971258b9d6fa81276347ec537dbd8d15af",
+    "app.svg": "2da1b47f720e30780a8fe3dde2b6eba2f1d932613b77673c890ba338a8b21084"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "9WXX",
+   "dir": "sealed/42baadbff1ef",
+   "stratum": "S5",
+   "half": "check",
+   "residues": 16,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 0.2,
+   "draw_seconds": 0.1,
+   "peak_mb": "not measured",
+   "svg_bytes": 1133,
+   "png_bytes": 9862,
+   "process": {
+    "exit": 0,
+    "seconds": 5.82,
+    "max_rss_mb": 129.7,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "a23ebe956673253e380deae2200bbe69f68ac700e80633567212ff13a5312319",
+    "app.svg": "b5bd24092542bb74e60db4a07d198aebac10d137c272e963f6c8d15c16271ddc"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "9ZTI",
+   "dir": "sealed/005a7b6fdcb6",
+   "stratum": "S7",
+   "half": "check",
+   "residues": 1645,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 11.46,
+   "draw_seconds": 8.88,
+   "peak_mb": "not measured",
+   "svg_bytes": 443772,
+   "png_bytes": 1747694,
+   "process": {
+    "exit": 0,
+    "seconds": 25.1,
+    "max_rss_mb": 218.3,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "ca328b24dc2bc98a70c5b8014d8887fe08aa26e17273e1f71a0ad6b509d73a89",
+    "app.svg": "192dd337cf8a3a9352bd9bd8e40f2ebff3b0659d94acc33d37754ef2bece94b6"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "21ME",
+   "dir": "sealed/36629c7af089",
+   "stratum": "S7",
+   "half": "check",
+   "residues": 980,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [
+    "A15",
+    "A3",
+    "A6"
+   ],
+   "criteria_detail": {
+    "A3": "default: strand I:-66-54, strand J:-53-67",
+    "A6": "default 1 (na:nt:J:-19 \u00d7 label:E:64-78)",
+    "A15": "default 19.44198650476655"
+   },
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 21.61,
+   "draw_seconds": 20.1,
+   "peak_mb": "not measured",
+   "svg_bytes": 351339,
+   "png_bytes": 1215585,
+   "process": {
+    "exit": 0,
+    "seconds": 44.69,
+    "max_rss_mb": 179.9,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "3799c93d878a095ac1f77dca8fd5b292d88dcce61baf8dfb6c62066a395e571c",
+    "app.svg": "b9206519a4e0c4bb61e7ee2cc86d5a4bbfabce044428fcd477ab77afaf75e580"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "9UD0",
+   "dir": "sealed/5f78ae9cb0c9",
+   "stratum": "S7",
+   "half": "check",
+   "residues": 116,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 0.61,
+   "draw_seconds": 0.5,
+   "peak_mb": "not measured",
+   "svg_bytes": 45405,
+   "png_bytes": 124392,
+   "process": {
+    "exit": 0,
+    "seconds": 7.07,
+    "max_rss_mb": 139.3,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "f5d2194b5927eed3a2f5526c686c8ee2475b90b1de9643e0f2e0a322cd4a29b8",
+    "app.svg": "95580adff86da7b4e6997e3511cedb3b53e94267119479af7068b5849eb9b545"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "38LQ",
+   "dir": "sealed/400b5bc5b9c1",
+   "stratum": "S7",
+   "half": "check",
+   "residues": 1381,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 6.17,
+   "draw_seconds": 4.61,
+   "peak_mb": "not measured",
+   "svg_bytes": 404449,
+   "png_bytes": 1211775,
+   "process": {
+    "exit": 0,
+    "seconds": 15.99,
+    "max_rss_mb": 174.3,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "b12ed7f12021c20edd3b90a1576c0ebb145b1cbd35c4d12107e304af1796bc2e",
+    "app.svg": "a217a37baf0f7b56f22816c61867ec267e1c86cf271da192724278ba54808169"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "9O34",
+   "dir": "sealed/04cbada70782",
+   "stratum": "S7",
+   "half": "check",
+   "residues": 7233,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 4.16,
+   "draw_seconds": 2.96,
+   "peak_mb": "not measured",
+   "svg_bytes": 75826,
+   "png_bytes": 226450,
+   "process": {
+    "exit": 0,
+    "seconds": 16.14,
+    "max_rss_mb": 280.4,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "44b2f41990ae86436487e88b48bb9bf101831a5e9fd9b6255e79608e288f459f",
+    "app.svg": "6cd6f55897fba14ef407c9cfdb5cfab09bbac7505dd819f9497808e1f33d7a76"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "11ON",
+   "dir": "sealed/01c922b86411",
+   "stratum": "S8",
+   "half": "check",
+   "residues": 816,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 2.15,
+   "draw_seconds": 2.02,
+   "peak_mb": "not measured",
+   "svg_bytes": 211699,
+   "png_bytes": 636237,
+   "process": {
+    "exit": 0,
+    "seconds": 12.53,
+    "max_rss_mb": 154.0,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "3be92cc86f6e89d527cb955c2f8068529cfee2dcef7d37dc3e6bc4870c991a5d",
+    "app.svg": "c8896ec3de787112c87802b4433b5bf5fa9225cae342eb1110c3a3cf7a3e07c1"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "9SYG",
+   "dir": "sealed/0a9f6fc5dfa3",
+   "stratum": "S8",
+   "half": "check",
+   "residues": 16721,
+   "refused": "time",
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": null,
+   "floor_reasons": [],
+   "seconds": 90.12,
+   "draw_seconds": null,
+   "peak_mb": "not measured",
+   "svg_bytes": null,
+   "png_bytes": null,
+   "process": {
+    "exit": 0,
+    "seconds": 95.94,
+    "max_rss_mb": 117.3,
+    "timed_out": false
+   },
+   "files": {},
+   "ui": "not run"
+  },
+  {
+   "id": "9SY6",
+   "dir": "sealed/63fc717129f5",
+   "stratum": "S8",
+   "half": "check",
+   "residues": 10298,
+   "refused": "time",
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": null,
+   "floor_reasons": [],
+   "seconds": 90.11,
+   "draw_seconds": null,
+   "peak_mb": "not measured",
+   "svg_bytes": null,
+   "png_bytes": null,
+   "process": {
+    "exit": 0,
+    "seconds": 95.53,
+    "max_rss_mb": 112.2,
+    "timed_out": false
+   },
+   "files": {},
+   "ui": "not run"
+  },
+  {
+   "id": "9QTW",
+   "dir": "sealed/69930614462a",
+   "stratum": "S9",
+   "half": "check",
+   "residues": 381,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [
+    "A6"
+   ],
+   "criteria_detail": {
+    "A6": "default 1 (na:nt:A:135 \u00d7 na:tie:135-141:mark)"
+   },
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 3.57,
+   "draw_seconds": 3.48,
+   "peak_mb": "not measured",
+   "svg_bytes": 203419,
+   "png_bytes": 1084193,
+   "process": {
+    "exit": 0,
+    "seconds": 17.74,
+    "max_rss_mb": 159.7,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "c9db16f16594fdc83c87f24061185881585297e3ff31809658364b359816337c",
+    "app.svg": "39857b34e804716fb8b4bb5985b9f3622c8dec85dab17b09e86bf05fcc988cfb"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "22MT",
+   "dir": "sealed/309d0ac10c33",
+   "stratum": "S9",
+   "half": "check",
+   "residues": 150,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 0.75,
+   "draw_seconds": 0.66,
+   "peak_mb": "not measured",
+   "svg_bytes": 45784,
+   "png_bytes": 286964,
+   "process": {
+    "exit": 0,
+    "seconds": 8.22,
+    "max_rss_mb": 138.0,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "9f0cc63edd662145e0425eb65ab733ae2c60b43fcdcc63c957b4714bca81eee6",
+    "app.svg": "9a0ca1364eef4a7aa69b0c91da25e2ada61998abff7f269947e97cd0d5d0417e"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "32IO",
+   "dir": "sealed/08db40282e38",
+   "stratum": "S11",
+   "half": "check",
+   "residues": 540,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 0.52,
+   "draw_seconds": 0.41,
+   "peak_mb": "not measured",
+   "svg_bytes": 14809,
+   "png_bytes": 68241,
+   "process": {
+    "exit": 0,
+    "seconds": 7.32,
+    "max_rss_mb": 140.8,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "42f40af602765350bd8c1973f81aee87b14faf39935abe40032ebd9f1ee4fddf",
+    "app.svg": "8a0225be7b71e41fea393e57958875576e520919bb93d7a9aec3b5c30739cdaf"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "9SWX",
+   "dir": "sealed/34d676c55288",
+   "stratum": "S11",
+   "half": "check",
+   "residues": 626,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 1.38,
+   "draw_seconds": 1.25,
+   "peak_mb": "not measured",
+   "svg_bytes": 180157,
+   "png_bytes": 549881,
+   "process": {
+    "exit": 0,
+    "seconds": 10.28,
+    "max_rss_mb": 165.3,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "ed34862696ee81bb59e23976216c46b7b6a1a1830f8042bc29a93591f1ba32e5",
+    "app.svg": "9ca08adaf8bc058c364a46257c8014cbd498dc786d9e8cc0bc46df73620bdc43"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "9YLC",
+   "dir": "sealed/6bf95e577426",
+   "stratum": "S11",
+   "half": "check",
+   "residues": 342,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 2.68,
+   "draw_seconds": 2.55,
+   "peak_mb": "not measured",
+   "svg_bytes": 256765,
+   "png_bytes": 692696,
+   "process": {
+    "exit": 0,
+    "seconds": 13.03,
+    "max_rss_mb": 173.8,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "3934b091c8494d15b15883ca29a938813174098dc5dcf67948554edb8fa140ca",
+    "app.svg": "0b89e380968660022820c93a036c867ae8b177e66f96977688bdfc81d38f0d51"
+   },
+   "ui": "not run"
+  }
+ ]
+}

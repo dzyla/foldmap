@@ -1,0 +1,1683 @@
+{
+ "source_stamp": {
+  "foldmap": "0.1.0",
+  "code_fingerprint": "893407124ec081be",
+  "package": "checkout",
+  "checkout_fingerprint": "893407124ec081be",
+  "installed_matches_checkout": true,
+  "git": {
+   "commit": "b84ebc3f404d263a04a69316f05e0a34d4a5ffe8",
+   "dirty": false,
+   "dirty_paths": [],
+   "source": "git"
+  },
+  "script": {
+   "name": "scripts/app29_after.py",
+   "sha256": "c276cd542481262dfaa599d35f5b66fc160f1f5dd8bac2c2814acbdb18319c16"
+  },
+  "python": {
+   "version": "3.12.9",
+   "implementation": "CPython"
+  },
+  "platform": {
+   "platform": "Linux-6.18.33.1-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+   "machine": "x86_64"
+  },
+  "packages": {
+   "gemmi": "0.7.5",
+   "numpy": "2.5.3",
+   "scipy": "1.18.1",
+   "networkx": "3.7",
+   "matplotlib": "3.11.2",
+   "PyYAML": "6.0.3"
+  }
+ },
+ "records": {
+  "before": "docs/validation/app29/before",
+  "rerun": "docs/validation/app29/after/before-rerun",
+  "after": "docs/validation/app29/after"
+ },
+ "table": {
+  "stats": {
+   "before": {
+    "tune": {
+     "entries": 47,
+     "pass": {
+      "k": 45,
+      "n": 47,
+      "ci": [
+       0.8575,
+       0.9883
+      ]
+     },
+     "crash": {
+      "k": 0,
+      "n": 47,
+      "ci": [
+       0.0,
+       0.0756
+      ]
+     },
+     "refused": {
+      "k": 0,
+      "n": 47,
+      "ci": [
+       0.0,
+       0.0756
+      ]
+     },
+     "floor": {
+      "k": 1,
+      "n": 47,
+      "ci": [
+       0.0038,
+       0.1111
+      ]
+     },
+     "criteria": {
+      "k": 1,
+      "n": 47,
+      "ci": [
+       0.0038,
+       0.1111
+      ]
+     },
+     "page_failed": {
+      "k": 0,
+      "n": 47,
+      "ci": [
+       0.0,
+       0.0756
+      ]
+     },
+     "seconds": {
+      "median": {
+       "n": 47,
+       "value": 0.82,
+       "ci": [
+        0.36,
+        1.19
+       ]
+      },
+      "p95": {
+       "n": 47,
+       "value": 17.131,
+       "ci": [
+        2.7,
+        23.66
+       ]
+      }
+     },
+     "draw_seconds": {
+      "median": {
+       "n": 47,
+       "value": 0.79,
+       "ci": [
+        0.34,
+        1.13
+       ]
+      },
+      "p95": {
+       "n": 47,
+       "value": 13.694,
+       "ci": [
+        2.63,
+        21.29
+       ]
+      }
+     }
+    },
+    "check": {
+     "entries": 32,
+     "pass": {
+      "k": 27,
+      "n": 32,
+      "ci": [
+       0.6825,
+       0.9314
+      ]
+     },
+     "crash": {
+      "k": 0,
+      "n": 32,
+      "ci": [
+       0.0,
+       0.1072
+      ]
+     },
+     "refused": {
+      "k": 1,
+      "n": 32,
+      "ci": [
+       0.0055,
+       0.1574
+      ]
+     },
+     "floor": {
+      "k": 1,
+      "n": 32,
+      "ci": [
+       0.0055,
+       0.1574
+      ]
+     },
+     "criteria": {
+      "k": 3,
+      "n": 32,
+      "ci": [
+       0.0324,
+       0.2422
+      ]
+     },
+     "page_failed": {
+      "k": 0,
+      "n": 32,
+      "ci": [
+       0.0,
+       0.1072
+      ]
+     },
+     "seconds": {
+      "median": {
+       "n": 31,
+       "value": 0.7,
+       "ci": [
+        0.28,
+        1.17
+       ]
+      },
+      "p95": {
+       "n": 31,
+       "value": 14.315,
+       "ci": [
+        2.68,
+        42.19
+       ]
+      }
+     },
+     "draw_seconds": {
+      "median": {
+       "n": 31,
+       "value": 0.62,
+       "ci": [
+        0.25,
+        1.14
+       ]
+      },
+      "p95": {
+       "n": 31,
+       "value": 12.24,
+       "ci": [
+        2.61,
+        39.22
+       ]
+      }
+     }
+    },
+    "all": {
+     "entries": 79,
+     "pass": {
+      "k": 72,
+      "n": 79,
+      "ci": [
+       0.8282,
+       0.9564
+      ]
+     },
+     "crash": {
+      "k": 0,
+      "n": 79,
+      "ci": [
+       0.0,
+       0.0464
+      ]
+     },
+     "refused": {
+      "k": 1,
+      "n": 79,
+      "ci": [
+       0.0022,
+       0.0683
+      ]
+     },
+     "floor": {
+      "k": 2,
+      "n": 79,
+      "ci": [
+       0.007,
+       0.0877
+      ]
+     },
+     "criteria": {
+      "k": 4,
+      "n": 79,
+      "ci": [
+       0.0199,
+       0.1231
+      ]
+     },
+     "page_failed": {
+      "k": 0,
+      "n": 79,
+      "ci": [
+       0.0,
+       0.0464
+      ]
+     },
+     "seconds": {
+      "median": {
+       "n": 78,
+       "value": 0.785,
+       "ci": [
+        0.47,
+        1.01
+       ]
+      },
+      "p95": {
+       "n": 78,
+       "value": 17.747,
+       "ci": [
+        7.52,
+        23.66
+       ]
+      }
+     },
+     "draw_seconds": {
+      "median": {
+       "n": 78,
+       "value": 0.735,
+       "ci": [
+        0.42,
+        0.96
+       ]
+      },
+      "p95": {
+       "n": 78,
+       "value": 15.141,
+       "ci": [
+        5.61,
+        21.29
+       ]
+      }
+     }
+    }
+   },
+   "rerun": {
+    "tune": {
+     "entries": 47,
+     "pass": {
+      "k": 45,
+      "n": 47,
+      "ci": [
+       0.8575,
+       0.9883
+      ]
+     },
+     "crash": {
+      "k": 0,
+      "n": 47,
+      "ci": [
+       0.0,
+       0.0756
+      ]
+     },
+     "refused": {
+      "k": 0,
+      "n": 47,
+      "ci": [
+       0.0,
+       0.0756
+      ]
+     },
+     "floor": {
+      "k": 1,
+      "n": 47,
+      "ci": [
+       0.0038,
+       0.1111
+      ]
+     },
+     "criteria": {
+      "k": 1,
+      "n": 47,
+      "ci": [
+       0.0038,
+       0.1111
+      ]
+     },
+     "page_failed": {
+      "k": 0,
+      "n": 47,
+      "ci": [
+       0.0,
+       0.0756
+      ]
+     },
+     "seconds": {
+      "median": {
+       "n": 47,
+       "value": 2.86,
+       "ci": [
+        1.5,
+        4.12
+       ]
+      },
+      "p95": {
+       "n": 47,
+       "value": 45.742,
+       "ci": [
+        11.58,
+        66.17
+       ]
+      }
+     },
+     "draw_seconds": {
+      "median": {
+       "n": 47,
+       "value": 2.78,
+       "ci": [
+        1.44,
+        3.96
+       ]
+      },
+      "p95": {
+       "n": 47,
+       "value": 38.973,
+       "ci": [
+        9.05,
+        61.66
+       ]
+      }
+     }
+    },
+    "check": {
+     "entries": 32,
+     "pass": {
+      "k": 27,
+      "n": 32,
+      "ci": [
+       0.6825,
+       0.9314
+      ]
+     },
+     "crash": {
+      "k": 0,
+      "n": 32,
+      "ci": [
+       0.0,
+       0.1072
+      ]
+     },
+     "refused": {
+      "k": 2,
+      "n": 32,
+      "ci": [
+       0.0173,
+       0.2015
+      ]
+     },
+     "floor": {
+      "k": 1,
+      "n": 32,
+      "ci": [
+       0.0055,
+       0.1574
+      ]
+     },
+     "criteria": {
+      "k": 2,
+      "n": 32,
+      "ci": [
+       0.0173,
+       0.2015
+      ]
+     },
+     "page_failed": {
+      "k": 0,
+      "n": 32,
+      "ci": [
+       0.0,
+       0.1072
+      ]
+     },
+     "seconds": {
+      "median": {
+       "n": 30,
+       "value": 2.615,
+       "ci": [
+        0.83,
+        4.38
+       ]
+      },
+      "p95": {
+       "n": 30,
+       "value": 21.347,
+       "ci": [
+        9.88,
+        56.42
+       ]
+      }
+     },
+     "draw_seconds": {
+      "median": {
+       "n": 30,
+       "value": 2.335,
+       "ci": [
+        0.7,
+        3.8
+       ]
+      },
+      "p95": {
+       "n": 30,
+       "value": 18.39,
+       "ci": [
+        6.16,
+        52.05
+       ]
+      }
+     }
+    },
+    "all": {
+     "entries": 79,
+     "pass": {
+      "k": 72,
+      "n": 79,
+      "ci": [
+       0.8282,
+       0.9564
+      ]
+     },
+     "crash": {
+      "k": 0,
+      "n": 79,
+      "ci": [
+       0.0,
+       0.0464
+      ]
+     },
+     "refused": {
+      "k": 2,
+      "n": 79,
+      "ci": [
+       0.007,
+       0.0877
+      ]
+     },
+     "floor": {
+      "k": 2,
+      "n": 79,
+      "ci": [
+       0.007,
+       0.0877
+      ]
+     },
+     "criteria": {
+      "k": 3,
+      "n": 79,
+      "ci": [
+       0.013,
+       0.1058
+      ]
+     },
+     "page_failed": {
+      "k": 0,
+      "n": 79,
+      "ci": [
+       0.0,
+       0.0464
+      ]
+     },
+     "seconds": {
+      "median": {
+       "n": 77,
+       "value": 2.86,
+       "ci": [
+        1.69,
+        3.61
+       ]
+      },
+      "p95": {
+       "n": 77,
+       "value": 43.762,
+       "ci": [
+        20.71,
+        60.16
+       ]
+      }
+     },
+     "draw_seconds": {
+      "median": {
+       "n": 77,
+       "value": 2.54,
+       "ci": [
+        1.58,
+        3.34
+       ]
+      },
+      "p95": {
+       "n": 77,
+       "value": 33.378,
+       "ci": [
+        16.19,
+        55.69
+       ]
+      }
+     }
+    }
+   },
+   "after": {
+    "tune": {
+     "entries": 47,
+     "pass": {
+      "k": 47,
+      "n": 47,
+      "ci": [
+       0.9244,
+       1.0
+      ]
+     },
+     "crash": {
+      "k": 0,
+      "n": 47,
+      "ci": [
+       0.0,
+       0.0756
+      ]
+     },
+     "refused": {
+      "k": 0,
+      "n": 47,
+      "ci": [
+       0.0,
+       0.0756
+      ]
+     },
+     "floor": {
+      "k": 0,
+      "n": 47,
+      "ci": [
+       0.0,
+       0.0756
+      ]
+     },
+     "criteria": {
+      "k": 0,
+      "n": 47,
+      "ci": [
+       0.0,
+       0.0756
+      ]
+     },
+     "page_failed": {
+      "k": 0,
+      "n": 47,
+      "ci": [
+       0.0,
+       0.0756
+      ]
+     },
+     "seconds": {
+      "median": {
+       "n": 47,
+       "value": 2.8,
+       "ci": [
+        1.65,
+        4.49
+       ]
+      },
+      "p95": {
+       "n": 47,
+       "value": 43.943,
+       "ci": [
+        7.16,
+        66.39
+       ]
+      }
+     },
+     "draw_seconds": {
+      "median": {
+       "n": 47,
+       "value": 2.41,
+       "ci": [
+        1.52,
+        3.98
+       ]
+      },
+      "p95": {
+       "n": 47,
+       "value": 40.072,
+       "ci": [
+        5.44,
+        61.77
+       ]
+      }
+     }
+    },
+    "check": {
+     "entries": 32,
+     "pass": {
+      "k": 28,
+      "n": 32,
+      "ci": [
+       0.7193,
+       0.9503
+      ]
+     },
+     "crash": {
+      "k": 0,
+      "n": 32,
+      "ci": [
+       0.0,
+       0.1072
+      ]
+     },
+     "refused": {
+      "k": 2,
+      "n": 32,
+      "ci": [
+       0.0173,
+       0.2015
+      ]
+     },
+     "floor": {
+      "k": 0,
+      "n": 32,
+      "ci": [
+       0.0,
+       0.1072
+      ]
+     },
+     "criteria": {
+      "k": 2,
+      "n": 32,
+      "ci": [
+       0.0173,
+       0.2015
+      ]
+     },
+     "page_failed": {
+      "k": 0,
+      "n": 32,
+      "ci": [
+       0.0,
+       0.1072
+      ]
+     },
+     "seconds": {
+      "median": {
+       "n": 30,
+       "value": 2.415,
+       "ci": [
+        0.86,
+        5.34
+       ]
+      },
+      "p95": {
+       "n": 30,
+       "value": 22.116,
+       "ci": [
+        9.81,
+        65.26
+       ]
+      }
+     },
+     "draw_seconds": {
+      "median": {
+       "n": 30,
+       "value": 2.19,
+       "ci": [
+        0.69,
+        4.49
+       ]
+      },
+      "p95": {
+       "n": 30,
+       "value": 19.065,
+       "ci": [
+        6.04,
+        61.79
+       ]
+      }
+     }
+    },
+    "all": {
+     "entries": 79,
+     "pass": {
+      "k": 75,
+      "n": 79,
+      "ci": [
+       0.8769,
+       0.9801
+      ]
+     },
+     "crash": {
+      "k": 0,
+      "n": 79,
+      "ci": [
+       0.0,
+       0.0464
+      ]
+     },
+     "refused": {
+      "k": 2,
+      "n": 79,
+      "ci": [
+       0.007,
+       0.0877
+      ]
+     },
+     "floor": {
+      "k": 0,
+      "n": 79,
+      "ci": [
+       0.0,
+       0.0464
+      ]
+     },
+     "criteria": {
+      "k": 2,
+      "n": 79,
+      "ci": [
+       0.007,
+       0.0877
+      ]
+     },
+     "page_failed": {
+      "k": 0,
+      "n": 79,
+      "ci": [
+       0.0,
+       0.0464
+      ]
+     },
+     "seconds": {
+      "median": {
+       "n": 77,
+       "value": 2.68,
+       "ci": [
+        1.73,
+        3.88
+       ]
+      },
+      "p95": {
+       "n": 77,
+       "value": 41.298,
+       "ci": [
+        14.25,
+        65.26
+       ]
+      }
+     },
+     "draw_seconds": {
+      "median": {
+       "n": 77,
+       "value": 2.36,
+       "ci": [
+        1.6,
+        3.48
+       ]
+      },
+      "p95": {
+       "n": 77,
+       "value": 38.692,
+       "ci": [
+        13.02,
+        61.77
+       ]
+      }
+     }
+    }
+   }
+  },
+  "changed": [
+   {
+    "id": "26EL",
+    "half": "tune",
+    "outcome": [
+     "pass",
+     "pass"
+    ],
+    "moved": [
+     "app.svg",
+     "app.png"
+    ],
+    "seconds": [
+     6.92,
+     4.49
+    ],
+    "ui_failed": [
+     false,
+     false
+    ]
+   },
+   {
+    "id": "29TB",
+    "half": "tune",
+    "outcome": [
+     "pass",
+     "pass"
+    ],
+    "moved": [
+     "app.svg",
+     "app.png"
+    ],
+    "seconds": [
+     1.4,
+     1.25
+    ],
+    "ui_failed": [
+     false,
+     false
+    ]
+   },
+   {
+    "id": "31FD",
+    "half": "tune",
+    "outcome": [
+     "fail floor",
+     "pass"
+    ],
+    "moved": [
+     "app.svg",
+     "app.png"
+    ],
+    "seconds": [
+     34.22,
+     40.24
+    ],
+    "ui_failed": [
+     false,
+     false
+    ]
+   },
+   {
+    "id": "9SVL",
+    "half": "check",
+    "outcome": [
+     "pass",
+     "pass"
+    ],
+    "moved": [
+     "app.svg",
+     "app.png"
+    ],
+    "seconds": [
+     1.02,
+     1.1
+    ],
+    "ui_failed": [
+     false,
+     false
+    ]
+   },
+   {
+    "id": "9SXF",
+    "half": "tune",
+    "outcome": [
+     "pass",
+     "pass"
+    ],
+    "moved": [
+     "app.svg",
+     "app.png"
+    ],
+    "seconds": [
+     0.77,
+     0.86
+    ],
+    "ui_failed": [
+     false,
+     false
+    ]
+   },
+   {
+    "id": "9WNE",
+    "half": "tune",
+    "outcome": [
+     "pass",
+     "pass"
+    ],
+    "moved": [
+     "app.svg",
+     "app.png"
+    ],
+    "seconds": [
+     6.67,
+     6.47
+    ],
+    "ui_failed": [
+     false,
+     false
+    ]
+   },
+   {
+    "id": "9X4L",
+    "half": "tune",
+    "outcome": [
+     "fail A20",
+     "pass"
+    ],
+    "moved": [
+     "app.svg",
+     "app.png"
+    ],
+    "seconds": [
+     46.93,
+     45.53
+    ],
+    "ui_failed": [
+     false,
+     false
+    ]
+   },
+   {
+    "id": "9X4M",
+    "half": "check",
+    "outcome": [
+     "fail floor",
+     "pass"
+    ],
+    "moved": [
+     "app.svg",
+     "app.png"
+    ],
+    "seconds": [
+     56.42,
+     65.26
+    ],
+    "ui_failed": [
+     false,
+     false
+    ]
+   },
+   {
+    "id": "9YN3",
+    "half": "check",
+    "outcome": [
+     "pass",
+     "pass"
+    ],
+    "moved": [
+     "app.svg",
+     "app.png"
+    ],
+    "seconds": [
+     20.72,
+     20.48
+    ],
+    "ui_failed": [
+     false,
+     false
+    ]
+   }
+  ],
+  "host_differs": [
+   {
+    "id": "9SY6",
+    "half": "check",
+    "outcome": [
+     "fail A3,A6",
+     "refused"
+    ],
+    "moved": [
+     "app.svg",
+     "app.png"
+    ],
+    "seconds": [
+     42.19,
+     90.11
+    ],
+    "ui_failed": [
+     false,
+     false
+    ]
+   }
+  ],
+  "missing": {
+   "rerun": [],
+   "after": []
+  },
+  "stamps": {
+   "before": {
+    "git": {
+     "commit": "549bef96bf1e40795fc16f6c9459315e304e323b",
+     "dirty": false,
+     "source": "asserted by runner"
+    },
+    "check": "549bef96bf1e40795fc16f6c9459315e304e323b",
+    "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+    "mixed_code": false
+   },
+   "rerun": {
+    "git": {
+     "commit": "f538981b8cfdfd1f77d26bd43e864cf1fede5526",
+     "dirty": false,
+     "source": "asserted by runner"
+    },
+    "check": "f538981b8cfdfd1f77d26bd43e864cf1fede5526",
+    "platform": "Linux-6.8.0-138-generic-x86_64-with-glibc2.35",
+    "mixed_code": false
+   },
+   "after": {
+    "git": {
+     "commit": "162e06751ebbc9dd183d3d0cfde1b82875fb4757",
+     "dirty": false,
+     "source": "asserted by runner"
+    },
+    "check": "162e06751ebbc9dd183d3d0cfde1b82875fb4757",
+    "platform": "Linux-6.8.0-138-generic-x86_64-with-glibc2.35",
+    "mixed_code": false
+   }
+  }
+ },
+ "measures": [
+  {
+   "kind": "campaign",
+   "summary": {
+    "label": "the third sample (random100-third, default view): 64b03ad (main before plan 29's fixes) against the final commit",
+    "entries": [
+     100,
+     100
+    ],
+    "passed": [
+     82,
+     82
+    ],
+    "verdict": "moved",
+    "worse": [],
+    "better": [
+     "9FZL: fallback counts_hidden 2 -> 1",
+     "9FZL: fallback helix_name_moved 22 -> 0",
+     "9FZL: fallback page_text_small 1 -> 0"
+    ],
+    "moved": [
+     "7SPI: area 426.01 -> 338.03",
+     "9FZL: area 65458.72 -> 14561.27"
+    ],
+    "svg_moved": [
+     "1NID",
+     "3ABR",
+     "3G6E",
+     "3WAU",
+     "4GWY",
+     "5S4U",
+     "6IZP",
+     "6PO4",
+     "6VBG",
+     "7F5S",
+     "7SPI",
+     "7XBK",
+     "8EM7",
+     "9FZL"
+    ],
+    "differ": [
+     "1NID",
+     "3ABR",
+     "3G6E",
+     "3WAU",
+     "4GWY",
+     "5S4U",
+     "6IZP",
+     "6PO4",
+     "6VBG",
+     "7F5S",
+     "7SPI",
+     "7XBK",
+     "8EM7",
+     "9FZL"
+    ],
+    "stamps": [
+     {
+      "commit": "64b03ad81a4a0bcd1d2135ee10d42567f6087bfd",
+      "dirty": false,
+      "source": "asserted by runner"
+     },
+     {
+      "commit": "162e06751ebbc9dd183d3d0cfde1b82875fb4757",
+      "dirty": false,
+      "source": "asserted by runner"
+     }
+    ],
+    "reference": false
+   }
+  },
+  {
+   "kind": "campaign",
+   "summary": {
+    "label": "the third sample: its committed report (7696947, views all; read-only) against 64b03ad (code before plan 29's fixes)",
+    "entries": [
+     100,
+     100
+    ],
+    "passed": [
+     83,
+     82
+    ],
+    "verdict": "worse",
+    "worse": [
+     "2YEJ: PASS -> FAIL",
+     "2YEJ: A19 now fails",
+     "3FT8: PASS -> FAIL",
+     "3FT8: A19 now fails",
+     "3G6E: fallback glyph_width_guessed 0 -> 52",
+     "3P2W: PASS -> FAIL",
+     "3P2W: A19 now fails",
+     "4AS1: fallback glyph_width_guessed 0 -> 4",
+     "4B2T: fallback counts_hidden 0 -> 1",
+     "5U3R: PASS -> FAIL",
+     "5U3R: A19 now fails",
+     "5XMX: PASS -> FAIL",
+     "5XMX: A19 now fails",
+     "6LTO: PASS -> FAIL",
+     "6LTO: A19 now fails",
+     "6M67: PASS -> FAIL",
+     "6M67: A19 now fails",
+     "6QIK: fallback counts_hidden 0 -> 1",
+     "6QIK: fallback glyph_width_guessed 0 -> 52",
+     "6QIK: fallback na_run_unclear 0 -> 1",
+     "6ZTQ: fallback counts_hidden 0 -> 1",
+     "7F5S: fallback counts_hidden 0 -> 5",
+     "7F5S: fallback glyph_width_guessed 0 -> 68",
+     "8CRC: PASS -> FAIL",
+     "8CRC: A19 now fails",
+     "8XJV: fallback counts_hidden 0 -> 5",
+     "8XJV: fallback glyph_width_guessed 0 -> 76",
+     "8XJV: fallback helix_name_moved 0 -> 19",
+     "8XJV: fallback na_gap_unclear 0 -> 3",
+     "8XJV: fallback na_tail_straight 0 -> 4",
+     "8XJV: fallback na_trace_unclear 0 -> 3",
+     "8XJV: fallback page_text_small 0 -> 1",
+     "9FZL: fallback counts_hidden 0 -> 2",
+     "9FZL: fallback helix_name_moved 0 -> 22",
+     "9FZL: fallback page_text_small 0 -> 1",
+     "9NMN: fallback loop_over_text 0 -> 1"
+    ],
+    "better": [
+     "4AS1: FAIL -> PASS",
+     "4AS1: A17 now passes",
+     "4YJ5: FAIL -> PASS",
+     "4YJ5: A15 now passes",
+     "6DQN: FAIL -> PASS",
+     "6DQN: A18 now passes",
+     "6VTX: FAIL -> PASS",
+     "6VTX: A17 now passes",
+     "7F5S: FAIL -> PASS",
+     "7F5S: A3 now passes",
+     "7F5S: A6 now passes",
+     "8PIN: FAIL -> PASS",
+     "8PIN: A15 now passes",
+     "9FZL: FAIL -> PASS",
+     "9FZL: A16 now passes",
+     "9FZL: A3 now passes",
+     "9FZL: A4 now passes",
+     "9FZL: A6 now passes"
+    ],
+    "moved": [
+     "1RKA: area 1121.25 -> 679.88",
+     "1VSK: area 352.68 -> 361.36",
+     "3EGZ: area 1478.07 -> 1564.02",
+     "3FT8: area 508.73 -> 433.34",
+     "4GWY: area 1942.44 -> 1633.59",
+     "6PO4: area 524.5 -> 643.66",
+     "6QIK: area 27610.17 -> 27350.66",
+     "7Y63: area 1783.14 -> 1764.17",
+     "8EM7: area 8203.86 -> 8239.72",
+     "8U1N: area 1723.55 -> 1117.64",
+     "9DU3: area 552.51 -> 654.76"
+    ],
+    "svg_moved": [
+     "1RKA",
+     "1VSK",
+     "3EGZ",
+     "3FT8",
+     "3G6E",
+     "4AS1",
+     "4GWY",
+     "6PO4",
+     "6QIK",
+     "7F5S",
+     "7Y63",
+     "8EM7",
+     "8U1N",
+     "8XJV",
+     "9DU3"
+    ],
+    "differ": [
+     "1RKA",
+     "1VSK",
+     "2YEJ",
+     "3EGZ",
+     "3FT8",
+     "3G6E",
+     "3P2W",
+     "4AS1",
+     "4B2T",
+     "4GWY",
+     "4YJ5",
+     "5U3R",
+     "5XMX",
+     "6DQN",
+     "6LTO",
+     "6M67",
+     "6PO4",
+     "6QIK",
+     "6VTX",
+     "6ZTQ",
+     "7F5S",
+     "7Y63",
+     "8CRC",
+     "8EM7",
+     "8PIN",
+     "8U1N",
+     "8XJV",
+     "9DU3",
+     "9FZL",
+     "9NMN"
+    ],
+    "stamps": [
+     null,
+     {
+      "commit": "64b03ad81a4a0bcd1d2135ee10d42567f6087bfd",
+      "dirty": false,
+      "source": "asserted by runner"
+     }
+    ],
+    "reference": true
+   }
+  },
+  {
+   "kind": "campaign",
+   "summary": {
+    "label": "the third sample: its committed report (7696947, views all; read-only) against the final commit",
+    "entries": [
+     100,
+     100
+    ],
+    "passed": [
+     83,
+     82
+    ],
+    "verdict": "worse",
+    "worse": [
+     "2YEJ: PASS -> FAIL",
+     "2YEJ: A19 now fails",
+     "3FT8: PASS -> FAIL",
+     "3FT8: A19 now fails",
+     "3G6E: fallback glyph_width_guessed 0 -> 52",
+     "3P2W: PASS -> FAIL",
+     "3P2W: A19 now fails",
+     "4AS1: fallback glyph_width_guessed 0 -> 4",
+     "4B2T: fallback counts_hidden 0 -> 1",
+     "5U3R: PASS -> FAIL",
+     "5U3R: A19 now fails",
+     "5XMX: PASS -> FAIL",
+     "5XMX: A19 now fails",
+     "6LTO: PASS -> FAIL",
+     "6LTO: A19 now fails",
+     "6M67: PASS -> FAIL",
+     "6M67: A19 now fails",
+     "6QIK: fallback counts_hidden 0 -> 1",
+     "6QIK: fallback glyph_width_guessed 0 -> 52",
+     "6QIK: fallback na_run_unclear 0 -> 1",
+     "6ZTQ: fallback counts_hidden 0 -> 1",
+     "7F5S: fallback counts_hidden 0 -> 5",
+     "7F5S: fallback glyph_width_guessed 0 -> 68",
+     "8CRC: PASS -> FAIL",
+     "8CRC: A19 now fails",
+     "8XJV: fallback counts_hidden 0 -> 5",
+     "8XJV: fallback glyph_width_guessed 0 -> 76",
+     "8XJV: fallback helix_name_moved 0 -> 19",
+     "8XJV: fallback na_gap_unclear 0 -> 3",
+     "8XJV: fallback na_tail_straight 0 -> 4",
+     "8XJV: fallback na_trace_unclear 0 -> 3",
+     "8XJV: fallback page_text_small 0 -> 1",
+     "9FZL: fallback counts_hidden 0 -> 1",
+     "9NMN: fallback loop_over_text 0 -> 1"
+    ],
+    "better": [
+     "4AS1: FAIL -> PASS",
+     "4AS1: A17 now passes",
+     "4YJ5: FAIL -> PASS",
+     "4YJ5: A15 now passes",
+     "6DQN: FAIL -> PASS",
+     "6DQN: A18 now passes",
+     "6VTX: FAIL -> PASS",
+     "6VTX: A17 now passes",
+     "7F5S: FAIL -> PASS",
+     "7F5S: A3 now passes",
+     "7F5S: A6 now passes",
+     "8PIN: FAIL -> PASS",
+     "8PIN: A15 now passes",
+     "9FZL: FAIL -> PASS",
+     "9FZL: A16 now passes",
+     "9FZL: A3 now passes",
+     "9FZL: A4 now passes",
+     "9FZL: A6 now passes"
+    ],
+    "moved": [
+     "1RKA: area 1121.25 -> 679.88",
+     "1VSK: area 352.68 -> 361.36",
+     "3EGZ: area 1478.07 -> 1564.02",
+     "3FT8: area 508.73 -> 433.34",
+     "4GWY: area 1942.44 -> 1633.59",
+     "6PO4: area 524.5 -> 643.66",
+     "6QIK: area 27610.17 -> 27350.66",
+     "7SPI: area 426.01 -> 338.03",
+     "7Y63: area 1783.14 -> 1764.17",
+     "8EM7: area 8203.86 -> 8239.72",
+     "8U1N: area 1723.55 -> 1117.64",
+     "9DU3: area 552.51 -> 654.76",
+     "9FZL: area 65458.72 -> 14561.27"
+    ],
+    "svg_moved": [
+     "1NID",
+     "1RKA",
+     "1VSK",
+     "3ABR",
+     "3EGZ",
+     "3FT8",
+     "3G6E",
+     "3WAU",
+     "4AS1",
+     "4GWY",
+     "5S4U",
+     "6IZP",
+     "6PO4",
+     "6QIK",
+     "6VBG",
+     "7F5S",
+     "7SPI",
+     "7XBK",
+     "7Y63",
+     "8EM7",
+     "8U1N",
+     "8XJV",
+     "9DU3",
+     "9FZL"
+    ],
+    "differ": [
+     "1NID",
+     "1RKA",
+     "1VSK",
+     "2YEJ",
+     "3ABR",
+     "3EGZ",
+     "3FT8",
+     "3G6E",
+     "3P2W",
+     "3WAU",
+     "4AS1",
+     "4B2T",
+     "4GWY",
+     "4YJ5",
+     "5S4U",
+     "5U3R",
+     "5XMX",
+     "6DQN",
+     "6IZP",
+     "6LTO",
+     "6M67",
+     "6PO4",
+     "6QIK",
+     "6VBG",
+     "6VTX",
+     "6ZTQ",
+     "7F5S",
+     "7SPI",
+     "7XBK",
+     "7Y63",
+     "8CRC",
+     "8EM7",
+     "8PIN",
+     "8U1N",
+     "8XJV",
+     "9DU3",
+     "9FZL",
+     "9NMN"
+    ],
+    "stamps": [
+     null,
+     {
+      "commit": "162e06751ebbc9dd183d3d0cfde1b82875fb4757",
+      "dirty": false,
+      "source": "asserted by runner"
+     }
+    ],
+    "reference": true
+   }
+  },
+  {
+   "kind": "campaign",
+   "summary": {
+    "label": "the NA set (na_fixes_record's cases and controls and the NA campaign's entries, 69, default view): 64b03ad against the final commit",
+    "entries": [
+     69,
+     69
+    ],
+    "passed": [
+     54,
+     54
+    ],
+    "verdict": "identical",
+    "worse": [],
+    "better": [],
+    "moved": [],
+    "svg_moved": [
+     "1KX5",
+     "4YBB",
+     "6IZP"
+    ],
+    "differ": [
+     "1KX5",
+     "4YBB",
+     "6IZP"
+    ],
+    "stamps": [
+     {
+      "commit": "64b03ad81a4a0bcd1d2135ee10d42567f6087bfd",
+      "dirty": false,
+      "source": "asserted by runner"
+     },
+     {
+      "commit": "162e06751ebbc9dd183d3d0cfde1b82875fb4757",
+      "dirty": false,
+      "source": "asserted by runner"
+     }
+    ],
+    "reference": false,
+    "na": {
+     "entries": [
+      69,
+      69
+     ],
+     "failing_a17": [
+      [
+       "1YTB",
+       "30QM",
+       "3CRX",
+       "3EGZ",
+       "3KTQ",
+       "4PJO",
+       "4YBB",
+       "6QIK",
+       "6ZY7",
+       "8BW5",
+       "8VBG",
+       "8XJV",
+       "9K4F",
+       "9YLM"
+      ],
+      [
+       "1YTB",
+       "30QM",
+       "3CRX",
+       "3EGZ",
+       "3KTQ",
+       "4PJO",
+       "4YBB",
+       "6QIK",
+       "6ZY7",
+       "8BW5",
+       "8VBG",
+       "8XJV",
+       "9K4F",
+       "9YLM"
+      ]
+     ],
+     "changed": [],
+     "worse": {},
+     "better": {}
+    }
+   }
+  },
+  {
+   "kind": "navalidate",
+   "summary": {
+    "label": "the NA campaign (scripts/na_validate.py, docs/validation/na)",
+    "entries": [
+     39,
+     39
+    ],
+    "passed": [
+     34,
+     34
+    ],
+    "differ": [],
+    "worse": {},
+    "better": {},
+    "stamps": [
+     {
+      "commit": "64b03ad81a4a0bcd1d2135ee10d42567f6087bfd",
+      "dirty": false,
+      "source": "asserted by runner"
+     },
+     {
+      "commit": "162e06751ebbc9dd183d3d0cfde1b82875fb4757",
+      "dirty": false,
+      "source": "asserted by runner"
+     }
+    ]
+   }
+  },
+  {
+   "kind": "science",
+   "summary": {
+    "entries": 630,
+    "judged": 630,
+    "errors": [],
+    "differ": [
+     "9X4L"
+    ],
+    "new_findings": {},
+    "changes": {
+     "9X4L": {
+      "S3": [
+       [
+        "sheet 7: 6 barrel strands drawn, the pairing cycle has 5"
+       ],
+       []
+      ]
+     }
+    },
+    "S3_before": {
+     "9X4L": [
+      "sheet 7: 6 barrel strands drawn, the pairing cycle has 5"
+     ]
+    },
+    "S3_after": {},
+    "sources": {
+     "cache": 491,
+     "tests/data": 92,
+     "tune": 47
+    },
+    "lent_blocks": 1,
+    "lent_entries": [
+     "9X4L"
+    ],
+    "lent_errors": [],
+    "ring_lent": {}
+   }
+  }
+ ],
+ "causes": {
+  "1NID": "Task 4 (fix-ligand: render._place_mark keeps a mark clear of loop lines; the tether-reach step): only its ligand marks, tethers and labels moved (9 SVG groups, every one a ligand's); no key moved",
+  "3ABR": "Task 4 (fix-ligand: render._place_mark keeps a mark clear of loop lines; the tether-reach step): only its ligand marks, tethers and labels moved (6 SVG groups, every one a ligand's); no key moved",
+  "3G6E": "Task 4 (fix-ligand: render._place_mark keeps a mark clear of loop lines; the tether-reach step): only its ligand marks, tethers and labels moved (15 SVG groups, every one a ligand's); no key moved",
+  "3WAU": "Task 4 (fix-ligand: render._place_mark keeps a mark clear of loop lines; the tether-reach step): only its ligand marks, tethers and labels moved (6 SVG groups, every one a ligand's); no key moved",
+  "4GWY": "Task 4 (fix-ligand: render._place_mark keeps a mark clear of loop lines; the tether-reach step): only its ligand marks, tethers and labels moved (10 SVG groups, every one a ligand's); no key moved",
+  "5S4U": "Task 4 (fix-ligand: render._place_mark keeps a mark clear of loop lines; the tether-reach step): only its ligand marks, tethers and labels moved (6 SVG groups, every one a ligand's); no key moved",
+  "6PO4": "Task 4 (fix-ligand: render._place_mark keeps a mark clear of loop lines; the tether-reach step): only its ligand marks, tethers and labels moved (12 SVG groups, every one a ligand's); no key moved",
+  "6VBG": "Task 4 (fix-ligand: render._place_mark keeps a mark clear of loop lines; the tether-reach step): only its ligand marks, tethers and labels moved (12 SVG groups, every one a ligand's); no key moved",
+  "7F5S": "Task 4 (fix-ligand: render._place_mark keeps a mark clear of loop lines; the tether-reach step): only its ligand marks, tethers and labels moved (3 SVG groups, every one a ligand's); no key moved",
+  "7XBK": "Task 4 (fix-ligand: render._place_mark keeps a mark clear of loop lines; the tether-reach step): only its ligand marks, tethers and labels moved (21 SVG groups, every one a ligand's); no key moved",
+  "8EM7": "Task 4 (fix-ligand: render._place_mark keeps a mark clear of loop lines; the tether-reach step): only its ligand marks, tethers and labels moved (7 SVG groups, every one a ligand's); no key moved",
+  "4YBB": "Task 4 (fix-ligand: render._place_mark keeps a mark clear of loop lines; the tether-reach step): only its ligand marks, tethers and labels moved (28 SVG groups, every one a ligand's); no key moved",
+  "1KX5": "Task 4 (fix-ligand: render._place_mark keeps a mark clear of loop lines; the tether-reach step): only its ligand marks, tethers and labels moved (3 SVG groups, every one a ligand's); no key moved",
+  "6IZP": "Task 4 (fix-ligand): the two B2R marks moved inward, so the page is 206.74 -> 203.96 pt wide and every element shifts with it (10 ligand groups moved, the rest translated); no key moved",
+  "9FZL": "Task 5 (fix-floor: focus auto draws one subunit of a two-copy complex whose whole figure is below the readability floor): one subunit, area 65458.72 -> 14561.27, the fallbacks counts_hidden 2 -> 1, helix_name_moved 22 -> 0 and page_text_small 1 -> 0 (better)",
+  "7SPI": "Task 8b Fix A (fix-copies: copies modelled in part are one protein to focus auto): TraV's A1 drawn once, B1 lent where it completes A1's sheet; area 426.01 -> 338.03; pass, criteria and fallbacks identical",
+  "29TB": "Task 4 (fix-ligand: render._place_mark keeps a mark clear of loop lines; the tether-reach step): only its ligand marks, tethers and labels moved (6 SVG groups, every one a ligand's)",
+  "9SXF": "Task 4 (fix-ligand: render._place_mark keeps a mark clear of loop lines; the tether-reach step): only its ligand marks, tethers and labels moved (6 SVG groups, every one a ligand's)",
+  "9WNE": "Task 4 (fix-ligand: render._place_mark keeps a mark clear of loop lines; the tether-reach step): only its ligand marks, tethers and labels moved (4 SVG groups, every one a ligand's)",
+  "9YN3": "Task 4 (fix-ligand: render._place_mark keeps a mark clear of loop lines; the tether-reach step): only its ligand marks, tethers and labels moved (6 SVG groups, every one a ligand's)",
+  "9X4L": "Task 4 (fix-ligand: render._place_mark keeps a mark clear of loop lines; the tether-reach step): only its ligand marks, tethers and labels moved (6 SVG groups, every one a ligand's); its A20 (ligand tethers local) now passes",
+  "9SVL": "Task 4 (fix-ligand): 11 ligand groups moved and the page widened 361.14 -> 374.38 pt with them, so the rest shifts",
+  "26EL": "Task 8b Fix A (fix-copies): focus auto draws A alone, not A, F and M on a diagonal; page 1091 x 1414 -> 525 x 668 pt",
+  "31FD": "Task 5 (fix-floor): the two-copy complex was below the floor whole, so one subunit is drawn; page 3456 x 619 -> 1477 x 883 pt; floor exit -> pass",
+  "9X4M": "Task 5 (fix-floor): the two-copy complex was below the floor whole, so one subunit is drawn; page 3456 x 1203 -> 1746 x 1466 pt; floor exit -> pass"
+ },
+ "slow": {
+  "host": "zyla-office",
+  "stamps": [
+   "f538981b8cfdfd1f77d26bd43e864cf1fede5526",
+   "279289f91f1c403520ab1fd96fa187cee36b3848"
+  ],
+  "entries": [
+   {
+    "id": "9FZL",
+    "half": "lead",
+    "outcome": [
+     "fail floor",
+     "pass"
+    ],
+    "seconds": [
+     55.56,
+     74.14
+    ],
+    "committed_before": null,
+    "moved": [
+     "app.svg",
+     "app.png"
+    ]
+   },
+   {
+    "id": "9SY6",
+    "half": "check",
+    "outcome": [
+     "fail A3,A6",
+     "fail A3,A6"
+    ],
+    "seconds": [
+     45.31,
+     47.04
+    ],
+    "committed_before": "fail A3,A6",
+    "moved": []
+   },
+   {
+    "id": "9SYG",
+    "half": "check",
+    "outcome": [
+     "refused",
+     "refused"
+    ],
+    "seconds": [
+     90.12,
+     90.06
+    ],
+    "committed_before": "refused",
+    "moved": []
+   }
+  ]
+ }
+}

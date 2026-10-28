@@ -1,0 +1,102 @@
+{
+ "source_stamp": {
+  "foldmap": "0.1.0",
+  "code_fingerprint": "f624dcc2403b2888",
+  "package": "checkout",
+  "checkout_fingerprint": "f624dcc2403b2888",
+  "installed_matches_checkout": true,
+  "git": {
+   "commit": "f538981b8cfdfd1f77d26bd43e864cf1fede5526",
+   "dirty": false,
+   "source": "asserted by runner"
+  },
+  "script": {
+   "name": "scripts/app29.py",
+   "sha256": "cdf60fa1e05239c2d5fcd93ce5d5945f8e260122ff9af7ed8a25b61ffa6f605e"
+  },
+  "python": {
+   "version": "3.13.13",
+   "implementation": "CPython"
+  },
+  "platform": {
+   "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+   "machine": "x86_64"
+  },
+  "packages": {
+   "gemmi": "0.7.5",
+   "numpy": "2.5.4",
+   "scipy": "1.18.1",
+   "networkx": "3.7",
+   "matplotlib": "3.11.2",
+   "PyYAML": "6.0.3"
+  }
+ },
+ "what": "the check half's rows of report.json: for plan 29's before/after measure only (load_both)",
+ "entries": [
+  {
+   "id": "9SY6",
+   "dir": "sealed/63fc717129f5",
+   "stratum": "S8",
+   "half": "check",
+   "residues": 10298,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [
+    "A3",
+    "A6"
+   ],
+   "criteria_detail": {
+    "A3": "default: strand A:247-248",
+    "A6": "default 3 (na:tie:198-248:label \u00d7 na:tie:194-201; terminus:C:S \u00d7 na:tie:811-1523:mark; terminus:C:S \u00d7 na:tie:1395-1495:mark)"
+   },
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 45.31,
+   "draw_seconds": 42.22,
+   "peak_mb": "not measured",
+   "svg_bytes": 2677090,
+   "png_bytes": 6053217,
+   "process": {
+    "exit": 0,
+    "seconds": 93.87,
+    "max_rss_mb": 498.1,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "259b80ad4d812d3aabf2fff4108a4ed580167f8b86e3430458e21faf862becaa",
+    "app.svg": "a9021e7302e03aed5bd6c08dee02fa194e3e7df6f8fc5a7c0cb4242693cfabac"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "9SYG",
+   "dir": "sealed/0a9f6fc5dfa3",
+   "stratum": "S8",
+   "half": "check",
+   "residues": 16721,
+   "refused": "time",
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": null,
+   "floor_reasons": [],
+   "seconds": 90.12,
+   "draw_seconds": null,
+   "peak_mb": "not measured",
+   "svg_bytes": null,
+   "png_bytes": null,
+   "process": {
+    "exit": 0,
+    "seconds": 91.67,
+    "max_rss_mb": 119.4,
+    "timed_out": false
+   },
+   "files": {},
+   "ui": "not run"
+  }
+ ]
+}

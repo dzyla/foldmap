@@ -1,0 +1,209 @@
+{
+ "source_stamp": {
+  "foldmap": "0.1.0",
+  "code_fingerprint": "f624dcc2403b2888",
+  "package": "checkout",
+  "checkout_fingerprint": "f624dcc2403b2888",
+  "installed_matches_checkout": true,
+  "git": {
+   "commit": "f538981b8cfdfd1f77d26bd43e864cf1fede5526",
+   "dirty": false,
+   "source": "asserted by runner"
+  },
+  "script": {
+   "name": "scripts/app29.py",
+   "sha256": "cdf60fa1e05239c2d5fcd93ce5d5945f8e260122ff9af7ed8a25b61ffa6f605e"
+  },
+  "python": {
+   "version": "3.13.13",
+   "implementation": "CPython"
+  },
+  "platform": {
+   "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+   "machine": "x86_64"
+  },
+  "packages": {
+   "gemmi": "0.7.5",
+   "numpy": "2.5.4",
+   "scipy": "1.18.1",
+   "networkx": "3.7",
+   "matplotlib": "3.11.2",
+   "PyYAML": "6.0.3"
+  }
+ },
+ "entry_code": {
+  "f624dcc2403b2888+cdf60fa1e05239c2": 3
+ },
+ "mixed_code": false,
+ "sample": {
+  "path": "docs/validation/app29/sample.json",
+  "sha256": "b3ed519636c18f0f72064b7c84c69387ffcd2e2dc84e1b26785b4f330b961b14",
+  "seed": 20261027,
+  "query_date": "2026-10-27",
+  "released_after": "2026-10-13",
+  "split": {
+   "tune": 47,
+   "check": 32
+  },
+  "strata": [
+   {
+    "stratum": "S1",
+    "title": "X-ray, 1 protein chain",
+    "target": 12,
+    "drawn": 12,
+    "short": 0
+   },
+   {
+    "stratum": "S2",
+    "title": "X-ray homo-oligomer (symmetric)",
+    "target": 12,
+    "drawn": 10,
+    "short": 2
+   },
+   {
+    "stratum": "S3",
+    "title": "X-ray hetero-complex",
+    "target": 10,
+    "drawn": 6,
+    "short": 4
+   },
+   {
+    "stratum": "S4",
+    "title": "cryo-EM",
+    "target": 15,
+    "drawn": 15,
+    "short": 0
+   },
+   {
+    "stratum": "S5",
+    "title": "NMR, multi-model",
+    "target": 8,
+    "drawn": 7,
+    "short": 1
+   },
+   {
+    "stratum": "S6",
+    "title": "Membrane",
+    "target": 8,
+    "drawn": 0,
+    "short": 8
+   },
+   {
+    "stratum": "S7",
+    "title": "Protein-DNA",
+    "target": 7,
+    "drawn": 6,
+    "short": 1
+   },
+   {
+    "stratum": "S8",
+    "title": "Protein-RNA",
+    "target": 7,
+    "drawn": 6,
+    "short": 1
+   },
+   {
+    "stratum": "S9",
+    "title": "RNA only",
+    "target": 3,
+    "drawn": 3,
+    "short": 0
+   },
+   {
+    "stratum": "S10",
+    "title": "Glycoproteins",
+    "target": 5,
+    "drawn": 4,
+    "short": 1
+   },
+   {
+    "stratum": "S11",
+    "title": "One protein, two states (5 pairs)",
+    "target": 10,
+    "drawn": 10,
+    "short": 0
+   },
+   {
+    "stratum": "S12",
+    "title": "AlphaFold DB models",
+    "target": 3,
+    "drawn": 0,
+    "short": 3,
+    "not_drawn": "not drawn (--no-alphafold): an AlphaFold DB pool has no release window (ruling Q61)"
+   }
+  ]
+ },
+ "totals": {
+  "tune": {
+   "entries": 0,
+   "drawn": 0,
+   "refused": 0,
+   "error": 0,
+   "not_measured": 0,
+   "png_error": 0,
+   "criteria_failed": 0,
+   "floor_failed": 0,
+   "ui_run": 0,
+   "ui_failed": 0
+  },
+  "check": {
+   "entries": 2,
+   "drawn": 1,
+   "refused": 1,
+   "error": 0,
+   "not_measured": 0,
+   "png_error": 0,
+   "criteria_failed": 1,
+   "floor_failed": 0,
+   "ui_run": 0,
+   "ui_failed": 0
+  },
+  "all": {
+   "entries": 3,
+   "drawn": 2,
+   "refused": 1,
+   "error": 0,
+   "not_measured": 0,
+   "png_error": 0,
+   "criteria_failed": 1,
+   "floor_failed": 1,
+   "ui_run": 0,
+   "ui_failed": 0
+  }
+ },
+ "entries": [
+  {
+   "id": "9FZL",
+   "dir": "9FZL",
+   "stratum": "-",
+   "half": "-",
+   "residues": 16196,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": false,
+   "floor_reasons": [
+    "its text is 2.0 pt, under 6 pt, on its 48 x 10 in page (its smallest text 1.2 pt)"
+   ],
+   "seconds": 55.56,
+   "draw_seconds": 51.9,
+   "peak_mb": "not measured",
+   "svg_bytes": 4421316,
+   "png_bytes": 4284341,
+   "process": {
+    "exit": 0,
+    "seconds": 114.71,
+    "max_rss_mb": 453.9,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "afd81559abfc6eb2895e59c0a231722a217b5fd16e57b7c6239c1bfcc976ea5b",
+    "app.svg": "2fbb74c7de724819c8dc3e6d419f4d449f014a9925e9ccf0e4be0a9b0859cee2"
+   },
+   "ui": "not run"
+  }
+ ]
+}

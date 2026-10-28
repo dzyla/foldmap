@@ -1,0 +1,238 @@
+{
+ "source_stamp": {
+  "foldmap": "0.1.0",
+  "code_fingerprint": "893407124ec081be",
+  "package": "checkout",
+  "checkout_fingerprint": "893407124ec081be",
+  "installed_matches_checkout": true,
+  "git": {
+   "commit": "b84ebc3f404d263a04a69316f05e0a34d4a5ffe8",
+   "dirty": false,
+   "source": "asserted by runner"
+  },
+  "script": {
+   "name": "scripts/app29_after.py",
+   "sha256": "c276cd542481262dfaa599d35f5b66fc160f1f5dd8bac2c2814acbdb18319c16"
+  },
+  "python": {
+   "version": "3.13.2",
+   "implementation": "CPython"
+  },
+  "platform": {
+   "platform": "Linux-6.8.0-138-generic-x86_64-with-glibc2.35",
+   "machine": "x86_64"
+  },
+  "packages": {
+   "gemmi": "0.7.5",
+   "numpy": "2.5.4",
+   "scipy": "1.18.1",
+   "networkx": "3.7",
+   "matplotlib": "3.11.2",
+   "PyYAML": "6.0.3"
+  }
+ },
+ "labels": [
+  "before (f538981)",
+  "after (162e067)"
+ ],
+ "pairs": [
+  {
+   "pair": "26EL",
+   "id": "26EL",
+   "half": "tune",
+   "why": "its SVG changed; lead: Task 8b named entry: focus auto draws one copy (A alone)",
+   "sheet": "docs/superpowers/work/app29/after/sheets/26EL.png",
+   "sheet_sha256": "da009fff03d2c699b30e7992cfa54c1e95037a9340f02bab5f308b3441b3d89a",
+   "px_per_pt": 1.1315,
+   "before_svg": "06964d4e7ba9e9587b0b7bef9c1b454435a7cb3b50738f639631e46fc64e744d",
+   "after_svg": "ff51eedcb96741824a153c77fecf731fb66fc87410f7982d0fea30adba531ffb",
+   "outcome": [
+    "pass",
+    "pass"
+   ]
+  },
+  {
+   "pair": "29TB",
+   "id": "29TB",
+   "half": "tune",
+   "why": "its SVG changed",
+   "sheet": "docs/superpowers/work/app29/after/sheets/29TB.png",
+   "sheet_sha256": "91c39eb34bb62b0ee052414fc591d9d5b216ca14624b4670e991972db60e9022",
+   "px_per_pt": 3.6202,
+   "before_svg": "68540b113d37585850b8ec55987eafd04410819231d7f9c789fba61492a6635e",
+   "after_svg": "9ec3c71fe08dc76d95b26eb47fad4e8ba57a20dd55174a191e33d8f3f9528d16",
+   "outcome": [
+    "pass",
+    "pass"
+   ]
+  },
+  {
+   "pair": "31FD",
+   "id": "31FD",
+   "half": "tune",
+   "why": "its SVG changed; lead: Task 5 named entry: a two-copy complex under the floor, now one subunit",
+   "sheet": "docs/superpowers/work/app29/after/sheets/31FD.png",
+   "sheet_sha256": "ff7472d4e6be8f2a0a3c1be0af252e94affbe674d61d6cd12418ab780eb3d133",
+   "px_per_pt": 0.463,
+   "before_svg": "e9f0b5fd6cfdc458042f24733e4cf7de393b6421f8348bf8f41305a90c271133",
+   "after_svg": "c1d847a64133612194d3b37fc96bcc49588647d70d562eb71f92e7aa04fa2a5e",
+   "outcome": [
+    "fail floor",
+    "pass"
+   ]
+  },
+  {
+   "pair": "9SVL",
+   "id": "9SVL",
+   "half": "check",
+   "why": "its SVG changed",
+   "sheet": "docs/superpowers/work/app29/after/sheets/9SVL.png",
+   "sheet_sha256": "c894c5d16381589b918bb7d04fb836f6613afa2f434af022951982bcafe31636",
+   "px_per_pt": 3.6195,
+   "before_svg": "cbc5a72351702af7db9ecf5c4df828648944ff361093c865ef6607d8e97a1855",
+   "after_svg": "dcdfab4be9bdca4883ade5f8428d0e1eb0c1e1d840fb14d9f32787ee560f5186",
+   "outcome": [
+    "pass",
+    "pass"
+   ]
+  },
+  {
+   "pair": "9SXF",
+   "id": "9SXF",
+   "half": "tune",
+   "why": "its SVG changed",
+   "sheet": "docs/superpowers/work/app29/after/sheets/9SXF.png",
+   "sheet_sha256": "1a17e127871415e7c19bb6db0a6d7b5f2cd9b9695a27b174540b9825606991b3",
+   "px_per_pt": 3.0864,
+   "before_svg": "8896426b730f79e9f29c8807b321d8e0a07ec3fdfc1a13f714de8807e7da371d",
+   "after_svg": "7ae2b11572053103377143cc0f56fd10cc16fb76c2e406651a928b6f77ad8528",
+   "outcome": [
+    "pass",
+    "pass"
+   ]
+  },
+  {
+   "pair": "9WNE",
+   "id": "9WNE",
+   "half": "tune",
+   "why": "its SVG changed; lead: Task 4: the Mg moved off the loop crossing",
+   "sheet": "docs/superpowers/work/app29/after/sheets/9WNE.png",
+   "sheet_sha256": "4fb29ec6cda4df4a1c89b9b72120338d9b7da828d48ef06e7fd69f072a4ddbaa",
+   "px_per_pt": 1.654,
+   "before_svg": "c40bb7fc773207ebb5cf0baa23b91531952972a4fe8619b6e54c19627f91a1e1",
+   "after_svg": "138613e329e5ca33a7a11b668f269e72418c7656760970d7944d9414dae1952d",
+   "outcome": [
+    "pass",
+    "pass"
+   ]
+  },
+  {
+   "pair": "9X4L",
+   "id": "9X4L",
+   "half": "tune",
+   "why": "its SVG changed; lead: Task 4 named entry (A20) and Task 7 (S3); a giant assembly",
+   "sheet": "docs/superpowers/work/app29/after/sheets/9X4L.png",
+   "sheet_sha256": "72816b6b00ab376dd9af46133f872d2ab626857c3542fa5a1c686b267be53f74",
+   "px_per_pt": 0.4805,
+   "before_svg": "40184e89b350c5bc773bb4aa6daa927ff45a9a9db634252f1db2e0f79e88894e",
+   "after_svg": "606eecd5cd80a9ae3d8085ea0774be7ad4e4c380c755649968e7e589fd54fba3",
+   "outcome": [
+    "fail A20",
+    "pass"
+   ]
+  },
+  {
+   "pair": "9X4M",
+   "id": "9X4M",
+   "half": "check",
+   "why": "its SVG changed",
+   "sheet": "docs/superpowers/work/app29/after/sheets/9X4M.png",
+   "sheet_sha256": "dc81f783d16786a780ac985df7a7db1339759821175e5879f04424128c04023d",
+   "px_per_pt": 0.463,
+   "before_svg": "b289900777870fa487c7c21b357d3987a4a341829a6b545cad4423121be6e912",
+   "after_svg": "b775282bc7b7764c841a7c0c64fb5f9c6a05cd9c43caa40bb522c4ba0c028019",
+   "outcome": [
+    "fail floor",
+    "pass"
+   ]
+  },
+  {
+   "pair": "9YN3",
+   "id": "9YN3",
+   "half": "check",
+   "why": "its SVG changed",
+   "sheet": "docs/superpowers/work/app29/after/sheets/9YN3.png",
+   "sheet_sha256": "8b02d86c5a8a39b3bf71d1eb34e86886f144c0b30d6c596c2f0a95196576468b",
+   "px_per_pt": 0.8445,
+   "before_svg": "731c565a8191b7e87bb789a56a2c0ddc97d98755b0806e3f63abf0612120a240",
+   "after_svg": "d4462c94c7e66aa0942f49b5c2543a3a5489818657be016db3006048ac576fcd",
+   "outcome": [
+    "pass",
+    "pass"
+   ]
+  },
+  {
+   "pair": "6JLN",
+   "id": "6JLN",
+   "half": "lead",
+   "why": "lead: Task 5 lead: a two-copy complex under the floor (plan 28's six sample defaults)",
+   "sheet": "docs/superpowers/work/app29/after/sheets/6JLN.png",
+   "sheet_sha256": "379798ade9b7c38f0f7616022790213337eeeccc5432a27679855c8dd8d1c926",
+   "px_per_pt": 0.463,
+   "before_svg": "d76c0330d6f9aa6c97a4f477f3b32cdb048044903c5968beb4a46f35d62ace87",
+   "after_svg": "35bfa63d8975b915a3d41f5edbdc7bfe600e55c5235a20204caa3dd75ef02e5a",
+   "outcome": null
+  },
+  {
+   "pair": "9FZL",
+   "id": "9FZL",
+   "half": "lead",
+   "why": "lead: Task 5 lead: under the floor (plan 28's six sample defaults; third sample) (zyla-office: over the hosted job limit on the run's host)",
+   "sheet": "docs/superpowers/work/app29/after/sheets/9FZL.png",
+   "sheet_sha256": "cd5b08b9852eaec176a139c2cdcfe55e7b7c7c33242f2f763b3ebfd6ec09198a",
+   "px_per_pt": 0.463,
+   "before_svg": "2fbb74c7de724819c8dc3e6d419f4d449f014a9925e9ccf0e4be0a9b0859cee2",
+   "after_svg": "3da210018e748c724ce2489eb622ded61a70e6c3689475ac6c84ac7688f13aea",
+   "outcome": null
+  },
+  {
+   "pair": "7SPI",
+   "id": "7SPI",
+   "half": "lead",
+   "why": "lead: Task 8b: TraV copies modelled in part, one protein (third sample)",
+   "sheet": "docs/superpowers/work/app29/after/sheets/7SPI.png",
+   "sheet_sha256": "dc6e2ef8ee722a9d8964521e1e571ce522d57a9973cc964eaa08d20128587c9f",
+   "px_per_pt": 2.7019,
+   "before_svg": "713c1ced9e667c21dd48fac45de421d757864284723515e67755b50cbb3250fa",
+   "after_svg": "cb3a48c69effc24e3e397ed5918448ac422e854188876ac3e6014ae563d11200",
+   "outcome": null
+  },
+  {
+   "pair": "1KX5",
+   "id": "1KX5",
+   "half": "lead",
+   "why": "lead: Task 4: the nucleosome's Mn mark moved (NA control)",
+   "sheet": "docs/superpowers/work/app29/after/sheets/1KX5.png",
+   "sheet_sha256": "73a12e689f36b317d8dcbff137212c1de1905d605d147f9a52619c4980ec606f",
+   "px_per_pt": 1.2583,
+   "before_svg": "4e72b11c3e59a0758714a4fb931e30268cb12ff9709c26acafed0828209f2ad1",
+   "after_svg": "d1957b3409aaaf05e96b4b49c8148d1f61ed2306b6bdf260c33c1c483cb50cb3",
+   "outcome": null
+  },
+  {
+   "pair": "9WNE-crop",
+   "id": "9WNE",
+   "half": "crop",
+   "why": "P29-10: the A1301/A1302 Mg tethers lying along each other (Task 4), cropped to the two marks",
+   "sheet": "docs/superpowers/work/app29/after/sheets/9WNE-crop.png",
+   "sheet_sha256": "2f95f318e17547ef57197fd107a7a9394399a65e2b418807cba45dc124998246",
+   "px_per_pt": 4.1661,
+   "before_svg": "c40bb7fc773207ebb5cf0baa23b91531952972a4fe8619b6e54c19627f91a1e1",
+   "after_svg": "138613e329e5ca33a7a11b668f269e72418c7656760970d7944d9414dae1952d",
+   "outcome": [
+    "pass",
+    "pass"
+   ]
+  }
+ ]
+}

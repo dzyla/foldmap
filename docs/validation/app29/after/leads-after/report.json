@@ -1,0 +1,297 @@
+{
+ "source_stamp": {
+  "foldmap": "0.1.0",
+  "code_fingerprint": "893407124ec081be",
+  "package": "checkout",
+  "checkout_fingerprint": "893407124ec081be",
+  "installed_matches_checkout": true,
+  "git": {
+   "commit": "162e06751ebbc9dd183d3d0cfde1b82875fb4757",
+   "dirty": false,
+   "source": "asserted by runner"
+  },
+  "script": {
+   "name": "scripts/app29.py",
+   "sha256": "cdf60fa1e05239c2d5fcd93ce5d5945f8e260122ff9af7ed8a25b61ffa6f605e"
+  },
+  "python": {
+   "version": "3.13.2",
+   "implementation": "CPython"
+  },
+  "platform": {
+   "platform": "Linux-6.8.0-138-generic-x86_64-with-glibc2.35",
+   "machine": "x86_64"
+  },
+  "packages": {
+   "gemmi": "0.7.5",
+   "numpy": "2.5.4",
+   "scipy": "1.18.1",
+   "networkx": "3.7",
+   "matplotlib": "3.11.2",
+   "PyYAML": "6.0.3"
+  }
+ },
+ "entry_code": {
+  "893407124ec081be+cdf60fa1e05239c2": 4
+ },
+ "mixed_code": false,
+ "sample": {
+  "path": "docs/validation/app29/sample.json",
+  "sha256": "b3ed519636c18f0f72064b7c84c69387ffcd2e2dc84e1b26785b4f330b961b14",
+  "seed": 20261027,
+  "query_date": "2026-10-27",
+  "released_after": "2026-10-13",
+  "split": {
+   "tune": 47,
+   "check": 32
+  },
+  "strata": [
+   {
+    "stratum": "S1",
+    "title": "X-ray, 1 protein chain",
+    "target": 12,
+    "drawn": 12,
+    "short": 0
+   },
+   {
+    "stratum": "S2",
+    "title": "X-ray homo-oligomer (symmetric)",
+    "target": 12,
+    "drawn": 10,
+    "short": 2
+   },
+   {
+    "stratum": "S3",
+    "title": "X-ray hetero-complex",
+    "target": 10,
+    "drawn": 6,
+    "short": 4
+   },
+   {
+    "stratum": "S4",
+    "title": "cryo-EM",
+    "target": 15,
+    "drawn": 15,
+    "short": 0
+   },
+   {
+    "stratum": "S5",
+    "title": "NMR, multi-model",
+    "target": 8,
+    "drawn": 7,
+    "short": 1
+   },
+   {
+    "stratum": "S6",
+    "title": "Membrane",
+    "target": 8,
+    "drawn": 0,
+    "short": 8
+   },
+   {
+    "stratum": "S7",
+    "title": "Protein-DNA",
+    "target": 7,
+    "drawn": 6,
+    "short": 1
+   },
+   {
+    "stratum": "S8",
+    "title": "Protein-RNA",
+    "target": 7,
+    "drawn": 6,
+    "short": 1
+   },
+   {
+    "stratum": "S9",
+    "title": "RNA only",
+    "target": 3,
+    "drawn": 3,
+    "short": 0
+   },
+   {
+    "stratum": "S10",
+    "title": "Glycoproteins",
+    "target": 5,
+    "drawn": 4,
+    "short": 1
+   },
+   {
+    "stratum": "S11",
+    "title": "One protein, two states (5 pairs)",
+    "target": 10,
+    "drawn": 10,
+    "short": 0
+   },
+   {
+    "stratum": "S12",
+    "title": "AlphaFold DB models",
+    "target": 3,
+    "drawn": 0,
+    "short": 3,
+    "not_drawn": "not drawn (--no-alphafold): an AlphaFold DB pool has no release window (ruling Q61)"
+   }
+  ]
+ },
+ "totals": {
+  "tune": {
+   "entries": 0,
+   "drawn": 0,
+   "refused": 0,
+   "error": 0,
+   "not_measured": 0,
+   "png_error": 0,
+   "criteria_failed": 0,
+   "floor_failed": 0,
+   "ui_run": 0,
+   "ui_failed": 0
+  },
+  "check": {
+   "entries": 0,
+   "drawn": 0,
+   "refused": 0,
+   "error": 0,
+   "not_measured": 0,
+   "png_error": 0,
+   "criteria_failed": 0,
+   "floor_failed": 0,
+   "ui_run": 0,
+   "ui_failed": 0
+  },
+  "all": {
+   "entries": 4,
+   "drawn": 3,
+   "refused": 1,
+   "error": 0,
+   "not_measured": 0,
+   "png_error": 0,
+   "criteria_failed": 0,
+   "floor_failed": 0,
+   "ui_run": 0,
+   "ui_failed": 0
+  }
+ },
+ "entries": [
+  {
+   "id": "6JLN",
+   "dir": "6JLN",
+   "stratum": "-",
+   "half": "-",
+   "residues": 5293,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 50.82,
+   "draw_seconds": 48.41,
+   "peak_mb": "not measured",
+   "svg_bytes": 899226,
+   "png_bytes": 3098418,
+   "process": {
+    "exit": 0,
+    "seconds": 105.67,
+    "max_rss_mb": 342.4,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "e3f69b04ab2f1f321e1181c142761591965953fa9c482c60ba0df7f660e4a2ab",
+    "app.svg": "35bfa63d8975b915a3d41f5edbdc7bfe600e55c5235a20204caa3dd75ef02e5a"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "9FZL",
+   "dir": "9FZL",
+   "stratum": "-",
+   "half": "-",
+   "residues": 16196,
+   "refused": "time",
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": null,
+   "floor_reasons": [],
+   "seconds": 90.11,
+   "draw_seconds": null,
+   "peak_mb": "not measured",
+   "svg_bytes": null,
+   "png_bytes": null,
+   "process": {
+    "exit": 0,
+    "seconds": 92.54,
+    "max_rss_mb": 120.6,
+    "timed_out": false
+   },
+   "files": {},
+   "ui": "not run"
+  },
+  {
+   "id": "7SPI",
+   "dir": "7SPI",
+   "stratum": "-",
+   "half": "-",
+   "residues": 7488,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 1.95,
+   "draw_seconds": 1.52,
+   "peak_mb": "not measured",
+   "svg_bytes": 50545,
+   "png_bytes": 197177,
+   "process": {
+    "exit": 0,
+    "seconds": 8.27,
+    "max_rss_mb": 291.2,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "c43c59d58e65ed1ad25928a8cc5bbeebe6097e2e2f5ef380fb49f5fd10b7a910",
+    "app.svg": "cb3a48c69effc24e3e397ed5918448ac422e854188876ac3e6014ae563d11200"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "1KX5",
+   "dir": "1KX5",
+   "stratum": "-",
+   "half": "-",
+   "residues": 1268,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 2.66,
+   "draw_seconds": 2.56,
+   "peak_mb": "not measured",
+   "svg_bytes": 479659,
+   "png_bytes": 1965939,
+   "process": {
+    "exit": 0,
+    "seconds": 12.38,
+    "max_rss_mb": 187.0,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "6c61b55c05713e21b51c91e508a4e6f38d6d152bc3930b3a5a41ff01b2fd3d15",
+    "app.svg": "d1957b3409aaaf05e96b4b49c8148d1f61ed2306b6bdf260c33c1c483cb50cb3"
+   },
+   "ui": "not run"
+  }
+ ]
+}

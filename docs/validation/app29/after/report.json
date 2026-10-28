@@ -1,0 +1,4218 @@
+{
+ "source_stamp": {
+  "foldmap": "0.1.0",
+  "code_fingerprint": "893407124ec081be",
+  "package": "checkout",
+  "checkout_fingerprint": "893407124ec081be",
+  "installed_matches_checkout": true,
+  "git": {
+   "commit": "162e06751ebbc9dd183d3d0cfde1b82875fb4757",
+   "dirty": false,
+   "source": "asserted by runner"
+  },
+  "script": {
+   "name": "scripts/app29.py",
+   "sha256": "cdf60fa1e05239c2d5fcd93ce5d5945f8e260122ff9af7ed8a25b61ffa6f605e"
+  },
+  "python": {
+   "version": "3.13.2",
+   "implementation": "CPython"
+  },
+  "platform": {
+   "platform": "Linux-6.8.0-138-generic-x86_64-with-glibc2.35",
+   "machine": "x86_64"
+  },
+  "packages": {
+   "gemmi": "0.7.5",
+   "numpy": "2.5.4",
+   "scipy": "1.18.1",
+   "networkx": "3.7",
+   "matplotlib": "3.11.2",
+   "PyYAML": "6.0.3"
+  }
+ },
+ "entry_code": {
+  "893407124ec081be+cdf60fa1e05239c2": 126
+ },
+ "mixed_code": false,
+ "sample": {
+  "path": "docs/validation/app29/sample.json",
+  "sha256": "b3ed519636c18f0f72064b7c84c69387ffcd2e2dc84e1b26785b4f330b961b14",
+  "seed": 20261027,
+  "query_date": "2026-10-27",
+  "released_after": "2026-10-13",
+  "split": {
+   "tune": 47,
+   "check": 32
+  },
+  "strata": [
+   {
+    "stratum": "S1",
+    "title": "X-ray, 1 protein chain",
+    "target": 12,
+    "drawn": 12,
+    "short": 0
+   },
+   {
+    "stratum": "S2",
+    "title": "X-ray homo-oligomer (symmetric)",
+    "target": 12,
+    "drawn": 10,
+    "short": 2
+   },
+   {
+    "stratum": "S3",
+    "title": "X-ray hetero-complex",
+    "target": 10,
+    "drawn": 6,
+    "short": 4
+   },
+   {
+    "stratum": "S4",
+    "title": "cryo-EM",
+    "target": 15,
+    "drawn": 15,
+    "short": 0
+   },
+   {
+    "stratum": "S5",
+    "title": "NMR, multi-model",
+    "target": 8,
+    "drawn": 7,
+    "short": 1
+   },
+   {
+    "stratum": "S6",
+    "title": "Membrane",
+    "target": 8,
+    "drawn": 0,
+    "short": 8
+   },
+   {
+    "stratum": "S7",
+    "title": "Protein-DNA",
+    "target": 7,
+    "drawn": 6,
+    "short": 1
+   },
+   {
+    "stratum": "S8",
+    "title": "Protein-RNA",
+    "target": 7,
+    "drawn": 6,
+    "short": 1
+   },
+   {
+    "stratum": "S9",
+    "title": "RNA only",
+    "target": 3,
+    "drawn": 3,
+    "short": 0
+   },
+   {
+    "stratum": "S10",
+    "title": "Glycoproteins",
+    "target": 5,
+    "drawn": 4,
+    "short": 1
+   },
+   {
+    "stratum": "S11",
+    "title": "One protein, two states (5 pairs)",
+    "target": 10,
+    "drawn": 10,
+    "short": 0
+   },
+   {
+    "stratum": "S12",
+    "title": "AlphaFold DB models",
+    "target": 3,
+    "drawn": 0,
+    "short": 3,
+    "not_drawn": "not drawn (--no-alphafold): an AlphaFold DB pool has no release window (ruling Q61)"
+   }
+  ]
+ },
+ "totals": {
+  "tune": {
+   "entries": 47,
+   "drawn": 47,
+   "refused": 0,
+   "error": 0,
+   "not_measured": 0,
+   "png_error": 0,
+   "criteria_failed": 0,
+   "floor_failed": 0,
+   "ui_run": 47,
+   "ui_failed": 0
+  },
+  "check": {
+   "entries": 32,
+   "drawn": 30,
+   "refused": 2,
+   "error": 0,
+   "not_measured": 0,
+   "png_error": 0,
+   "criteria_failed": 2,
+   "floor_failed": 0,
+   "ui_run": 0,
+   "ui_failed": 0
+  },
+  "all": {
+   "entries": 79,
+   "drawn": 77,
+   "refused": 2,
+   "error": 0,
+   "not_measured": 0,
+   "png_error": 0,
+   "criteria_failed": 2,
+   "floor_failed": 0,
+   "ui_run": 47,
+   "ui_failed": 0
+  }
+ },
+ "entries": [
+  {
+   "id": "9SXY",
+   "dir": "9SXY",
+   "stratum": "S1",
+   "half": "tune",
+   "residues": 339,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 1.01,
+   "draw_seconds": 0.9,
+   "peak_mb": "not measured",
+   "svg_bytes": 89076,
+   "png_bytes": 275479,
+   "process": {
+    "exit": 0,
+    "seconds": 8.67,
+    "max_rss_mb": 131.8,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "6766fdd7633f3ecf952616c3c6400f1febf860a32d6c9b62b770fd11d436a174",
+    "app.svg": "e9d6fd57e29737c5d10e1162f7ef3013ac310d3f991bc3e5a0687d69bee16947",
+    "ui-data.json": "67444504adfe8d9a14e7a8691d3841c03fd3110906a53aa3224e2b50bab305a2",
+    "ui-data.zip": "fb8cf83f3ce63c3e795acffca2d6f3a2402ecfa8b5a477a0914ccbcaa9051802",
+    "ui-layout.yaml": "9a12a47ab4b12d87abab13e31a39e0e5c29c33b8efbcc4633072efd161feaaf8",
+    "ui.pdf": "b3b94a29212f3523c6f6b897dec2ab40acc9eee5fcee9d52f823e409417766f0",
+    "ui.png": "4edea8f2973a82e355b41bc7d6d09852dc69c08d6b5636b71c2522b6a8af20c1",
+    "ui.svg": "1ec714b6b67a38898c35784ffe3076220997ac457443360074597fe868886d9d"
+   },
+   "ui": {
+    "exception": null,
+    "errors": [],
+    "warnings": [],
+    "steps": [
+     "load",
+     "theme minimal",
+     "downloads"
+    ],
+    "stage": "edit",
+    "downloads": {
+     "dl_svg": {
+      "bytes": 89061,
+      "sha256": "1ec714b6b67a38898c35784ffe3076220997ac457443360074597fe868886d9d",
+      "ok": true
+     },
+     "dl_png": {
+      "bytes": 308484,
+      "sha256": "4edea8f2973a82e355b41bc7d6d09852dc69c08d6b5636b71c2522b6a8af20c1",
+      "ok": true
+     },
+     "dl_pdf": {
+      "bytes": 38398,
+      "sha256": "b3b94a29212f3523c6f6b897dec2ab40acc9eee5fcee9d52f823e409417766f0",
+      "ok": true
+     },
+     "dl_layout": {
+      "bytes": 252,
+      "sha256": "9a12a47ab4b12d87abab13e31a39e0e5c29c33b8efbcc4633072efd161feaaf8",
+      "ok": true
+     },
+     "dl_data_json": {
+      "bytes": 24003,
+      "sha256": "67444504adfe8d9a14e7a8691d3841c03fd3110906a53aa3224e2b50bab305a2",
+      "ok": true
+     },
+     "dl_data_zip": {
+      "bytes": 3503,
+      "sha256": "fb8cf83f3ce63c3e795acffca2d6f3a2402ecfa8b5a477a0914ccbcaa9051802",
+      "ok": true
+     }
+    },
+    "harness_error": null,
+    "process": {
+     "exit": 0,
+     "seconds": 10.37,
+     "max_rss_mb": 218.9,
+     "timed_out": false
+    }
+   }
+  },
+  {
+   "id": "9SXU",
+   "dir": "9SXU",
+   "stratum": "S1",
+   "half": "tune",
+   "residues": 342,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 0.9,
+   "draw_seconds": 0.79,
+   "peak_mb": "not measured",
+   "svg_bytes": 88824,
+   "png_bytes": 248813,
+   "process": {
+    "exit": 0,
+    "seconds": 8.08,
+    "max_rss_mb": 133.3,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "34a1835be6147dc6c9fb4e8ff0f13f4fd43d834373a938255d4b024b606619bc",
+    "app.svg": "9119951be551a59122b8f985a6ccd7b08cf52726de0f87deeead4aec4536c1e5",
+    "ui-data.json": "82f4f72313ae53d297c87d8264aeaf71f252fd1ecd169b5aa97d609bdb3adfd5",
+    "ui-data.zip": "5ad9c4251b06b51a0dee8a795e7e81311e55a60a3850f63b63e8502bd17d9185",
+    "ui-layout.yaml": "a86e225c460a28b1d7aec2401fae7083675c2f3f64c6f76881128b24a16e32bb",
+    "ui.pdf": "2f3657e4d6dbb24d762fa2d781fcc100d00f27627f06bbbf2e4d9728324dd182",
+    "ui.png": "28737a0bd8fad4dc143db7455a417eea72b0cc3b6085e2b0bc3dfc13d5f598d8",
+    "ui.svg": "1f4e786eaa58f088995a8581aa7744cbe6014ef3f87a5cc774a2dfa5e46e0d4b"
+   },
+   "ui": {
+    "exception": null,
+    "errors": [],
+    "warnings": [],
+    "steps": [
+     "load",
+     "theme minimal",
+     "downloads"
+    ],
+    "stage": "edit",
+    "downloads": {
+     "dl_svg": {
+      "bytes": 88842,
+      "sha256": "1f4e786eaa58f088995a8581aa7744cbe6014ef3f87a5cc774a2dfa5e46e0d4b",
+      "ok": true
+     },
+     "dl_png": {
+      "bytes": 282055,
+      "sha256": "28737a0bd8fad4dc143db7455a417eea72b0cc3b6085e2b0bc3dfc13d5f598d8",
+      "ok": true
+     },
+     "dl_pdf": {
+      "bytes": 38385,
+      "sha256": "2f3657e4d6dbb24d762fa2d781fcc100d00f27627f06bbbf2e4d9728324dd182",
+      "ok": true
+     },
+     "dl_layout": {
+      "bytes": 252,
+      "sha256": "a86e225c460a28b1d7aec2401fae7083675c2f3f64c6f76881128b24a16e32bb",
+      "ok": true
+     },
+     "dl_data_json": {
+      "bytes": 28650,
+      "sha256": "82f4f72313ae53d297c87d8264aeaf71f252fd1ecd169b5aa97d609bdb3adfd5",
+      "ok": true
+     },
+     "dl_data_zip": {
+      "bytes": 3652,
+      "sha256": "5ad9c4251b06b51a0dee8a795e7e81311e55a60a3850f63b63e8502bd17d9185",
+      "ok": true
+     }
+    },
+    "harness_error": null,
+    "process": {
+     "exit": 0,
+     "seconds": 10.42,
+     "max_rss_mb": 221.5,
+     "timed_out": false
+    }
+   }
+  },
+  {
+   "id": "9SXF",
+   "dir": "9SXF",
+   "stratum": "S1",
+   "half": "tune",
+   "residues": 295,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 0.86,
+   "draw_seconds": 0.75,
+   "peak_mb": "not measured",
+   "svg_bytes": 78393,
+   "png_bytes": 267929,
+   "process": {
+    "exit": 0,
+    "seconds": 8.07,
+    "max_rss_mb": 138.9,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "93daecabe505e2b375c87deeb64a06f0c6c62c47d7eb6906e1509a684c77a87d",
+    "app.svg": "7ae2b11572053103377143cc0f56fd10cc16fb76c2e406651a928b6f77ad8528",
+    "ui-data.json": "f0fc3d55ee722e37f74ae5a9e23082d9f45e4e1153bea813ef74f5ce69ab3fec",
+    "ui-data.zip": "e32218d0096b359ffe2e1013b4e296cae5402416dafc761eafd541a11e323a79",
+    "ui-layout.yaml": "df9fe576d8b5f71aec22cc625e61ff8df68c862cfad150647422f542fb730342",
+    "ui.pdf": "30da2b879a92a4382277553ccbaed229f3658e46e4da03cb05b2016ae720a6d5",
+    "ui.png": "a3d42680568f4f30c9e8a0efc6f74bd48ae50208c465fa161159fe8697aeb0bf",
+    "ui.svg": "6bfdf97c2e1fee0cc8ded2d669fdd5ceba2f59add5d8968518d613ddd4f3ab20"
+   },
+   "ui": {
+    "exception": null,
+    "errors": [],
+    "warnings": [],
+    "steps": [
+     "load",
+     "theme minimal",
+     "downloads"
+    ],
+    "stage": "edit",
+    "downloads": {
+     "dl_svg": {
+      "bytes": 78416,
+      "sha256": "6bfdf97c2e1fee0cc8ded2d669fdd5ceba2f59add5d8968518d613ddd4f3ab20",
+      "ok": true
+     },
+     "dl_png": {
+      "bytes": 297071,
+      "sha256": "a3d42680568f4f30c9e8a0efc6f74bd48ae50208c465fa161159fe8697aeb0bf",
+      "ok": true
+     },
+     "dl_pdf": {
+      "bytes": 35326,
+      "sha256": "30da2b879a92a4382277553ccbaed229f3658e46e4da03cb05b2016ae720a6d5",
+      "ok": true
+     },
+     "dl_layout": {
+      "bytes": 252,
+      "sha256": "df9fe576d8b5f71aec22cc625e61ff8df68c862cfad150647422f542fb730342",
+      "ok": true
+     },
+     "dl_data_json": {
+      "bytes": 21052,
+      "sha256": "f0fc3d55ee722e37f74ae5a9e23082d9f45e4e1153bea813ef74f5ce69ab3fec",
+      "ok": true
+     },
+     "dl_data_zip": {
+      "bytes": 3318,
+      "sha256": "e32218d0096b359ffe2e1013b4e296cae5402416dafc761eafd541a11e323a79",
+      "ok": true
+     }
+    },
+    "harness_error": null,
+    "process": {
+     "exit": 0,
+     "seconds": 10.27,
+     "max_rss_mb": 226.9,
+     "timed_out": false
+    }
+   }
+  },
+  {
+   "id": "9SXG",
+   "dir": "9SXG",
+   "stratum": "S1",
+   "half": "tune",
+   "residues": 292,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 1.04,
+   "draw_seconds": 0.94,
+   "peak_mb": "not measured",
+   "svg_bytes": 77809,
+   "png_bytes": 284020,
+   "process": {
+    "exit": 0,
+    "seconds": 8.57,
+    "max_rss_mb": 134.1,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "eeb6cb7b6cf9e551b796bc8cb9e97da24847bb764c461e85ddaef27a0eef3f83",
+    "app.svg": "e35c46af2be70fa6f9b9dc81b6beead097b86b8b92bec108aad639fd399c67fc",
+    "ui-data.json": "7ea25829b7293c348980b0c194569a7922e93b414acbc74afbf49d2acbef3484",
+    "ui-data.zip": "79b44821a57233014868a6b003e910ac06288ad931395fe0ccfd8be32a31787d",
+    "ui-layout.yaml": "b183e19a5e40adb4bf43f3f40124c30a6dd73a69b44f85dfe4749884e8271ead",
+    "ui.pdf": "cfdc2729a8a51720ab7dce86e1add2cf059bb12ed24f3f3bce29854de3fe3ddc",
+    "ui.png": "9f6c9c25d4823587f774c964d76bb5939ef7484ee21ec883712e7c8cd865412b",
+    "ui.svg": "25734fd64a4dd11e3df72415feb799d1df76f4af9035ea10908b2a65de60649e"
+   },
+   "ui": {
+    "exception": null,
+    "errors": [],
+    "warnings": [],
+    "steps": [
+     "load",
+     "theme minimal",
+     "downloads"
+    ],
+    "stage": "edit",
+    "downloads": {
+     "dl_svg": {
+      "bytes": 77880,
+      "sha256": "25734fd64a4dd11e3df72415feb799d1df76f4af9035ea10908b2a65de60649e",
+      "ok": true
+     },
+     "dl_png": {
+      "bytes": 315420,
+      "sha256": "9f6c9c25d4823587f774c964d76bb5939ef7484ee21ec883712e7c8cd865412b",
+      "ok": true
+     },
+     "dl_pdf": {
+      "bytes": 34882,
+      "sha256": "cfdc2729a8a51720ab7dce86e1add2cf059bb12ed24f3f3bce29854de3fe3ddc",
+      "ok": true
+     },
+     "dl_layout": {
+      "bytes": 252,
+      "sha256": "b183e19a5e40adb4bf43f3f40124c30a6dd73a69b44f85dfe4749884e8271ead",
+      "ok": true
+     },
+     "dl_data_json": {
+      "bytes": 20977,
+      "sha256": "7ea25829b7293c348980b0c194569a7922e93b414acbc74afbf49d2acbef3484",
+      "ok": true
+     },
+     "dl_data_zip": {
+      "bytes": 3339,
+      "sha256": "79b44821a57233014868a6b003e910ac06288ad931395fe0ccfd8be32a31787d",
+      "ok": true
+     }
+    },
+    "harness_error": null,
+    "process": {
+     "exit": 0,
+     "seconds": 10.32,
+     "max_rss_mb": 221.7,
+     "timed_out": false
+    }
+   }
+  },
+  {
+   "id": "29LB",
+   "dir": "29LB",
+   "stratum": "S1",
+   "half": "tune",
+   "residues": 265,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 0.79,
+   "draw_seconds": 0.68,
+   "peak_mb": "not measured",
+   "svg_bytes": 65177,
+   "png_bytes": 204001,
+   "process": {
+    "exit": 0,
+    "seconds": 7.87,
+    "max_rss_mb": 140.3,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "46b8dcbe210fc3dcb1ac721ea34e58cf9b82727ca43454cf0e1e408873c6bdd7",
+    "app.svg": "8ab9d46700bd3a3619edb5dbb917aaea7433a0c01380bd0a94166d4ddf762034",
+    "ui-data.json": "60075d373eca8c5b3d3a5dee0458c06ed82c547de863acd455db962ef1960a98",
+    "ui-data.zip": "8f70f360abe68a9b7e713243af1b31a5047d77a7e57d885e7eae99fb200fabd4",
+    "ui-layout.yaml": "92b4c149fe25fd839b66ce03aa65e8652011ebfe75727d665ec40d730ed669c2",
+    "ui.pdf": "6c0f41ea1fdb04033e53c0ef532b3cdb221e7482754daec7e7c7f6a98053ca7c",
+    "ui.png": "1dacb565cd00851bf4d20edfd7cdb119cf5f884f681e7a12f5ecbcf9672885e4",
+    "ui.svg": "901b96d307d86c889a1b7d793b868af9b7e9a971c2cc249b26ede40edf45b021"
+   },
+   "ui": {
+    "exception": null,
+    "errors": [],
+    "warnings": [],
+    "steps": [
+     "load",
+     "theme minimal",
+     "downloads"
+    ],
+    "stage": "edit",
+    "downloads": {
+     "dl_svg": {
+      "bytes": 65169,
+      "sha256": "901b96d307d86c889a1b7d793b868af9b7e9a971c2cc249b26ede40edf45b021",
+      "ok": true
+     },
+     "dl_png": {
+      "bytes": 227392,
+      "sha256": "1dacb565cd00851bf4d20edfd7cdb119cf5f884f681e7a12f5ecbcf9672885e4",
+      "ok": true
+     },
+     "dl_pdf": {
+      "bytes": 32914,
+      "sha256": "6c0f41ea1fdb04033e53c0ef532b3cdb221e7482754daec7e7c7f6a98053ca7c",
+      "ok": true
+     },
+     "dl_layout": {
+      "bytes": 252,
+      "sha256": "92b4c149fe25fd839b66ce03aa65e8652011ebfe75727d665ec40d730ed669c2",
+      "ok": true
+     },
+     "dl_data_json": {
+      "bytes": 28120,
+      "sha256": "60075d373eca8c5b3d3a5dee0458c06ed82c547de863acd455db962ef1960a98",
+      "ok": true
+     },
+     "dl_data_zip": {
+      "bytes": 3542,
+      "sha256": "8f70f360abe68a9b7e713243af1b31a5047d77a7e57d885e7eae99fb200fabd4",
+      "ok": true
+     }
+    },
+    "harness_error": null,
+    "process": {
+     "exit": 0,
+     "seconds": 9.97,
+     "max_rss_mb": 227.2,
+     "timed_out": false
+    }
+   }
+  },
+  {
+   "id": "29TB",
+   "dir": "29TB",
+   "stratum": "S1",
+   "half": "tune",
+   "residues": 257,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 1.25,
+   "draw_seconds": 1.15,
+   "peak_mb": "not measured",
+   "svg_bytes": 50500,
+   "png_bytes": 191279,
+   "process": {
+    "exit": 0,
+    "seconds": 9.09,
+    "max_rss_mb": 138.8,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "f1703fb9e63f43a83f3783c41ee578f34306272a2da78f49d4bdec69b2987113",
+    "app.svg": "9ec3c71fe08dc76d95b26eb47fad4e8ba57a20dd55174a191e33d8f3f9528d16",
+    "ui-data.json": "df8300c80e6018c897f0a05a7911507ce922c2379b27bad30c826851e1e5bf3d",
+    "ui-data.zip": "47cf913502403c4ecc745fbd242d9a1b3c0b263c320b93621b7701418d22142d",
+    "ui-layout.yaml": "cc0cf679be46b08329b2399393bf5c578e35d5862523bf0320dd7bb8ce1a0c45",
+    "ui.pdf": "ee674964d17af04f0de969141709419c4562757ee19a7b94ad3cfbc680ba4b8b",
+    "ui.png": "75dc8a8f9cd85e9ad9869f1b47e1bee16ef86104e54ec31da9fb9a046bccedf4",
+    "ui.svg": "23ec334bad7949bf705b58921e3ce33c00b05420d85ac972d7b9b4d1ef80926d"
+   },
+   "ui": {
+    "exception": null,
+    "errors": [],
+    "warnings": [],
+    "steps": [
+     "load",
+     "theme minimal",
+     "downloads"
+    ],
+    "stage": "edit",
+    "downloads": {
+     "dl_svg": {
+      "bytes": 50550,
+      "sha256": "23ec334bad7949bf705b58921e3ce33c00b05420d85ac972d7b9b4d1ef80926d",
+      "ok": true
+     },
+     "dl_png": {
+      "bytes": 202530,
+      "sha256": "75dc8a8f9cd85e9ad9869f1b47e1bee16ef86104e54ec31da9fb9a046bccedf4",
+      "ok": true
+     },
+     "dl_pdf": {
+      "bytes": 27544,
+      "sha256": "ee674964d17af04f0de969141709419c4562757ee19a7b94ad3cfbc680ba4b8b",
+      "ok": true
+     },
+     "dl_layout": {
+      "bytes": 252,
+      "sha256": "cc0cf679be46b08329b2399393bf5c578e35d5862523bf0320dd7bb8ce1a0c45",
+      "ok": true
+     },
+     "dl_data_json": {
+      "bytes": 25403,
+      "sha256": "df8300c80e6018c897f0a05a7911507ce922c2379b27bad30c826851e1e5bf3d",
+      "ok": true
+     },
+     "dl_data_zip": {
+      "bytes": 3489,
+      "sha256": "47cf913502403c4ecc745fbd242d9a1b3c0b263c320b93621b7701418d22142d",
+      "ok": true
+     }
+    },
+    "harness_error": null,
+    "process": {
+     "exit": 0,
+     "seconds": 10.87,
+     "max_rss_mb": 221.0,
+     "timed_out": false
+    }
+   }
+  },
+  {
+   "id": "9T57",
+   "dir": "9T57",
+   "stratum": "S1",
+   "half": "tune",
+   "residues": 258,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 1.1,
+   "draw_seconds": 1.0,
+   "peak_mb": "not measured",
+   "svg_bytes": 47906,
+   "png_bytes": 174937,
+   "process": {
+    "exit": 0,
+    "seconds": 9.03,
+    "max_rss_mb": 135.1,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "22153bafbc33f0398cd4c40e25f55de764603daebfe124bae45da1b02654f083",
+    "app.svg": "b89177d39525e55a56330fbd2622ef87400238a62b16e38d5cd9d4c3db41b572",
+    "ui-data.json": "e9b9cfb3fbc394c581f3001afcf4954ab9bb6f406ff740c7fb1f64e06cdd7b8a",
+    "ui-data.zip": "8e8d45fecbb77db7c380b590c9265ed69b0cdeb3c7b527d260d518876205e4cb",
+    "ui-layout.yaml": "1bd975828caed92efcf939233cecf29ed78314a68c3b0a7e0886ea0c3748f73e",
+    "ui.pdf": "dd3290675aad38c83b243e5ae526d4f85ca50cb1f88ab61764058d134479797e",
+    "ui.png": "88f258360c086fdffea478b5807a0b6880944cb42e860e7075c78572d42ce660",
+    "ui.svg": "a831b4a7ee9908f4adbb7d795db22f4bf459c69029da3763eb89d42c33999441"
+   },
+   "ui": {
+    "exception": null,
+    "errors": [],
+    "warnings": [],
+    "steps": [
+     "load",
+     "theme minimal",
+     "downloads"
+    ],
+    "stage": "edit",
+    "downloads": {
+     "dl_svg": {
+      "bytes": 47956,
+      "sha256": "a831b4a7ee9908f4adbb7d795db22f4bf459c69029da3763eb89d42c33999441",
+      "ok": true
+     },
+     "dl_png": {
+      "bytes": 185548,
+      "sha256": "88f258360c086fdffea478b5807a0b6880944cb42e860e7075c78572d42ce660",
+      "ok": true
+     },
+     "dl_pdf": {
+      "bytes": 27281,
+      "sha256": "dd3290675aad38c83b243e5ae526d4f85ca50cb1f88ab61764058d134479797e",
+      "ok": true
+     },
+     "dl_layout": {
+      "bytes": 252,
+      "sha256": "1bd975828caed92efcf939233cecf29ed78314a68c3b0a7e0886ea0c3748f73e",
+      "ok": true
+     },
+     "dl_data_json": {
+      "bytes": 25449,
+      "sha256": "e9b9cfb3fbc394c581f3001afcf4954ab9bb6f406ff740c7fb1f64e06cdd7b8a",
+      "ok": true
+     },
+     "dl_data_zip": {
+      "bytes": 3487,
+      "sha256": "8e8d45fecbb77db7c380b590c9265ed69b0cdeb3c7b527d260d518876205e4cb",
+      "ok": true
+     }
+    },
+    "harness_error": null,
+    "process": {
+     "exit": 0,
+     "seconds": 10.67,
+     "max_rss_mb": 223.6,
+     "timed_out": false
+    }
+   }
+  },
+  {
+   "id": "9ZFX",
+   "dir": "9ZFX",
+   "stratum": "S2",
+   "half": "tune",
+   "residues": 1335,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 1.92,
+   "draw_seconds": 1.78,
+   "peak_mb": "not measured",
+   "svg_bytes": 182092,
+   "png_bytes": 501597,
+   "process": {
+    "exit": 0,
+    "seconds": 11.63,
+    "max_rss_mb": 198.9,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "c691bdace8a2ab6cc57caa076b985336b8c0341505ebe69da9d7653a070b89ff",
+    "app.svg": "50221514dde692f75e2d759eeb7b7fa990ff31e6524f20f29e701fb00086c6b5",
+    "ui-data.json": "560d2a0f5b8599008928316b3d7d9a9967a92a6d2e949a5acee3efb271fc7ffd",
+    "ui-data.zip": "545f16dc6d6e86e871f984dff696802b791677cfb53de0c387ddef4e39c42a90",
+    "ui-layout.yaml": "de2fd989cbe651023a0a4c4d8de10d1ccee576f9214d8462e90214f8ed7ae2ff",
+    "ui.pdf": "d885814f714cd206ea658964a96d571454df9b4296e925e7644611b0475c235d",
+    "ui.png": "5b248a83da8b9a8124c0d76af6a7bf293ff22f2ab84bc09ebb65cd16c565c6a8",
+    "ui.svg": "f047e641d978c900078887498b4420e51c02c51628c42fccf48f57ae21f9af6a"
+   },
+   "ui": {
+    "exception": null,
+    "errors": [],
+    "warnings": [],
+    "steps": [
+     "load",
+     "theme minimal",
+     "downloads"
+    ],
+    "stage": "edit",
+    "downloads": {
+     "dl_svg": {
+      "bytes": 182328,
+      "sha256": "f047e641d978c900078887498b4420e51c02c51628c42fccf48f57ae21f9af6a",
+      "ok": true
+     },
+     "dl_png": {
+      "bytes": 569889,
+      "sha256": "5b248a83da8b9a8124c0d76af6a7bf293ff22f2ab84bc09ebb65cd16c565c6a8",
+      "ok": true
+     },
+     "dl_pdf": {
+      "bytes": 56142,
+      "sha256": "d885814f714cd206ea658964a96d571454df9b4296e925e7644611b0475c235d",
+      "ok": true
+     },
+     "dl_layout": {
+      "bytes": 252,
+      "sha256": "de2fd989cbe651023a0a4c4d8de10d1ccee576f9214d8462e90214f8ed7ae2ff",
+      "ok": true
+     },
+     "dl_data_json": {
+      "bytes": 42838,
+      "sha256": "560d2a0f5b8599008928316b3d7d9a9967a92a6d2e949a5acee3efb271fc7ffd",
+      "ok": true
+     },
+     "dl_data_zip": {
+      "bytes": 4079,
+      "sha256": "545f16dc6d6e86e871f984dff696802b791677cfb53de0c387ddef4e39c42a90",
+      "ok": true
+     }
+    },
+    "harness_error": null,
+    "process": {
+     "exit": 0,
+     "seconds": 17.63,
+     "max_rss_mb": 247.5,
+     "timed_out": false
+    }
+   }
+  },
+  {
+   "id": "14CU",
+   "dir": "14CU",
+   "stratum": "S2",
+   "half": "tune",
+   "residues": 3404,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 6.69,
+   "draw_seconds": 4.21,
+   "peak_mb": "not measured",
+   "svg_bytes": 526697,
+   "png_bytes": 1958736,
+   "process": {
+    "exit": 0,
+    "seconds": 17.44,
+    "max_rss_mb": 214.3,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "649a56f443a1b1e930b2b835524285c211125bc250224a85ddfdcd24d02acc8f",
+    "app.svg": "45608a03bc7bf6684aa77fa755bbf4e0f5741a9ed1be34dd80470057fd65ad58",
+    "ui-data.json": "3910c48914364c9a8184e211a89e710816864479166e797ba7eb36da112a5cf4",
+    "ui-data.zip": "ed21e37971e26fe1020f00d1e055edab91422eea33479e3d75d06d1338538217",
+    "ui-layout.yaml": "ef69390de56e43a2fa169aedeb3c8e8b3cba78fb45df1424a346293d9cdb8df4",
+    "ui.pdf": "5e1d66ca96441aafdb961db1231a991380f04709c32a2018f9cbc707029ef02c",
+    "ui.png": "299524dc670548b57affce630cba7ad51d491a7b0ddaa64e8a26d1d3d67dfdb4",
+    "ui.svg": "40c62fb75ae1dfcef4989b8aac99257f1949846e2d1e6d093b9b21d000509180"
+   },
+   "ui": {
+    "exception": null,
+    "errors": [],
+    "warnings": [],
+    "steps": [
+     "load",
+     "theme minimal",
+     "downloads"
+    ],
+    "stage": "edit",
+    "downloads": {
+     "dl_svg": {
+      "bytes": 526971,
+      "sha256": "40c62fb75ae1dfcef4989b8aac99257f1949846e2d1e6d093b9b21d000509180",
+      "ok": true
+     },
+     "dl_png": {
+      "bytes": 2117741,
+      "sha256": "299524dc670548b57affce630cba7ad51d491a7b0ddaa64e8a26d1d3d67dfdb4",
+      "ok": true
+     },
+     "dl_pdf": {
+      "bytes": 139668,
+      "sha256": "5e1d66ca96441aafdb961db1231a991380f04709c32a2018f9cbc707029ef02c",
+      "ok": true
+     },
+     "dl_layout": {
+      "bytes": 252,
+      "sha256": "ef69390de56e43a2fa169aedeb3c8e8b3cba78fb45df1424a346293d9cdb8df4",
+      "ok": true
+     },
+     "dl_data_json": {
+      "bytes": 132178,
+      "sha256": "3910c48914364c9a8184e211a89e710816864479166e797ba7eb36da112a5cf4",
+      "ok": true
+     },
+     "dl_data_zip": {
+      "bytes": 7633,
+      "sha256": "ed21e37971e26fe1020f00d1e055edab91422eea33479e3d75d06d1338538217",
+      "ok": true
+     }
+    },
+    "harness_error": null,
+    "process": {
+     "exit": 0,
+     "seconds": 25.6,
+     "max_rss_mb": 259.3,
+     "timed_out": false
+    }
+   }
+  },
+  {
+   "id": "30CY",
+   "dir": "30CY",
+   "stratum": "S2",
+   "half": "tune",
+   "residues": 704,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 3.48,
+   "draw_seconds": 3.36,
+   "peak_mb": "not measured",
+   "svg_bytes": 200135,
+   "png_bytes": 557739,
+   "process": {
+    "exit": 0,
+    "seconds": 16.04,
+    "max_rss_mb": 187.7,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "fe2dbba685722e6246533ee784cfd303e90a1761395935833509d4f9bf37cfd3",
+    "app.svg": "3912c24fc4690030869fa5b2f281d8967439c02c5e4306c7b9961bcce6961d2a",
+    "ui-data.json": "0a8cd1e8b1c7428e6640d65214fa73f193f1fdfd7fab074ad1aa06704dd879c0",
+    "ui-data.zip": "e9fa6c13ddb48c338150f7dd115402f2ab0ed93da815b5d6add27a19e08d98ee",
+    "ui-layout.yaml": "4b1a6ca8a4e938ca9d42406321fb8d1d8aca2c086e1728a6a891c8ec99c97c91",
+    "ui.pdf": "da9aa8cff1d93e795aff4f781eaf4d565d6dd40ad93a0fa061aa8d0fdda782e2",
+    "ui.png": "49125508d474f753c3b9eb8b03ecf7fca562c366e46d30269b32e36cd6441de1",
+    "ui.svg": "51146e6e37a70727d0c149e541f8d05ca1bf1f73c5082cb1fea7abb5df762b5d"
+   },
+   "ui": {
+    "exception": null,
+    "errors": [],
+    "warnings": [],
+    "steps": [
+     "load",
+     "theme minimal",
+     "downloads"
+    ],
+    "stage": "edit",
+    "downloads": {
+     "dl_svg": {
+      "bytes": 200347,
+      "sha256": "51146e6e37a70727d0c149e541f8d05ca1bf1f73c5082cb1fea7abb5df762b5d",
+      "ok": true
+     },
+     "dl_png": {
+      "bytes": 618070,
+      "sha256": "49125508d474f753c3b9eb8b03ecf7fca562c366e46d30269b32e36cd6441de1",
+      "ok": true
+     },
+     "dl_pdf": {
+      "bytes": 63913,
+      "sha256": "da9aa8cff1d93e795aff4f781eaf4d565d6dd40ad93a0fa061aa8d0fdda782e2",
+      "ok": true
+     },
+     "dl_layout": {
+      "bytes": 252,
+      "sha256": "4b1a6ca8a4e938ca9d42406321fb8d1d8aca2c086e1728a6a891c8ec99c97c91",
+      "ok": true
+     },
+     "dl_data_json": {
+      "bytes": 51903,
+      "sha256": "0a8cd1e8b1c7428e6640d65214fa73f193f1fdfd7fab074ad1aa06704dd879c0",
+      "ok": true
+     },
+     "dl_data_zip": {
+      "bytes": 4613,
+      "sha256": "e9fa6c13ddb48c338150f7dd115402f2ab0ed93da815b5d6add27a19e08d98ee",
+      "ok": true
+     }
+    },
+    "harness_error": null,
+    "process": {
+     "exit": 0,
+     "seconds": 24.74,
+     "max_rss_mb": 252.0,
+     "timed_out": false
+    }
+   }
+  },
+  {
+   "id": "44LS",
+   "dir": "44LS",
+   "stratum": "S2",
+   "half": "tune",
+   "residues": 1048,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 5.65,
+   "draw_seconds": 4.34,
+   "peak_mb": "not measured",
+   "svg_bytes": 185362,
+   "png_bytes": 633639,
+   "process": {
+    "exit": 0,
+    "seconds": 15.24,
+    "max_rss_mb": 192.4,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "96be2f652338bf5308977f70ae1b421babc791141fd29e4e3ba7c5ee8c6189eb",
+    "app.svg": "b0c882c647cd89322c08efe5c575d9bf01979f28f4e8e2d7b81825804cf1bdca",
+    "ui-data.json": "776a170f17687d18389f628d3d8af5ac951339065a2984c26b76acf1ccfcd7c4",
+    "ui-data.zip": "c5e9b5d84bf43048565da3d153f449c068d748840d9d2f685630613c2f3f2658",
+    "ui-layout.yaml": "94ca9149878432b189fa3cb848c49e2f228df1214b3d8ea6b04de2e17bbadb47",
+    "ui.pdf": "8bc952e304971cb48d7bc0c0e5e0b9f0abffcd559213870267e5d2811214ab88",
+    "ui.png": "ff1d263390bea4ef64fbcc4ae1b8901f139d20123f913ad96c7ce924a22cdaa7",
+    "ui.svg": "d350ceda4df216b03385a541d859a03f81d8e1db0b2ccdffdd5f71e8240e4324"
+   },
+   "ui": {
+    "exception": null,
+    "errors": [],
+    "warnings": [],
+    "steps": [
+     "load",
+     "theme minimal",
+     "downloads"
+    ],
+    "stage": "edit",
+    "downloads": {
+     "dl_svg": {
+      "bytes": 185947,
+      "sha256": "d350ceda4df216b03385a541d859a03f81d8e1db0b2ccdffdd5f71e8240e4324",
+      "ok": true
+     },
+     "dl_png": {
+      "bytes": 677824,
+      "sha256": "ff1d263390bea4ef64fbcc4ae1b8901f139d20123f913ad96c7ce924a22cdaa7",
+      "ok": true
+     },
+     "dl_pdf": {
+      "bytes": 52607,
+      "sha256": "8bc952e304971cb48d7bc0c0e5e0b9f0abffcd559213870267e5d2811214ab88",
+      "ok": true
+     },
+     "dl_layout": {
+      "bytes": 252,
+      "sha256": "94ca9149878432b189fa3cb848c49e2f228df1214b3d8ea6b04de2e17bbadb47",
+      "ok": true
+     },
+     "dl_data_json": {
+      "bytes": 89926,
+      "sha256": "776a170f17687d18389f628d3d8af5ac951339065a2984c26b76acf1ccfcd7c4",
+      "ok": true
+     },
+     "dl_data_zip": {
+      "bytes": 6509,
+      "sha256": "c5e9b5d84bf43048565da3d153f449c068d748840d9d2f685630613c2f3f2658",
+      "ok": true
+     }
+    },
+    "harness_error": null,
+    "process": {
+     "exit": 0,
+     "seconds": 31.61,
+     "max_rss_mb": 250.4,
+     "timed_out": false
+    }
+   }
+  },
+  {
+   "id": "9YL9",
+   "dir": "9YL9",
+   "stratum": "S2",
+   "half": "tune",
+   "residues": 343,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 2.45,
+   "draw_seconds": 2.32,
+   "peak_mb": "not measured",
+   "svg_bytes": 242387,
+   "png_bytes": 629321,
+   "process": {
+    "exit": 0,
+    "seconds": 12.18,
+    "max_rss_mb": 165.5,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "f37239ef83e4bb238c585eb5120c4d0f1d0f927566916efae6a438ebe8a2a650",
+    "app.svg": "9ff1a9ac9bd0055a7bef194401aeb2c024f44d8ac89afdc49b4e568d41efdd70",
+    "ui-data.json": "42fb41eee5739121c251796e823da995bb6f5c44c58c9ada53f346cc8e31cc15",
+    "ui-data.zip": "82b0450d28d6d18d727c2199883478cecb7cb2e205d1b8e1713b343a11a6d4ea",
+    "ui-layout.yaml": "d0f25126ac3901fa70146b9b4c1fee8375ad32d2e7e26904ad44e56484dffb90",
+    "ui.pdf": "1c454c228e5434fea3891426f2467985841576263fd5e234af3df0f69119214d",
+    "ui.png": "8a37d3ab0d788f97a5adbaed8df60c937db561bf167b6d72d5f0bdedc8d1b218",
+    "ui.svg": "696a6538ab5e515ac08d5889ae9a66646bc75dbe7e1d09712846731b0d99a74e"
+   },
+   "ui": {
+    "exception": null,
+    "errors": [],
+    "warnings": [],
+    "steps": [
+     "load",
+     "theme minimal",
+     "downloads"
+    ],
+    "stage": "edit",
+    "downloads": {
+     "dl_svg": {
+      "bytes": 242429,
+      "sha256": "696a6538ab5e515ac08d5889ae9a66646bc75dbe7e1d09712846731b0d99a74e",
+      "ok": true
+     },
+     "dl_png": {
+      "bytes": 721976,
+      "sha256": "8a37d3ab0d788f97a5adbaed8df60c937db561bf167b6d72d5f0bdedc8d1b218",
+      "ok": true
+     },
+     "dl_pdf": {
+      "bytes": 81963,
+      "sha256": "1c454c228e5434fea3891426f2467985841576263fd5e234af3df0f69119214d",
+      "ok": true
+     },
+     "dl_layout": {
+      "bytes": 252,
+      "sha256": "d0f25126ac3901fa70146b9b4c1fee8375ad32d2e7e26904ad44e56484dffb90",
+      "ok": true
+     },
+     "dl_data_json": {
+      "bytes": 22429,
+      "sha256": "42fb41eee5739121c251796e823da995bb6f5c44c58c9ada53f346cc8e31cc15",
+      "ok": true
+     },
+     "dl_data_zip": {
+      "bytes": 3088,
+      "sha256": "82b0450d28d6d18d727c2199883478cecb7cb2e205d1b8e1713b343a11a6d4ea",
+      "ok": true
+     }
+    },
+    "harness_error": null,
+    "process": {
+     "exit": 0,
+     "seconds": 18.54,
+     "max_rss_mb": 250.7,
+     "timed_out": false
+    }
+   }
+  },
+  {
+   "id": "20XT",
+   "dir": "20XT",
+   "stratum": "S2",
+   "half": "tune",
+   "residues": 806,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 2.39,
+   "draw_seconds": 2.27,
+   "peak_mb": "not measured",
+   "svg_bytes": 231065,
+   "png_bytes": 694189,
+   "process": {
+    "exit": 0,
+    "seconds": 13.18,
+    "max_rss_mb": 178.7,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "0baffdfbebdaa698c816c804ae17a3acd634c0e52586009d41bce752e5e51bbc",
+    "app.svg": "f6b41cd7886cf90ab547af668fbe0aa86eb07001438a692ac173adb6dcbb8dea",
+    "ui-data.json": "b1afa583e54abf62bab70b75c17e951402507141ebab19e67212038af715c204",
+    "ui-data.zip": "b1a218e25033301311bc2bfa5ce0431ae40b718cf1fb9890d4072243cb7e8f1e",
+    "ui-layout.yaml": "a02a831a7a1c0e5d252afaa6436c6be02d0a431fe9dfd30da165a3e04f4b88e8",
+    "ui.pdf": "726bb1164ea6b7c6b17a9dea6d712f9bf086e7d96142d3c12a3a2f9af51cf1da",
+    "ui.png": "a9f60d8fefd298d5ad6686ee955318486eefbb348a8e53f1e4917cdf85f8e477",
+    "ui.svg": "938c31e876633a4cc5267a0a4888eccfe79b265b7891131356e08cf69931c262"
+   },
+   "ui": {
+    "exception": null,
+    "errors": [],
+    "warnings": [],
+    "steps": [
+     "load",
+     "theme minimal",
+     "downloads"
+    ],
+    "stage": "edit",
+    "downloads": {
+     "dl_svg": {
+      "bytes": 231412,
+      "sha256": "938c31e876633a4cc5267a0a4888eccfe79b265b7891131356e08cf69931c262",
+      "ok": true
+     },
+     "dl_png": {
+      "bytes": 763567,
+      "sha256": "a9f60d8fefd298d5ad6686ee955318486eefbb348a8e53f1e4917cdf85f8e477",
+      "ok": true
+     },
+     "dl_pdf": {
+      "bytes": 70164,
+      "sha256": "726bb1164ea6b7c6b17a9dea6d712f9bf086e7d96142d3c12a3a2f9af51cf1da",
+      "ok": true
+     },
+     "dl_layout": {
+      "bytes": 252,
+      "sha256": "a02a831a7a1c0e5d252afaa6436c6be02d0a431fe9dfd30da165a3e04f4b88e8",
+      "ok": true
+     },
+     "dl_data_json": {
+      "bytes": 66514,
+      "sha256": "b1afa583e54abf62bab70b75c17e951402507141ebab19e67212038af715c204",
+      "ok": true
+     },
+     "dl_data_zip": {
+      "bytes": 5388,
+      "sha256": "b1a218e25033301311bc2bfa5ce0431ae40b718cf1fb9890d4072243cb7e8f1e",
+      "ok": true
+     }
+    },
+    "harness_error": null,
+    "process": {
+     "exit": 0,
+     "seconds": 20.94,
+     "max_rss_mb": 251.4,
+     "timed_out": false
+    }
+   }
+  },
+  {
+   "id": "9WVR",
+   "dir": "9WVR",
+   "stratum": "S2",
+   "half": "tune",
+   "residues": 170,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 1.26,
+   "draw_seconds": 1.14,
+   "peak_mb": "not measured",
+   "svg_bytes": 99467,
+   "png_bytes": 299471,
+   "process": {
+    "exit": 0,
+    "seconds": 8.83,
+    "max_rss_mb": 140.1,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "2792560c5439ba2d804a16f75395a68721fdbe5370344c3aa2e09276b55635cd",
+    "app.svg": "135c6f746856f9888b3bb586099d43f61628c1976d948097151aa62b1f297eea",
+    "ui-data.json": "9251a8dc157ff63e638179d99dd0987dc7ce10527e3f454f8fb05d880e9e3593",
+    "ui-data.zip": "00b85b8fd7f0598b84aca6c8016049749d3aa97c3daa65ac386ca0f1e63cb560",
+    "ui-layout.yaml": "c0bf57e5a151843348bd675de0b295b88e8783df5955f08cf61817ea4ea0c939",
+    "ui.pdf": "8204247ab9822503c4760ebc3e25cc1ecabf257a118d092acf87e27d8141d5ac",
+    "ui.png": "517beded2880fee9a8e4639002092d2a4a2cd6e302a2633d5bffd64489ee8bf3",
+    "ui.svg": "728008dbe2417d7c16b7f693aaeb7f1378702d0b6c5c1bfa6d2ded447ce55f67"
+   },
+   "ui": {
+    "exception": null,
+    "errors": [],
+    "warnings": [],
+    "steps": [
+     "load",
+     "theme minimal",
+     "downloads"
+    ],
+    "stage": "edit",
+    "downloads": {
+     "dl_svg": {
+      "bytes": 99569,
+      "sha256": "728008dbe2417d7c16b7f693aaeb7f1378702d0b6c5c1bfa6d2ded447ce55f67",
+      "ok": true
+     },
+     "dl_png": {
+      "bytes": 322217,
+      "sha256": "517beded2880fee9a8e4639002092d2a4a2cd6e302a2633d5bffd64489ee8bf3",
+      "ok": true
+     },
+     "dl_pdf": {
+      "bytes": 35371,
+      "sha256": "8204247ab9822503c4760ebc3e25cc1ecabf257a118d092acf87e27d8141d5ac",
+      "ok": true
+     },
+     "dl_layout": {
+      "bytes": 252,
+      "sha256": "c0bf57e5a151843348bd675de0b295b88e8783df5955f08cf61817ea4ea0c939",
+      "ok": true
+     },
+     "dl_data_json": {
+      "bytes": 54743,
+      "sha256": "9251a8dc157ff63e638179d99dd0987dc7ce10527e3f454f8fb05d880e9e3593",
+      "ok": true
+     },
+     "dl_data_zip": {
+      "bytes": 4219,
+      "sha256": "00b85b8fd7f0598b84aca6c8016049749d3aa97c3daa65ac386ca0f1e63cb560",
+      "ok": true
+     }
+    },
+    "harness_error": null,
+    "process": {
+     "exit": 0,
+     "seconds": 10.92,
+     "max_rss_mb": 218.8,
+     "timed_out": false
+    }
+   }
+  },
+  {
+   "id": "9Z0S",
+   "dir": "9Z0S",
+   "stratum": "S3",
+   "half": "tune",
+   "residues": 2682,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 5.47,
+   "draw_seconds": 4.65,
+   "peak_mb": "not measured",
+   "svg_bytes": 80192,
+   "png_bytes": 260883,
+   "process": {
+    "exit": 0,
+    "seconds": 15.59,
+    "max_rss_mb": 167.1,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "d888065444103ba221bbcdc7dd7ca56ecc462ace64847f21185f8922f0573492",
+    "app.svg": "1f89d02905ffffd7626d88d076889ebe89a427cc6ce9f3cb56c0cd749a2a3fd4",
+    "ui-data.json": "1e06d9e93394c0afdd29bf89a335fb8e221a759c3037fac9c2fb6067b4c9302c",
+    "ui-data.zip": "11b9a89a8bf0f7fcff2d7d29a7cf5026ab952222d47f61b061b44b9abf025152",
+    "ui-layout.yaml": "ef75ba9fc9aee9f92d5208c3eaca36aa41760a93003b64de21defe17b6d1a0e1",
+    "ui.pdf": "e290bf916525ba9196028a555a3067dbe6ba6064cc96e2bbb1dbb84699e60029",
+    "ui.png": "d5fec01c276d3bc792529c2e0e4921b2b2359c659c68e6fb5c77a1c50058a936",
+    "ui.svg": "799cacdcc771b198a3cf9607c3f122ea1a6e5feb99c72b7aed5475ae9847f563"
+   },
+   "ui": {
+    "exception": null,
+    "errors": [],
+    "warnings": [],
+    "steps": [
+     "load",
+     "theme minimal",
+     "downloads"
+    ],
+    "stage": "edit",
+    "downloads": {
+     "dl_svg": {
+      "bytes": 80423,
+      "sha256": "799cacdcc771b198a3cf9607c3f122ea1a6e5feb99c72b7aed5475ae9847f563",
+      "ok": true
+     },
+     "dl_png": {
+      "bytes": 273690,
+      "sha256": "d5fec01c276d3bc792529c2e0e4921b2b2359c659c68e6fb5c77a1c50058a936",
+      "ok": true
+     },
+     "dl_pdf": {
+      "bytes": 33864,
+      "sha256": "e290bf916525ba9196028a555a3067dbe6ba6064cc96e2bbb1dbb84699e60029",
+      "ok": true
+     },
+     "dl_layout": {
+      "bytes": 252,
+      "sha256": "ef75ba9fc9aee9f92d5208c3eaca36aa41760a93003b64de21defe17b6d1a0e1",
+      "ok": true
+     },
+     "dl_data_json": {
+      "bytes": 51821,
+      "sha256": "1e06d9e93394c0afdd29bf89a335fb8e221a759c3037fac9c2fb6067b4c9302c",
+      "ok": true
+     },
+     "dl_data_zip": {
+      "bytes": 4716,
+      "sha256": "11b9a89a8bf0f7fcff2d7d29a7cf5026ab952222d47f61b061b44b9abf025152",
+      "ok": true
+     }
+    },
+    "harness_error": null,
+    "process": {
+     "exit": 0,
+     "seconds": 33.76,
+     "max_rss_mb": 235.1,
+     "timed_out": false
+    }
+   }
+  },
+  {
+   "id": "9TCF",
+   "dir": "9TCF",
+   "stratum": "S3",
+   "half": "tune",
+   "residues": 1828,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 3.09,
+   "draw_seconds": 2.92,
+   "peak_mb": "not measured",
+   "svg_bytes": 467290,
+   "png_bytes": 1285043,
+   "process": {
+    "exit": 0,
+    "seconds": 16.14,
+    "max_rss_mb": 180.7,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "958c9118e95f0b181476a87560d42d47625bc98c67c3c4d8d4558128401e380f",
+    "app.svg": "84c2b6eb1843f6100ddec3999729db72ca2d2bd73d9ea0bdde189ffa1d9b8785",
+    "ui-data.json": "b3ff7d1b0f92ae6bf96e81c5b37496606ecdaa270e1b4e3bc59ae41b86f91d0d",
+    "ui-data.zip": "1f93aad5bdbf6f6041bada367eab5ef87f3a384bec831a3183da7292e19d48c7",
+    "ui-layout.yaml": "ce4650d5cb436b7e0e2e139ac0f92bd6a23be481d6418d86ad0c75b4ff93c660",
+    "ui.pdf": "954fb0052e6574385a5b5080e5b7f038923f77178c8c85ca77ee9a756355732c",
+    "ui.png": "1715e307376b6a0a6dcb3ffb7421526ae790a893fcede27e9dc6488cbfb02be3",
+    "ui.svg": "4130bdecaabade695a8718b0bca2f60612d834df27f603ce4795e52d5a87e0f5"
+   },
+   "ui": {
+    "exception": null,
+    "errors": [],
+    "warnings": [],
+    "steps": [
+     "load",
+     "theme minimal",
+     "downloads"
+    ],
+    "stage": "edit",
+    "downloads": {
+     "dl_svg": {
+      "bytes": 467577,
+      "sha256": "4130bdecaabade695a8718b0bca2f60612d834df27f603ce4795e52d5a87e0f5",
+      "ok": true
+     },
+     "dl_png": {
+      "bytes": 1418017,
+      "sha256": "1715e307376b6a0a6dcb3ffb7421526ae790a893fcede27e9dc6488cbfb02be3",
+      "ok": true
+     },
+     "dl_pdf": {
+      "bytes": 125580,
+      "sha256": "954fb0052e6574385a5b5080e5b7f038923f77178c8c85ca77ee9a756355732c",
+      "ok": true
+     },
+     "dl_layout": {
+      "bytes": 252,
+      "sha256": "ce4650d5cb436b7e0e2e139ac0f92bd6a23be481d6418d86ad0c75b4ff93c660",
+      "ok": true
+     },
+     "dl_data_json": {
+      "bytes": 103278,
+      "sha256": "b3ff7d1b0f92ae6bf96e81c5b37496606ecdaa270e1b4e3bc59ae41b86f91d0d",
+      "ok": true
+     },
+     "dl_data_zip": {
+      "bytes": 6611,
+      "sha256": "1f93aad5bdbf6f6041bada367eab5ef87f3a384bec831a3183da7292e19d48c7",
+      "ok": true
+     }
+    },
+    "harness_error": null,
+    "process": {
+     "exit": 0,
+     "seconds": 20.84,
+     "max_rss_mb": 247.2,
+     "timed_out": false
+    }
+   }
+  },
+  {
+   "id": "9YOA",
+   "dir": "9YOA",
+   "stratum": "S3",
+   "half": "tune",
+   "residues": 1048,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 14.25,
+   "draw_seconds": 13.02,
+   "peak_mb": "not measured",
+   "svg_bytes": 220279,
+   "png_bytes": 690556,
+   "process": {
+    "exit": 0,
+    "seconds": 30.86,
+    "max_rss_mb": 177.1,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "2984a51a544c1d062737b166eaba860ad4857a0ab5b6ce0ac5f8ef79155ac467",
+    "app.svg": "4ffc93613b6049cb891a9358124abb1979131255ca1b562903bf829c4fff8224",
+    "ui-data.json": "7c78181cd7c4f794b322b6bb5f4450feed862f041c59a60def937749f0f09eff",
+    "ui-data.zip": "8f43fdfc0b63a40daab8131f4aa905a43c14a85ba7fa79996c2ba40ff44867a0",
+    "ui-layout.yaml": "5cf0bd04ee42ad92f21277110d0768d41462246a7916a5e36da1223ccdbbb5bd",
+    "ui.pdf": "56a9d01783d01270a7477139042afb8297584c2aedb0f7594977ad848a638aa1",
+    "ui.png": "2984a51a544c1d062737b166eaba860ad4857a0ab5b6ce0ac5f8ef79155ac467",
+    "ui.svg": "4ffc93613b6049cb891a9358124abb1979131255ca1b562903bf829c4fff8224"
+   },
+   "ui": {
+    "exception": null,
+    "errors": [],
+    "warnings": [],
+    "steps": [
+     "load",
+     "theme minimal",
+     "downloads"
+    ],
+    "stage": "edit",
+    "downloads": {
+     "dl_svg": {
+      "bytes": 220302,
+      "sha256": "4ffc93613b6049cb891a9358124abb1979131255ca1b562903bf829c4fff8224",
+      "ok": true
+     },
+     "dl_png": {
+      "bytes": 690556,
+      "sha256": "2984a51a544c1d062737b166eaba860ad4857a0ab5b6ce0ac5f8ef79155ac467",
+      "ok": true
+     },
+     "dl_pdf": {
+      "bytes": 67636,
+      "sha256": "56a9d01783d01270a7477139042afb8297584c2aedb0f7594977ad848a638aa1",
+      "ok": true
+     },
+     "dl_layout": {
+      "bytes": 256,
+      "sha256": "5cf0bd04ee42ad92f21277110d0768d41462246a7916a5e36da1223ccdbbb5bd",
+      "ok": true
+     },
+     "dl_data_json": {
+      "bytes": 107280,
+      "sha256": "7c78181cd7c4f794b322b6bb5f4450feed862f041c59a60def937749f0f09eff",
+      "ok": true
+     },
+     "dl_data_zip": {
+      "bytes": 7591,
+      "sha256": "8f43fdfc0b63a40daab8131f4aa905a43c14a85ba7fa79996c2ba40ff44867a0",
+      "ok": true
+     }
+    },
+    "harness_error": null,
+    "process": {
+     "exit": 0,
+     "seconds": 49.6,
+     "max_rss_mb": 243.3,
+     "timed_out": false
+    }
+   }
+  },
+  {
+   "id": "38NR",
+   "dir": "38NR",
+   "stratum": "S3",
+   "half": "tune",
+   "residues": 987,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 0.96,
+   "draw_seconds": 0.84,
+   "peak_mb": "not measured",
+   "svg_bytes": 165513,
+   "png_bytes": 480918,
+   "process": {
+    "exit": 0,
+    "seconds": 9.02,
+    "max_rss_mb": 148.6,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "bd8093261e67aa712d5ec71783a76df6297a86f3ec91197a890e14e3243addcf",
+    "app.svg": "8430c7f2b925e9bf2b914621c0a3af857efd46ccdce13f701134573ca0a58824",
+    "ui-data.json": "5f6d1c019beb8b749074ed6bb2f71001b2f91167474c71817cc34a70dd39892d",
+    "ui-data.zip": "46adbd8455742d43448e3302cba0c42b9f8208eeac6d284a97baa56660d842a0",
+    "ui-layout.yaml": "5058382ad8708a383ff8b15dfca6a6a09652edf6e70e65dedd30c79a6042cfdb",
+    "ui.pdf": "decdf473446f07d7d1f778a2093c46e303c65f840293cd422414a90dcbd86d33",
+    "ui.png": "7efa1d9e5be29ab76702ae20b557dfe87d79ccf473a448d7447c871aba883799",
+    "ui.svg": "8680ab578c62f5af3857648a8964eac7ddbdd90ef22423563763ca9019f66961"
+   },
+   "ui": {
+    "exception": null,
+    "errors": [],
+    "warnings": [],
+    "steps": [
+     "load",
+     "theme minimal",
+     "downloads"
+    ],
+    "stage": "edit",
+    "downloads": {
+     "dl_svg": {
+      "bytes": 165534,
+      "sha256": "8680ab578c62f5af3857648a8964eac7ddbdd90ef22423563763ca9019f66961",
+      "ok": true
+     },
+     "dl_png": {
+      "bytes": 571071,
+      "sha256": "7efa1d9e5be29ab76702ae20b557dfe87d79ccf473a448d7447c871aba883799",
+      "ok": true
+     },
+     "dl_pdf": {
+      "bytes": 63008,
+      "sha256": "decdf473446f07d7d1f778a2093c46e303c65f840293cd422414a90dcbd86d33",
+      "ok": true
+     },
+     "dl_layout": {
+      "bytes": 252,
+      "sha256": "5058382ad8708a383ff8b15dfca6a6a09652edf6e70e65dedd30c79a6042cfdb",
+      "ok": true
+     },
+     "dl_data_json": {
+      "bytes": 9847,
+      "sha256": "5f6d1c019beb8b749074ed6bb2f71001b2f91167474c71817cc34a70dd39892d",
+      "ok": true
+     },
+     "dl_data_zip": {
+      "bytes": 2546,
+      "sha256": "46adbd8455742d43448e3302cba0c42b9f8208eeac6d284a97baa56660d842a0",
+      "ok": true
+     }
+    },
+    "harness_error": null,
+    "process": {
+     "exit": 0,
+     "seconds": 10.67,
+     "max_rss_mb": 231.3,
+     "timed_out": false
+    }
+   }
+  },
+  {
+   "id": "23FR",
+   "dir": "23FR",
+   "stratum": "S4",
+   "half": "tune",
+   "residues": 5754,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 3.88,
+   "draw_seconds": 2.41,
+   "peak_mb": "not measured",
+   "svg_bytes": 29346,
+   "png_bytes": 123908,
+   "process": {
+    "exit": 0,
+    "seconds": 15.04,
+    "max_rss_mb": 223.7,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "b985be64133c064827953d429a873a9f822adb817ac93a4958e2cb636e8e0355",
+    "app.svg": "3fcf53839f051c5ad59cf4e46b94c469e4e996b4f871ad7c8109c61e106fb9e8",
+    "ui-data.json": "189f57fef2eb9fd96b0a87997f8c48b8dbb7149645e185dd2966796418e06780",
+    "ui-data.zip": "90abf1033e31e69d359024069fd00030ea7f077636b32749dfbfe370944624cb",
+    "ui-layout.yaml": "7ec5fc1a8fd49e5578f8c4ca9de17aaded1c6c47403a262ea593dee520578066",
+    "ui.pdf": "3c35e6deb5de822221763290e094b383e82113970b2c182f104a71d98c2c2eec",
+    "ui.png": "fefffd6b392e047f93b97bf352e812df67e3708f0f58768a11889ae0c9d4ff21",
+    "ui.svg": "dab87cd21d43465bfb8325b99eeea61961fc70ebbd15faf6cd0bdebeabc04f9b"
+   },
+   "ui": {
+    "exception": null,
+    "errors": [],
+    "warnings": [],
+    "steps": [
+     "load",
+     "theme minimal",
+     "downloads"
+    ],
+    "stage": "edit",
+    "downloads": {
+     "dl_svg": {
+      "bytes": 29377,
+      "sha256": "dab87cd21d43465bfb8325b99eeea61961fc70ebbd15faf6cd0bdebeabc04f9b",
+      "ok": true
+     },
+     "dl_png": {
+      "bytes": 132975,
+      "sha256": "fefffd6b392e047f93b97bf352e812df67e3708f0f58768a11889ae0c9d4ff21",
+      "ok": true
+     },
+     "dl_pdf": {
+      "bytes": 37706,
+      "sha256": "3c35e6deb5de822221763290e094b383e82113970b2c182f104a71d98c2c2eec",
+      "ok": true
+     },
+     "dl_layout": {
+      "bytes": 252,
+      "sha256": "7ec5fc1a8fd49e5578f8c4ca9de17aaded1c6c47403a262ea593dee520578066",
+      "ok": true
+     },
+     "dl_data_json": {
+      "bytes": 62613,
+      "sha256": "189f57fef2eb9fd96b0a87997f8c48b8dbb7149645e185dd2966796418e06780",
+      "ok": true
+     },
+     "dl_data_zip": {
+      "bytes": 3902,
+      "sha256": "90abf1033e31e69d359024069fd00030ea7f077636b32749dfbfe370944624cb",
+      "ok": true
+     }
+    },
+    "harness_error": null,
+    "process": {
+     "exit": 0,
+     "seconds": 21.94,
+     "max_rss_mb": 255.9,
+     "timed_out": false
+    }
+   }
+  },
+  {
+   "id": "31FD",
+   "dir": "31FD",
+   "stratum": "S4",
+   "half": "tune",
+   "residues": 4174,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 40.24,
+   "draw_seconds": 38.14,
+   "peak_mb": "not measured",
+   "svg_bytes": 708552,
+   "png_bytes": 2466939,
+   "process": {
+    "exit": 0,
+    "seconds": 80.24,
+    "max_rss_mb": 261.5,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "3d3e2742100edaf84c4ec75063fc50372f68dbec4ab6e6094e8d76f4777fea0e",
+    "app.svg": "c1d847a64133612194d3b37fc96bcc49588647d70d562eb71f92e7aa04fa2a5e",
+    "ui-data.json": "79643261e9fb55fdff57bcb6e9b2c75ecf003786a0f4db7c5437eefff7dd3d14",
+    "ui-data.zip": "11591c28afde8f703094658d09d60df01d290d7d6953c9788876784c12810cf1",
+    "ui-layout.yaml": "2aae85c26e0f4401e713739a6c7e915670eb330e0006f156aa4a8f60bf5e738c",
+    "ui.pdf": "82357b910fa16b61cf96479ae3e4e2ebc05038b86182de27c38dcd7ac9bcd96c",
+    "ui.png": "3d3e2742100edaf84c4ec75063fc50372f68dbec4ab6e6094e8d76f4777fea0e",
+    "ui.svg": "c1d847a64133612194d3b37fc96bcc49588647d70d562eb71f92e7aa04fa2a5e"
+   },
+   "ui": {
+    "exception": null,
+    "errors": [],
+    "warnings": [],
+    "steps": [
+     "load",
+     "theme minimal",
+     "downloads"
+    ],
+    "stage": "edit",
+    "downloads": {
+     "dl_svg": {
+      "bytes": 708643,
+      "sha256": "c1d847a64133612194d3b37fc96bcc49588647d70d562eb71f92e7aa04fa2a5e",
+      "ok": true
+     },
+     "dl_png": {
+      "bytes": 2466939,
+      "sha256": "3d3e2742100edaf84c4ec75063fc50372f68dbec4ab6e6094e8d76f4777fea0e",
+      "ok": true
+     },
+     "dl_pdf": {
+      "bytes": 205368,
+      "sha256": "82357b910fa16b61cf96479ae3e4e2ebc05038b86182de27c38dcd7ac9bcd96c",
+      "ok": true
+     },
+     "dl_layout": {
+      "bytes": 256,
+      "sha256": "2aae85c26e0f4401e713739a6c7e915670eb330e0006f156aa4a8f60bf5e738c",
+      "ok": true
+     },
+     "dl_data_json": {
+      "bytes": 368616,
+      "sha256": "79643261e9fb55fdff57bcb6e9b2c75ecf003786a0f4db7c5437eefff7dd3d14",
+      "ok": true
+     },
+     "dl_data_zip": {
+      "bytes": 16322,
+      "sha256": "11591c28afde8f703094658d09d60df01d290d7d6953c9788876784c12810cf1",
+      "ok": true
+     }
+    },
+    "harness_error": null,
+    "process": {
+     "exit": 0,
+     "seconds": 203.17,
+     "max_rss_mb": 314.2,
+     "timed_out": false
+    }
+   }
+  },
+  {
+   "id": "22VF",
+   "dir": "22VF",
+   "stratum": "S4",
+   "half": "tune",
+   "residues": 4194,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 6.97,
+   "draw_seconds": 4.46,
+   "peak_mb": "not measured",
+   "svg_bytes": 547962,
+   "png_bytes": 1605883,
+   "process": {
+    "exit": 0,
+    "seconds": 18.19,
+    "max_rss_mb": 276.2,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "4b92c35de0122f0f9edfe9c4551ee9e0e418ce9060fd3d86161562a146293cf1",
+    "app.svg": "626ac9ed8eac5a6ef662c6c17c2931bb6f43e8888d0671413b1104c54480851a",
+    "ui-data.json": "4ea877c9242254069c1df1a3bd247e0d8f26a4f5e019c07f93468b13efddc232",
+    "ui-data.zip": "c22a61574e2434787523d9af18dcb9cb40d846dbcd3298b1fdf36a3bf84df536",
+    "ui-layout.yaml": "e29dc0a2547c7206e6fa6909af6a801c894bea6cbb1cfcb3ce1d838b6eab15c4",
+    "ui.pdf": "527305adf7ffbeb239c768d6a3430c692fd059e0b6d143bcf361e75b9f2150a9",
+    "ui.png": "b763fb84df9f9c48c177af56924c03862322c7d6badb10e4da224bd8bc444964",
+    "ui.svg": "274f873150993c92496fe97793a505747e0bb22a9057ee11f802389ab32da23a"
+   },
+   "ui": {
+    "exception": null,
+    "errors": [],
+    "warnings": [],
+    "steps": [
+     "load",
+     "theme minimal",
+     "downloads"
+    ],
+    "stage": "edit",
+    "downloads": {
+     "dl_svg": {
+      "bytes": 548058,
+      "sha256": "274f873150993c92496fe97793a505747e0bb22a9057ee11f802389ab32da23a",
+      "ok": true
+     },
+     "dl_png": {
+      "bytes": 1819134,
+      "sha256": "b763fb84df9f9c48c177af56924c03862322c7d6badb10e4da224bd8bc444964",
+      "ok": true
+     },
+     "dl_pdf": {
+      "bytes": 170997,
+      "sha256": "527305adf7ffbeb239c768d6a3430c692fd059e0b6d143bcf361e75b9f2150a9",
+      "ok": true
+     },
+     "dl_layout": {
+      "bytes": 252,
+      "sha256": "e29dc0a2547c7206e6fa6909af6a801c894bea6cbb1cfcb3ce1d838b6eab15c4",
+      "ok": true
+     },
+     "dl_data_json": {
+      "bytes": 94441,
+      "sha256": "4ea877c9242254069c1df1a3bd247e0d8f26a4f5e019c07f93468b13efddc232",
+      "ok": true
+     },
+     "dl_data_zip": {
+      "bytes": 7305,
+      "sha256": "c22a61574e2434787523d9af18dcb9cb40d846dbcd3298b1fdf36a3bf84df536",
+      "ok": true
+     }
+    },
+    "harness_error": null,
+    "process": {
+     "exit": 0,
+     "seconds": 31.45,
+     "max_rss_mb": 296.9,
+     "timed_out": false
+    }
+   }
+  },
+  {
+   "id": "12XK",
+   "dir": "12XK",
+   "stratum": "S4",
+   "half": "tune",
+   "residues": 1470,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 5.68,
+   "draw_seconds": 4.12,
+   "peak_mb": "not measured",
+   "svg_bytes": 447659,
+   "png_bytes": 1322868,
+   "process": {
+    "exit": 0,
+    "seconds": 15.44,
+    "max_rss_mb": 212.0,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "3066741bee859050da9121e19acd26485f752a0fd64b66f6000cb5cc3ffd9e6c",
+    "app.svg": "66e63dea39506e02885d5ffbb5326aa855a787b8147d8795130e4f15931c0b10",
+    "ui-data.json": "346641c5627c63838354a74500277ac219d6c0e6ab606698a83a7468e40e0c86",
+    "ui-data.zip": "3de5148117bf4dddc241a99eea3b03112d7a42028bff0a55529bdd90324bf503",
+    "ui-layout.yaml": "6d3081bdf56a9ab57954f95666e7985fe439a6a01ea1107cac1f1c77e746a647",
+    "ui.pdf": "4c91f49e87207e7a4375ac99890836f441d4696b98a7678ad135100474e9fb54",
+    "ui.png": "cefc6e59a4265f3914acc32b987ac6e70d83fe86ab11f67c59f5f5e127734aa2",
+    "ui.svg": "ecf35136bc9c9ed4eaada83602d1f2d742abc062a2db070f388888ef324ba40c"
+   },
+   "ui": {
+    "exception": null,
+    "errors": [],
+    "warnings": [],
+    "steps": [
+     "load",
+     "theme minimal",
+     "downloads"
+    ],
+    "stage": "edit",
+    "downloads": {
+     "dl_svg": {
+      "bytes": 447984,
+      "sha256": "ecf35136bc9c9ed4eaada83602d1f2d742abc062a2db070f388888ef324ba40c",
+      "ok": true
+     },
+     "dl_png": {
+      "bytes": 1475077,
+      "sha256": "cefc6e59a4265f3914acc32b987ac6e70d83fe86ab11f67c59f5f5e127734aa2",
+      "ok": true
+     },
+     "dl_pdf": {
+      "bytes": 130068,
+      "sha256": "4c91f49e87207e7a4375ac99890836f441d4696b98a7678ad135100474e9fb54",
+      "ok": true
+     },
+     "dl_layout": {
+      "bytes": 252,
+      "sha256": "6d3081bdf56a9ab57954f95666e7985fe439a6a01ea1107cac1f1c77e746a647",
+      "ok": true
+     },
+     "dl_data_json": {
+      "bytes": 95033,
+      "sha256": "346641c5627c63838354a74500277ac219d6c0e6ab606698a83a7468e40e0c86",
+      "ok": true
+     },
+     "dl_data_zip": {
+      "bytes": 6578,
+      "sha256": "3de5148117bf4dddc241a99eea3b03112d7a42028bff0a55529bdd90324bf503",
+      "ok": true
+     }
+    },
+    "harness_error": null,
+    "process": {
+     "exit": 0,
+     "seconds": 30.16,
+     "max_rss_mb": 255.9,
+     "timed_out": false
+    }
+   }
+  },
+  {
+   "id": "35VC",
+   "dir": "35VC",
+   "stratum": "S4",
+   "half": "tune",
+   "residues": 1560,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 6.44,
+   "draw_seconds": 4.68,
+   "peak_mb": "not measured",
+   "svg_bytes": 522066,
+   "png_bytes": 1563299,
+   "process": {
+    "exit": 0,
+    "seconds": 17.14,
+    "max_rss_mb": 173.6,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "e56eb882ff01f7ac5c66630bf5e9ad1a56dc30c704ba86a9c5e12f5c253bac3e",
+    "app.svg": "d8770aed3a68aa049b980678e4ee10ba38dab0381da958cf0e380c569c743705",
+    "ui-data.json": "12494fb327f30c58ea53e7fba5aade0a526d482c33b1a1808ad3ad9f1cf37a7c",
+    "ui-data.zip": "78766877a2e7923c2e8a3932b9aae7edd672c36d490ea8930d8397614db2c2ec",
+    "ui-layout.yaml": "86fbc89758dac10f340e5f9714a3547f8027584b3267a014fecd7d489c2e7a73",
+    "ui.pdf": "d5b3388e4d6a02aae8d435ba3cc75ecdc5eb50825cc08a136a6e252989ae7a38",
+    "ui.png": "4bc6c47b6e68ce3d81f9599fda15790f265b3869c6047ed87af9626f52bebece",
+    "ui.svg": "a957c281c2b58a6fcc99bd478e76575e908b3d12f63fcea68c325d6e34ed4843"
+   },
+   "ui": {
+    "exception": null,
+    "errors": [],
+    "warnings": [],
+    "steps": [
+     "load",
+     "theme minimal",
+     "downloads"
+    ],
+    "stage": "edit",
+    "downloads": {
+     "dl_svg": {
+      "bytes": 522250,
+      "sha256": "a957c281c2b58a6fcc99bd478e76575e908b3d12f63fcea68c325d6e34ed4843",
+      "ok": true
+     },
+     "dl_png": {
+      "bytes": 1725222,
+      "sha256": "4bc6c47b6e68ce3d81f9599fda15790f265b3869c6047ed87af9626f52bebece",
+      "ok": true
+     },
+     "dl_pdf": {
+      "bytes": 145236,
+      "sha256": "d5b3388e4d6a02aae8d435ba3cc75ecdc5eb50825cc08a136a6e252989ae7a38",
+      "ok": true
+     },
+     "dl_layout": {
+      "bytes": 252,
+      "sha256": "86fbc89758dac10f340e5f9714a3547f8027584b3267a014fecd7d489c2e7a73",
+      "ok": true
+     },
+     "dl_data_json": {
+      "bytes": 100254,
+      "sha256": "12494fb327f30c58ea53e7fba5aade0a526d482c33b1a1808ad3ad9f1cf37a7c",
+      "ok": true
+     },
+     "dl_data_zip": {
+      "bytes": 5996,
+      "sha256": "78766877a2e7923c2e8a3932b9aae7edd672c36d490ea8930d8397614db2c2ec",
+      "ok": true
+     }
+    },
+    "harness_error": null,
+    "process": {
+     "exit": 0,
+     "seconds": 24.65,
+     "max_rss_mb": 242.0,
+     "timed_out": false
+    }
+   }
+  },
+  {
+   "id": "23CX",
+   "dir": "23CX",
+   "stratum": "S4",
+   "half": "tune",
+   "residues": 1085,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 5.68,
+   "draw_seconds": 4.37,
+   "peak_mb": "not measured",
+   "svg_bytes": 253029,
+   "png_bytes": 805969,
+   "process": {
+    "exit": 0,
+    "seconds": 15.88,
+    "max_rss_mb": 157.1,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "5a18c6884134894f9962ac693b5fba0846a68bd5353b05a0f6795c9ab05dfbfa",
+    "app.svg": "ede6abf2463ed4b4de193f075d6eb3fb98ca41442c2d518f0fecf480c3ba42b6",
+    "ui-data.json": "278ce598e0f6ac728db4870d396361758f86a5f235a334d9e847b8a90741aff4",
+    "ui-data.zip": "296c1333cdd9b3fd78894be378f69970194007325d3c6d012c72a3d4ceed4d7d",
+    "ui-layout.yaml": "1f28cb906d6b9ce9c6d56264a52deb975990e9aacebfe09576a40a2f37ff5437",
+    "ui.pdf": "68f43e552ed0b6095a4760727c6529bb2265584481a06b65573c8cc6c50ba10b",
+    "ui.png": "14e7790867dde97fd1c0d8d745bc2630a8e1d195893d2d29ddb2df637742cc69",
+    "ui.svg": "f272f75c81bc8b2518e6c6b1e0dedb65cbb8dba73ee9f31831498854b01ecc7a"
+   },
+   "ui": {
+    "exception": null,
+    "errors": [],
+    "warnings": [],
+    "steps": [
+     "load",
+     "theme minimal",
+     "downloads"
+    ],
+    "stage": "edit",
+    "downloads": {
+     "dl_svg": {
+      "bytes": 253472,
+      "sha256": "f272f75c81bc8b2518e6c6b1e0dedb65cbb8dba73ee9f31831498854b01ecc7a",
+      "ok": true
+     },
+     "dl_png": {
+      "bytes": 857868,
+      "sha256": "14e7790867dde97fd1c0d8d745bc2630a8e1d195893d2d29ddb2df637742cc69",
+      "ok": true
+     },
+     "dl_pdf": {
+      "bytes": 79690,
+      "sha256": "68f43e552ed0b6095a4760727c6529bb2265584481a06b65573c8cc6c50ba10b",
+      "ok": true
+     },
+     "dl_layout": {
+      "bytes": 252,
+      "sha256": "1f28cb906d6b9ce9c6d56264a52deb975990e9aacebfe09576a40a2f37ff5437",
+      "ok": true
+     },
+     "dl_data_json": {
+      "bytes": 83582,
+      "sha256": "278ce598e0f6ac728db4870d396361758f86a5f235a334d9e847b8a90741aff4",
+      "ok": true
+     },
+     "dl_data_zip": {
+      "bytes": 6386,
+      "sha256": "296c1333cdd9b3fd78894be378f69970194007325d3c6d012c72a3d4ceed4d7d",
+      "ok": true
+     }
+    },
+    "harness_error": null,
+    "process": {
+     "exit": 0,
+     "seconds": 31.15,
+     "max_rss_mb": 228.9,
+     "timed_out": false
+    }
+   }
+  },
+  {
+   "id": "28HY",
+   "dir": "28HY",
+   "stratum": "S4",
+   "half": "tune",
+   "residues": 972,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 1.65,
+   "draw_seconds": 1.52,
+   "peak_mb": "not measured",
+   "svg_bytes": 320908,
+   "png_bytes": 1015796,
+   "process": {
+    "exit": 0,
+    "seconds": 11.23,
+    "max_rss_mb": 170.5,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "64c317a4b1164fc643bd60ea423c406ec1ee36e805c98192b3aa5995ce40ec4f",
+    "app.svg": "aef6edf6d792c7c4c95e541df432d484ea4706beb0d2d088e8e137e29f937b48",
+    "ui-data.json": "51d00d84277cc49d015a3e31ecb75690ed9e174c4650efb15325efd65e94122d",
+    "ui-data.zip": "0ce2ff4d0323d50d8c910b2f0912825adf7b1c96d211797be5cf9b61168c2eed",
+    "ui-layout.yaml": "b0911a61e050dbd3e6dde3c554424a0b39d71ca9b741f9cc5b9186990b8b817c",
+    "ui.pdf": "a3c50434d8d004d6a8539f8128b8b0fd9970877a5550b3c41d21499c5400400f",
+    "ui.png": "2fc900ca440e1cacf824748658e594e775c38b552ddf294cf128d7172bc45282",
+    "ui.svg": "bef5fc5c62db5f0440158bb0ceac246e1f1f766ee3bc238ae434b13373d0449a"
+   },
+   "ui": {
+    "exception": null,
+    "errors": [],
+    "warnings": [],
+    "steps": [
+     "load",
+     "theme minimal",
+     "downloads"
+    ],
+    "stage": "edit",
+    "downloads": {
+     "dl_svg": {
+      "bytes": 320962,
+      "sha256": "bef5fc5c62db5f0440158bb0ceac246e1f1f766ee3bc238ae434b13373d0449a",
+      "ok": true
+     },
+     "dl_png": {
+      "bytes": 1132513,
+      "sha256": "2fc900ca440e1cacf824748658e594e775c38b552ddf294cf128d7172bc45282",
+      "ok": true
+     },
+     "dl_pdf": {
+      "bytes": 93461,
+      "sha256": "a3c50434d8d004d6a8539f8128b8b0fd9970877a5550b3c41d21499c5400400f",
+      "ok": true
+     },
+     "dl_layout": {
+      "bytes": 252,
+      "sha256": "b0911a61e050dbd3e6dde3c554424a0b39d71ca9b741f9cc5b9186990b8b817c",
+      "ok": true
+     },
+     "dl_data_json": {
+      "bytes": 37348,
+      "sha256": "51d00d84277cc49d015a3e31ecb75690ed9e174c4650efb15325efd65e94122d",
+      "ok": true
+     },
+     "dl_data_zip": {
+      "bytes": 3577,
+      "sha256": "0ce2ff4d0323d50d8c910b2f0912825adf7b1c96d211797be5cf9b61168c2eed",
+      "ok": true
+     }
+    },
+    "harness_error": null,
+    "process": {
+     "exit": 0,
+     "seconds": 14.43,
+     "max_rss_mb": 233.7,
+     "timed_out": false
+    }
+   }
+  },
+  {
+   "id": "26EL",
+   "dir": "26EL",
+   "stratum": "S4",
+   "half": "tune",
+   "residues": 12238,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 4.49,
+   "draw_seconds": 3.88,
+   "peak_mb": "not measured",
+   "svg_bytes": 131025,
+   "png_bytes": 408463,
+   "process": {
+    "exit": 0,
+    "seconds": 18.19,
+    "max_rss_mb": 289.2,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "cdeb19fd3cbe6a63d35c096eaaa175b395ea88244f3d3d5a32bafaa2a7935ee5",
+    "app.svg": "ff51eedcb96741824a153c77fecf731fb66fc87410f7982d0fea30adba531ffb",
+    "ui-data.json": "7481fffb650dfe26c80a4914b0b750266d1b2949dbdd59dce822177fbc024c14",
+    "ui-data.zip": "b3c42c8a1b7de3fba6103d2718084b0a8a2f268f8921be5a185d68caf5109396",
+    "ui-layout.yaml": "027791eb024b2642b392f351ee5c0448112b808065a86cb7a4159ee7f4fffbfc",
+    "ui.pdf": "273e748c40c9396d3f44d78b0a630dba573dc58bae7f4d14b2e68cf36f4dc4a8",
+    "ui.png": "2d0f36b048eb0542d492d443bf1b50e1e4a407a8137acf1c967b07ec9b950396",
+    "ui.svg": "f49d32eccd95a3d89bf91916e84ef8d625ec77eb8321dbe1ae49131a169f3348"
+   },
+   "ui": {
+    "exception": null,
+    "errors": [],
+    "warnings": [],
+    "steps": [
+     "load",
+     "theme minimal",
+     "downloads"
+    ],
+    "stage": "edit",
+    "downloads": {
+     "dl_svg": {
+      "bytes": 131043,
+      "sha256": "f49d32eccd95a3d89bf91916e84ef8d625ec77eb8321dbe1ae49131a169f3348",
+      "ok": true
+     },
+     "dl_png": {
+      "bytes": 445130,
+      "sha256": "2d0f36b048eb0542d492d443bf1b50e1e4a407a8137acf1c967b07ec9b950396",
+      "ok": true
+     },
+     "dl_pdf": {
+      "bytes": 55639,
+      "sha256": "273e748c40c9396d3f44d78b0a630dba573dc58bae7f4d14b2e68cf36f4dc4a8",
+      "ok": true
+     },
+     "dl_layout": {
+      "bytes": 252,
+      "sha256": "027791eb024b2642b392f351ee5c0448112b808065a86cb7a4159ee7f4fffbfc",
+      "ok": true
+     },
+     "dl_data_json": {
+      "bytes": 59086,
+      "sha256": "7481fffb650dfe26c80a4914b0b750266d1b2949dbdd59dce822177fbc024c14",
+      "ok": true
+     },
+     "dl_data_zip": {
+      "bytes": 5105,
+      "sha256": "b3c42c8a1b7de3fba6103d2718084b0a8a2f268f8921be5a185d68caf5109396",
+      "ok": true
+     }
+    },
+    "harness_error": null,
+    "process": {
+     "exit": 0,
+     "seconds": 26.6,
+     "max_rss_mb": 301.3,
+     "timed_out": false
+    }
+   }
+  },
+  {
+   "id": "9X4L",
+   "dir": "9X4L",
+   "stratum": "S4",
+   "half": "tune",
+   "residues": 8692,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 45.53,
+   "draw_seconds": 40.9,
+   "peak_mb": "not measured",
+   "svg_bytes": 2383468,
+   "png_bytes": 5100177,
+   "process": {
+    "exit": 0,
+    "seconds": 91.7,
+    "max_rss_mb": 362.7,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "6532c02c245c1b1680253d3c2be37f550f875eca0ecb9ac61f5b39f2fcc7a457",
+    "app.svg": "606eecd5cd80a9ae3d8085ea0774be7ad4e4c380c755649968e7e589fd54fba3",
+    "ui-data.json": "3eee724d2d103e016c60809d8f2cdc14e2b237b4e892b686b467ba03f8b9b5c0",
+    "ui-data.zip": "9f5bbb7c39558b0a5ee2e1268278415aad6424b0545cf80aca84129db5e5624c",
+    "ui-layout.yaml": "b0ab328368bce6e4b38238465fee1cbf437f73551060445cdd65ccafd33062ee",
+    "ui.pdf": "11c9c7adc1e63d0d3fe17078943493aca65e8b41743e9c8628833f351e227d93",
+    "ui.png": "6532c02c245c1b1680253d3c2be37f550f875eca0ecb9ac61f5b39f2fcc7a457",
+    "ui.svg": "606eecd5cd80a9ae3d8085ea0774be7ad4e4c380c755649968e7e589fd54fba3"
+   },
+   "ui": {
+    "exception": null,
+    "errors": [],
+    "warnings": [],
+    "steps": [
+     "load",
+     "theme minimal",
+     "downloads"
+    ],
+    "stage": "edit",
+    "downloads": {
+     "dl_svg": {
+      "bytes": 2383830,
+      "sha256": "606eecd5cd80a9ae3d8085ea0774be7ad4e4c380c755649968e7e589fd54fba3",
+      "ok": true
+     },
+     "dl_png": {
+      "bytes": 5100177,
+      "sha256": "6532c02c245c1b1680253d3c2be37f550f875eca0ecb9ac61f5b39f2fcc7a457",
+      "ok": true
+     },
+     "dl_pdf": {
+      "bytes": 574342,
+      "sha256": "11c9c7adc1e63d0d3fe17078943493aca65e8b41743e9c8628833f351e227d93",
+      "ok": true
+     },
+     "dl_layout": {
+      "bytes": 256,
+      "sha256": "b0ab328368bce6e4b38238465fee1cbf437f73551060445cdd65ccafd33062ee",
+      "ok": true
+     },
+     "dl_data_json": {
+      "bytes": 539856,
+      "sha256": "3eee724d2d103e016c60809d8f2cdc14e2b237b4e892b686b467ba03f8b9b5c0",
+      "ok": true
+     },
+     "dl_data_zip": {
+      "bytes": 28054,
+      "sha256": "9f5bbb7c39558b0a5ee2e1268278415aad6424b0545cf80aca84129db5e5624c",
+      "ok": true
+     }
+    },
+    "harness_error": null,
+    "process": {
+     "exit": 0,
+     "seconds": 226.26,
+     "max_rss_mb": 359.0,
+     "timed_out": false
+    }
+   }
+  },
+  {
+   "id": "9NYA",
+   "dir": "9NYA",
+   "stratum": "S5",
+   "half": "tune",
+   "residues": 86,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 0.48,
+   "draw_seconds": 0.38,
+   "peak_mb": "not measured",
+   "svg_bytes": 21784,
+   "png_bytes": 79775,
+   "process": {
+    "exit": 0,
+    "seconds": 7.02,
+    "max_rss_mb": 140.3,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "893fba744b1df257df367fc7b4834c59e76ac935fbce357e1f6e5d5ebdcf2cbe",
+    "app.svg": "b0e3ea17429eff9d076b4a9cf66986d9f792ab05d208c3c17ac76c065e1d23dd",
+    "ui-data.json": "d6348b2df54e0a5d5b975cfdaeef51a151c41ead7a73629f22fe5a94880e9868",
+    "ui-data.zip": "4fd0c5f2ecabb28386b74d2f6531d2f9639d4f7bff2a97aaf7ebdefd75876378",
+    "ui-layout.yaml": "c83332e10bd877f8eca35e939dc19a9d05376e90a18362b03b24577912dd8a85",
+    "ui.pdf": "a2a7e7de11c012a2e13f3103fe33b18f172d2ae32c55007cc0abe032fc4ea8e1",
+    "ui.png": "168a46685f033009aef94c09f80a662d5de5d96f4ff9efa7c8dca6245f0979b8",
+    "ui.svg": "89a23846344376a6ebf1d4a2dfc6922a0aae46193d256a83665c23c433508e2d"
+   },
+   "ui": {
+    "exception": null,
+    "errors": [],
+    "warnings": [],
+    "steps": [
+     "load",
+     "theme minimal",
+     "downloads"
+    ],
+    "stage": "edit",
+    "downloads": {
+     "dl_svg": {
+      "bytes": 21811,
+      "sha256": "89a23846344376a6ebf1d4a2dfc6922a0aae46193d256a83665c23c433508e2d",
+      "ok": true
+     },
+     "dl_png": {
+      "bytes": 86201,
+      "sha256": "168a46685f033009aef94c09f80a662d5de5d96f4ff9efa7c8dca6245f0979b8",
+      "ok": true
+     },
+     "dl_pdf": {
+      "bytes": 21553,
+      "sha256": "a2a7e7de11c012a2e13f3103fe33b18f172d2ae32c55007cc0abe032fc4ea8e1",
+      "ok": true
+     },
+     "dl_layout": {
+      "bytes": 252,
+      "sha256": "c83332e10bd877f8eca35e939dc19a9d05376e90a18362b03b24577912dd8a85",
+      "ok": true
+     },
+     "dl_data_json": {
+      "bytes": 6293,
+      "sha256": "d6348b2df54e0a5d5b975cfdaeef51a151c41ead7a73629f22fe5a94880e9868",
+      "ok": true
+     },
+     "dl_data_zip": {
+      "bytes": 2475,
+      "sha256": "4fd0c5f2ecabb28386b74d2f6531d2f9639d4f7bff2a97aaf7ebdefd75876378",
+      "ok": true
+     }
+    },
+    "harness_error": null,
+    "process": {
+     "exit": 0,
+     "seconds": 7.82,
+     "max_rss_mb": 219.9,
+     "timed_out": false
+    }
+   }
+  },
+  {
+   "id": "45JF",
+   "dir": "45JF",
+   "stratum": "S5",
+   "half": "tune",
+   "residues": 32,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 0.38,
+   "draw_seconds": 0.25,
+   "peak_mb": "not measured",
+   "svg_bytes": 6090,
+   "png_bytes": 12829,
+   "process": {
+    "exit": 0,
+    "seconds": 6.17,
+    "max_rss_mb": 144.1,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "91827b66f9dbf54767aba93bf983a84e2098ad53e0d5c8c9f66eaa2cd6e1c66e",
+    "app.svg": "91dc51f0de0dcfd4a8e6411e1c7f01c1ed4b459fb6a4ba4f2e8a92b772eaf6c1",
+    "ui-data.json": "69189a978e0fccafccff4ea3a153e5568c2c4cb7653dc2a65b6dfd627518b0b0",
+    "ui-data.zip": "415a4f13ab60db8e5fd9714f36f417cbf7f485fa01901b83adc0daf4db20b4ef",
+    "ui-layout.yaml": "12ffe93048d4d1e8294cf9d0ffdae6a2f11e7b666d35cd0c6a1446924f935f60",
+    "ui.pdf": "80c5840c28ddac507c95ceb769724a737329b9a5447c70409e5054e650faf5f7",
+    "ui.png": "4b8ac21fcf5aa9df99e3ccbd7535b58788afc345de8affa7f6a0ab6251a96091",
+    "ui.svg": "0cccbcd5d72b5cf2870e94095550fda397e743bd2cbe4fb936c2c48741cf8972"
+   },
+   "ui": {
+    "exception": null,
+    "errors": [],
+    "warnings": [],
+    "steps": [
+     "load",
+     "theme minimal",
+     "downloads"
+    ],
+    "stage": "edit",
+    "downloads": {
+     "dl_svg": {
+      "bytes": 6094,
+      "sha256": "0cccbcd5d72b5cf2870e94095550fda397e743bd2cbe4fb936c2c48741cf8972",
+      "ok": true
+     },
+     "dl_png": {
+      "bytes": 13126,
+      "sha256": "4b8ac21fcf5aa9df99e3ccbd7535b58788afc345de8affa7f6a0ab6251a96091",
+      "ok": true
+     },
+     "dl_pdf": {
+      "bytes": 12978,
+      "sha256": "80c5840c28ddac507c95ceb769724a737329b9a5447c70409e5054e650faf5f7",
+      "ok": true
+     },
+     "dl_layout": {
+      "bytes": 252,
+      "sha256": "12ffe93048d4d1e8294cf9d0ffdae6a2f11e7b666d35cd0c6a1446924f935f60",
+      "ok": true
+     },
+     "dl_data_json": {
+      "bytes": 2652,
+      "sha256": "69189a978e0fccafccff4ea3a153e5568c2c4cb7653dc2a65b6dfd627518b0b0",
+      "ok": true
+     },
+     "dl_data_zip": {
+      "bytes": 2173,
+      "sha256": "415a4f13ab60db8e5fd9714f36f417cbf7f485fa01901b83adc0daf4db20b4ef",
+      "ok": true
+     }
+    },
+    "harness_error": null,
+    "process": {
+     "exit": 0,
+     "seconds": 7.47,
+     "max_rss_mb": 227.7,
+     "timed_out": false
+    }
+   }
+  },
+  {
+   "id": "34XH",
+   "dir": "34XH",
+   "stratum": "S5",
+   "half": "tune",
+   "residues": 23,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 0.49,
+   "draw_seconds": 0.39,
+   "peak_mb": "not measured",
+   "svg_bytes": 11967,
+   "png_bytes": 38827,
+   "process": {
+    "exit": 0,
+    "seconds": 6.92,
+    "max_rss_mb": 159.6,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "53d7c372112dcc225bb852a2ae5097481b56f13988974f5eef1d2b3272e630bf",
+    "app.svg": "2d79b096570761031ba4b3b411fba079f18ee2d403c03edfaafa785d0d8a4c58",
+    "ui-data.json": "943da1d66ca8ec7d61d5cd2ff1cb5cd14a35a05325d9fcbb31f06845f53298de",
+    "ui-data.zip": "43c7e678fcd215e14e4da11b80b101f9c6a1ee04778e569a65cf99a815a65671",
+    "ui-layout.yaml": "53539bed3cd710f8f53ba2155d00155a12d20685676567a6dc38a5b56273aef0",
+    "ui.pdf": "2ed93f55ebc53cadf9b4441c4e09bd88a676f390caebccb38875109a51a78c5a",
+    "ui.png": "e6d3f5dfd6247e62bff5a58bd0a15dd7034f9d74200c096d2f30d0da9dcb51ed",
+    "ui.svg": "2e263b90df1259a25fd8e77e5e408dba461e8873af3819b272f054c767c20624"
+   },
+   "ui": {
+    "exception": null,
+    "errors": [],
+    "warnings": [],
+    "steps": [
+     "load",
+     "theme minimal",
+     "downloads"
+    ],
+    "stage": "edit",
+    "downloads": {
+     "dl_svg": {
+      "bytes": 3596,
+      "sha256": "2e263b90df1259a25fd8e77e5e408dba461e8873af3819b272f054c767c20624",
+      "ok": true
+     },
+     "dl_png": {
+      "bytes": 22191,
+      "sha256": "e6d3f5dfd6247e62bff5a58bd0a15dd7034f9d74200c096d2f30d0da9dcb51ed",
+      "ok": true
+     },
+     "dl_pdf": {
+      "bytes": 17662,
+      "sha256": "2ed93f55ebc53cadf9b4441c4e09bd88a676f390caebccb38875109a51a78c5a",
+      "ok": true
+     },
+     "dl_layout": {
+      "bytes": 252,
+      "sha256": "53539bed3cd710f8f53ba2155d00155a12d20685676567a6dc38a5b56273aef0",
+      "ok": true
+     },
+     "dl_data_json": {
+      "bytes": 4654,
+      "sha256": "943da1d66ca8ec7d61d5cd2ff1cb5cd14a35a05325d9fcbb31f06845f53298de",
+      "ok": true
+     },
+     "dl_data_zip": {
+      "bytes": 2917,
+      "sha256": "43c7e678fcd215e14e4da11b80b101f9c6a1ee04778e569a65cf99a815a65671",
+      "ok": true
+     }
+    },
+    "harness_error": null,
+    "process": {
+     "exit": 0,
+     "seconds": 7.92,
+     "max_rss_mb": 229.8,
+     "timed_out": false
+    }
+   }
+  },
+  {
+   "id": "9WXY",
+   "dir": "9WXY",
+   "stratum": "S5",
+   "half": "tune",
+   "residues": 16,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 0.17,
+   "draw_seconds": 0.09,
+   "peak_mb": "not measured",
+   "svg_bytes": 1133,
+   "png_bytes": 9862,
+   "process": {
+    "exit": 0,
+    "seconds": 5.87,
+    "max_rss_mb": 132.5,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "a23ebe956673253e380deae2200bbe69f68ac700e80633567212ff13a5312319",
+    "app.svg": "b5bd24092542bb74e60db4a07d198aebac10d137c272e963f6c8d15c16271ddc",
+    "ui-data.json": "97e1eade70bdb6aa772a546890579281810f835435ed767b58783a796ae855ab",
+    "ui-data.zip": "28ff363f28fae9418499cc23aef76ab91ea06dc3c66d5da0735e361f4f57fc3c",
+    "ui-layout.yaml": "a4595226f02af2b5f4327abb0f30272ee7dd833abbf622f7f44df51b1fc9ed30",
+    "ui.pdf": "d358b164f01cdbc93cc60f55f0b944f842e563978618405b46300fc4b684bfbc",
+    "ui.png": "a23ebe956673253e380deae2200bbe69f68ac700e80633567212ff13a5312319",
+    "ui.svg": "b5bd24092542bb74e60db4a07d198aebac10d137c272e963f6c8d15c16271ddc"
+   },
+   "ui": {
+    "exception": null,
+    "errors": [],
+    "warnings": [],
+    "steps": [
+     "load",
+     "theme minimal",
+     "downloads"
+    ],
+    "stage": "edit",
+    "downloads": {
+     "dl_svg": {
+      "bytes": 1133,
+      "sha256": "b5bd24092542bb74e60db4a07d198aebac10d137c272e963f6c8d15c16271ddc",
+      "ok": true
+     },
+     "dl_png": {
+      "bytes": 9862,
+      "sha256": "a23ebe956673253e380deae2200bbe69f68ac700e80633567212ff13a5312319",
+      "ok": true
+     },
+     "dl_pdf": {
+      "bytes": 7700,
+      "sha256": "d358b164f01cdbc93cc60f55f0b944f842e563978618405b46300fc4b684bfbc",
+      "ok": true
+     },
+     "dl_layout": {
+      "bytes": 252,
+      "sha256": "a4595226f02af2b5f4327abb0f30272ee7dd833abbf622f7f44df51b1fc9ed30",
+      "ok": true
+     },
+     "dl_data_json": {
+      "bytes": 772,
+      "sha256": "97e1eade70bdb6aa772a546890579281810f835435ed767b58783a796ae855ab",
+      "ok": true
+     },
+     "dl_data_zip": {
+      "bytes": 1990,
+      "sha256": "28ff363f28fae9418499cc23aef76ab91ea06dc3c66d5da0735e361f4f57fc3c",
+      "ok": true
+     }
+    },
+    "harness_error": null,
+    "process": {
+     "exit": 0,
+     "seconds": 6.62,
+     "max_rss_mb": 218.1,
+     "timed_out": false
+    }
+   }
+  },
+  {
+   "id": "9ZSJ",
+   "dir": "9ZSJ",
+   "stratum": "S7",
+   "half": "tune",
+   "residues": 1729,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 12.02,
+   "draw_seconds": 9.38,
+   "peak_mb": "not measured",
+   "svg_bytes": 463545,
+   "png_bytes": 1810603,
+   "process": {
+    "exit": 0,
+    "seconds": 25.71,
+    "max_rss_mb": 218.0,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "7d1c670a6fe2e5f31dcb99695dde8a1014169d4587061ed0a6e6799dc7889873",
+    "app.svg": "bf6b3d97efb5722858f908dd59f48ffda44b435806a0ad1420cf80dce9d981e6",
+    "ui-data.json": "1c70e704903df2ef4a8a13287a4f778e80e97a5685fe163711b9a5e2f7565a12",
+    "ui-data.zip": "19921e9e1a19178c4df04fa78eb96349e44a8b8355283202656e4b0badeecc86",
+    "ui-layout.yaml": "80ed8f3c102878f5baac350ae8799d4537bd965568fef43a6d56ab0948ca55c0",
+    "ui.pdf": "e1bbf4884e381821b5dbb677232463ea895438ba4b93ca71f60eabc8fa369076",
+    "ui.png": "7d1c670a6fe2e5f31dcb99695dde8a1014169d4587061ed0a6e6799dc7889873",
+    "ui.svg": "bf6b3d97efb5722858f908dd59f48ffda44b435806a0ad1420cf80dce9d981e6"
+   },
+   "ui": {
+    "exception": null,
+    "errors": [],
+    "warnings": [],
+    "steps": [
+     "load",
+     "theme minimal",
+     "downloads"
+    ],
+    "stage": "edit",
+    "downloads": {
+     "dl_svg": {
+      "bytes": 463639,
+      "sha256": "bf6b3d97efb5722858f908dd59f48ffda44b435806a0ad1420cf80dce9d981e6",
+      "ok": true
+     },
+     "dl_png": {
+      "bytes": 1810603,
+      "sha256": "7d1c670a6fe2e5f31dcb99695dde8a1014169d4587061ed0a6e6799dc7889873",
+      "ok": true
+     },
+     "dl_pdf": {
+      "bytes": 134306,
+      "sha256": "e1bbf4884e381821b5dbb677232463ea895438ba4b93ca71f60eabc8fa369076",
+      "ok": true
+     },
+     "dl_layout": {
+      "bytes": 256,
+      "sha256": "80ed8f3c102878f5baac350ae8799d4537bd965568fef43a6d56ab0948ca55c0",
+      "ok": true
+     },
+     "dl_data_json": {
+      "bytes": 163337,
+      "sha256": "1c70e704903df2ef4a8a13287a4f778e80e97a5685fe163711b9a5e2f7565a12",
+      "ok": true
+     },
+     "dl_data_zip": {
+      "bytes": 15422,
+      "sha256": "19921e9e1a19178c4df04fa78eb96349e44a8b8355283202656e4b0badeecc86",
+      "ok": true
+     }
+    },
+    "harness_error": null,
+    "process": {
+     "exit": 0,
+     "seconds": 34.97,
+     "max_rss_mb": 269.8,
+     "timed_out": false
+    }
+   }
+  },
+  {
+   "id": "9YPK",
+   "dir": "9YPK",
+   "stratum": "S8",
+   "half": "tune",
+   "residues": 6687,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 66.39,
+   "draw_seconds": 61.77,
+   "peak_mb": "not measured",
+   "svg_bytes": 1732439,
+   "png_bytes": 5186408,
+   "process": {
+    "exit": 0,
+    "seconds": 134.68,
+    "max_rss_mb": 381.5,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "cccc03f7d60869a9c912a71219462546eaf03a33e4fe164785b2b45859e10269",
+    "app.svg": "07094c9b4a1853e9145b1e862f2c98450d760d8de425656b504486585d02bed6",
+    "ui-data.json": "9cf2da3298f56081a36e95aa58f5cdad26ddd88489287ce3acc8e3b43ec164ce",
+    "ui-data.zip": "b46d898b61f446c75abae5b8b0c16952cee95ea9688eb8fd5b398977dcdc17c8",
+    "ui-layout.yaml": "c1ce5e38c1b4e7cda9e43381f444891792374fd23d05cf19f47a49c678f4cd74",
+    "ui.pdf": "ca0404ee724c9ca4aca839b0e6e5910389058407edb1ed44037861be3f8e9d8e",
+    "ui.png": "cccc03f7d60869a9c912a71219462546eaf03a33e4fe164785b2b45859e10269",
+    "ui.svg": "07094c9b4a1853e9145b1e862f2c98450d760d8de425656b504486585d02bed6"
+   },
+   "ui": {
+    "exception": null,
+    "errors": [],
+    "warnings": [],
+    "steps": [
+     "load",
+     "theme minimal",
+     "downloads"
+    ],
+    "stage": "edit",
+    "downloads": {
+     "dl_svg": {
+      "bytes": 1732802,
+      "sha256": "07094c9b4a1853e9145b1e862f2c98450d760d8de425656b504486585d02bed6",
+      "ok": true
+     },
+     "dl_png": {
+      "bytes": 5186408,
+      "sha256": "cccc03f7d60869a9c912a71219462546eaf03a33e4fe164785b2b45859e10269",
+      "ok": true
+     },
+     "dl_pdf": {
+      "bytes": 442112,
+      "sha256": "ca0404ee724c9ca4aca839b0e6e5910389058407edb1ed44037861be3f8e9d8e",
+      "ok": true
+     },
+     "dl_layout": {
+      "bytes": 256,
+      "sha256": "c1ce5e38c1b4e7cda9e43381f444891792374fd23d05cf19f47a49c678f4cd74",
+      "ok": true
+     },
+     "dl_data_json": {
+      "bytes": 711319,
+      "sha256": "9cf2da3298f56081a36e95aa58f5cdad26ddd88489287ce3acc8e3b43ec164ce",
+      "ok": true
+     },
+     "dl_data_zip": {
+      "bytes": 89866,
+      "sha256": "b46d898b61f446c75abae5b8b0c16952cee95ea9688eb8fd5b398977dcdc17c8",
+      "ok": true
+     }
+    },
+    "harness_error": null,
+    "process": {
+     "exit": 0,
+     "seconds": 150.25,
+     "max_rss_mb": 353.1,
+     "timed_out": false
+    }
+   }
+  },
+  {
+   "id": "9YPN",
+   "dir": "9YPN",
+   "stratum": "S8",
+   "half": "tune",
+   "residues": 6481,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 58.13,
+   "draw_seconds": 53.71,
+   "peak_mb": "not measured",
+   "svg_bytes": 1676095,
+   "png_bytes": 4342283,
+   "process": {
+    "exit": 0,
+    "seconds": 119.03,
+    "max_rss_mb": 383.5,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "005ca6274f39d38f3ed8eeb598850591ca62f654063a1baa231a3d160dc3b5aa",
+    "app.svg": "45713ce4c32c4238df4ae0629993f193a2cae8ded07805b5e3f0de95e35f29ac",
+    "ui-data.json": "54c1a92cab9a78edded1f225517a0c515bcd2fdc76552ced181ffbf23eec56e1",
+    "ui-data.zip": "b57c877e175403447f78097ae9c39048392c9f908e674eb4f8fddf4c3df8da2b",
+    "ui-layout.yaml": "cce25237bfe702b22e77c8ec3227236344e18703b8f0a98d43df538e0c310ce4",
+    "ui.pdf": "2bc511406e99871a48c25595e6a4991f8bd877b9b9dc4ef9d74a2335358962d2",
+    "ui.png": "005ca6274f39d38f3ed8eeb598850591ca62f654063a1baa231a3d160dc3b5aa",
+    "ui.svg": "45713ce4c32c4238df4ae0629993f193a2cae8ded07805b5e3f0de95e35f29ac"
+   },
+   "ui": {
+    "exception": null,
+    "errors": [],
+    "warnings": [],
+    "steps": [
+     "load",
+     "theme minimal",
+     "downloads"
+    ],
+    "stage": "edit",
+    "downloads": {
+     "dl_svg": {
+      "bytes": 1676443,
+      "sha256": "45713ce4c32c4238df4ae0629993f193a2cae8ded07805b5e3f0de95e35f29ac",
+      "ok": true
+     },
+     "dl_png": {
+      "bytes": 4342283,
+      "sha256": "005ca6274f39d38f3ed8eeb598850591ca62f654063a1baa231a3d160dc3b5aa",
+      "ok": true
+     },
+     "dl_pdf": {
+      "bytes": 424127,
+      "sha256": "2bc511406e99871a48c25595e6a4991f8bd877b9b9dc4ef9d74a2335358962d2",
+      "ok": true
+     },
+     "dl_layout": {
+      "bytes": 256,
+      "sha256": "cce25237bfe702b22e77c8ec3227236344e18703b8f0a98d43df538e0c310ce4",
+      "ok": true
+     },
+     "dl_data_json": {
+      "bytes": 687326,
+      "sha256": "54c1a92cab9a78edded1f225517a0c515bcd2fdc76552ced181ffbf23eec56e1",
+      "ok": true
+     },
+     "dl_data_zip": {
+      "bytes": 87012,
+      "sha256": "b57c877e175403447f78097ae9c39048392c9f908e674eb4f8fddf4c3df8da2b",
+      "ok": true
+     }
+    },
+    "harness_error": null,
+    "process": {
+     "exit": 0,
+     "seconds": 135.58,
+     "max_rss_mb": 345.5,
+     "timed_out": false
+    }
+   }
+  },
+  {
+   "id": "9WNE",
+   "dir": "9WNE",
+   "stratum": "S8",
+   "half": "tune",
+   "residues": 1310,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 6.47,
+   "draw_seconds": 4.82,
+   "peak_mb": "not measured",
+   "svg_bytes": 394625,
+   "png_bytes": 1274386,
+   "process": {
+    "exit": 0,
+    "seconds": 17.39,
+    "max_rss_mb": 165.0,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "99bbd474190d8ea8050f788c22fc7a965e377f7a8dcb8b7cc41d93908cc74f4e",
+    "app.svg": "138613e329e5ca33a7a11b668f269e72418c7656760970d7944d9414dae1952d",
+    "ui-data.json": "c996841ec3eb43f891951179bc9dd54c91915481f098efae9906c3d8144a9d8f",
+    "ui-data.zip": "e3dc402e1a08c0a2285472a50a17ff97453c9034767b1247d5312cbeb7b724cf",
+    "ui-layout.yaml": "53e077c2b1d82a4dcda3f4c0a5587e3d00ec01494e55ef7c2850249cb1d16447",
+    "ui.pdf": "b69e5febd9f612ca7346a4d6fcd665c9857c83d0c0642940b1dd6b0f6bd2a47c",
+    "ui.png": "9be6a2c2a3653def3da7ab51e70ef8dafb2c5daa08721bf21bbc8b6d4d8e8838",
+    "ui.svg": "fa8575f06fef56f9b6c4d4322f975c4bdf878acc54746882dccfe4c06d3bc67f"
+   },
+   "ui": {
+    "exception": null,
+    "errors": [],
+    "warnings": [],
+    "steps": [
+     "load",
+     "theme minimal",
+     "downloads"
+    ],
+    "stage": "edit",
+    "downloads": {
+     "dl_svg": {
+      "bytes": 360383,
+      "sha256": "fa8575f06fef56f9b6c4d4322f975c4bdf878acc54746882dccfe4c06d3bc67f",
+      "ok": true
+     },
+     "dl_png": {
+      "bytes": 1318390,
+      "sha256": "9be6a2c2a3653def3da7ab51e70ef8dafb2c5daa08721bf21bbc8b6d4d8e8838",
+      "ok": true
+     },
+     "dl_pdf": {
+      "bytes": 114959,
+      "sha256": "b69e5febd9f612ca7346a4d6fcd665c9857c83d0c0642940b1dd6b0f6bd2a47c",
+      "ok": true
+     },
+     "dl_layout": {
+      "bytes": 252,
+      "sha256": "53e077c2b1d82a4dcda3f4c0a5587e3d00ec01494e55ef7c2850249cb1d16447",
+      "ok": true
+     },
+     "dl_data_json": {
+      "bytes": 78221,
+      "sha256": "c996841ec3eb43f891951179bc9dd54c91915481f098efae9906c3d8144a9d8f",
+      "ok": true
+     },
+     "dl_data_zip": {
+      "bytes": 8050,
+      "sha256": "e3dc402e1a08c0a2285472a50a17ff97453c9034767b1247d5312cbeb7b724cf",
+      "ok": true
+     }
+    },
+    "harness_error": null,
+    "process": {
+     "exit": 0,
+     "seconds": 29.84,
+     "max_rss_mb": 227.7,
+     "timed_out": false
+    }
+   }
+  },
+  {
+   "id": "22MZ",
+   "dir": "22MZ",
+   "stratum": "S9",
+   "half": "tune",
+   "residues": 76,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 1.76,
+   "draw_seconds": 1.67,
+   "peak_mb": "not measured",
+   "svg_bytes": 46851,
+   "png_bytes": 280260,
+   "process": {
+    "exit": 0,
+    "seconds": 10.93,
+    "max_rss_mb": 134.3,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "faec85c3d363147323f5317c5ed3a6fccd52ae00f5fa8ab1434f61a38b134055",
+    "app.svg": "be0980f27ca123db4cda973c2ce0fdd9d58912194f1743f531b37e8fc43046e7",
+    "ui-data.json": "ad9c6c4a4f8627df54e2d63d517c7818ea22b1b69de7d0d44d6ed426e6a1697c",
+    "ui-data.zip": "b1d6a33bab273e995c46d72ce70d630940017c1c95ecde6ae8c84e31bbd89291",
+    "ui-layout.yaml": "bc8e91c32f29e7d3e29bc55cac037d70d1296ad297ea8d6a45882c58260d4c3e",
+    "ui.pdf": "2b36f0c1906fc58d66d2e1bed7e16e28ed9cf8ada353bbf3fbec9153145c9044",
+    "ui.png": "f12c82d3196e7bd934ed5d8bb88545b438cabd929d7bbc5efb35b8742fac1155",
+    "ui.svg": "277764c619a44c225bb517e1a53f0cec2a2a0edc1dabe7bbc8fea8970b541574"
+   },
+   "ui": {
+    "exception": null,
+    "errors": [],
+    "warnings": [],
+    "steps": [
+     "load",
+     "theme minimal",
+     "downloads"
+    ],
+    "stage": "edit",
+    "downloads": {
+     "dl_svg": {
+      "bytes": 21191,
+      "sha256": "277764c619a44c225bb517e1a53f0cec2a2a0edc1dabe7bbc8fea8970b541574",
+      "ok": true
+     },
+     "dl_png": {
+      "bytes": 202624,
+      "sha256": "f12c82d3196e7bd934ed5d8bb88545b438cabd929d7bbc5efb35b8742fac1155",
+      "ok": true
+     },
+     "dl_pdf": {
+      "bytes": 29861,
+      "sha256": "2b36f0c1906fc58d66d2e1bed7e16e28ed9cf8ada353bbf3fbec9153145c9044",
+      "ok": true
+     },
+     "dl_layout": {
+      "bytes": 252,
+      "sha256": "bc8e91c32f29e7d3e29bc55cac037d70d1296ad297ea8d6a45882c58260d4c3e",
+      "ok": true
+     },
+     "dl_data_json": {
+      "bytes": 14764,
+      "sha256": "ad9c6c4a4f8627df54e2d63d517c7818ea22b1b69de7d0d44d6ed426e6a1697c",
+      "ok": true
+     },
+     "dl_data_zip": {
+      "bytes": 4114,
+      "sha256": "b1d6a33bab273e995c46d72ce70d630940017c1c95ecde6ae8c84e31bbd89291",
+      "ok": true
+     }
+    },
+    "harness_error": null,
+    "process": {
+     "exit": 0,
+     "seconds": 11.67,
+     "max_rss_mb": 223.5,
+     "timed_out": false
+    }
+   }
+  },
+  {
+   "id": "9XIC",
+   "dir": "9XIC",
+   "stratum": "S10",
+   "half": "tune",
+   "residues": 5496,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 28.89,
+   "draw_seconds": 26.94,
+   "peak_mb": "not measured",
+   "svg_bytes": 355515,
+   "png_bytes": 1182331,
+   "process": {
+    "exit": 0,
+    "seconds": 56.81,
+    "max_rss_mb": 233.0,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "dbd367086e9e0baf73749f06eaf3da21768292423068a641b66cda13d82a099b",
+    "app.svg": "c5a4f99a1240bef868dbbbb3349b39eea034805966ad226131a589b310293fcc",
+    "ui-data.json": "cc8f599b49c8cb0a0e4de0d0c449d4a39787b74a48cb00522becc912f88ae6e7",
+    "ui-data.zip": "e43ba13e7a0aaff79667ff7bc8ec28e663ba940d8cda395e2b51952d69998739",
+    "ui-layout.yaml": "2b5e1f4a1b42d30fba0d95c66d1adfdf959019e398cc14054fdb5b749ee4a039",
+    "ui.pdf": "13b0dcf1a43471657d12d2e5a2d978174068fed104bd8cbe8723e7116b0eacd8",
+    "ui.png": "dbd367086e9e0baf73749f06eaf3da21768292423068a641b66cda13d82a099b",
+    "ui.svg": "c5a4f99a1240bef868dbbbb3349b39eea034805966ad226131a589b310293fcc"
+   },
+   "ui": {
+    "exception": null,
+    "errors": [],
+    "warnings": [],
+    "steps": [
+     "load",
+     "theme minimal",
+     "downloads"
+    ],
+    "stage": "edit",
+    "downloads": {
+     "dl_svg": {
+      "bytes": 355562,
+      "sha256": "c5a4f99a1240bef868dbbbb3349b39eea034805966ad226131a589b310293fcc",
+      "ok": true
+     },
+     "dl_png": {
+      "bytes": 1182331,
+      "sha256": "dbd367086e9e0baf73749f06eaf3da21768292423068a641b66cda13d82a099b",
+      "ok": true
+     },
+     "dl_pdf": {
+      "bytes": 110226,
+      "sha256": "13b0dcf1a43471657d12d2e5a2d978174068fed104bd8cbe8723e7116b0eacd8",
+      "ok": true
+     },
+     "dl_layout": {
+      "bytes": 256,
+      "sha256": "2b5e1f4a1b42d30fba0d95c66d1adfdf959019e398cc14054fdb5b749ee4a039",
+      "ok": true
+     },
+     "dl_data_json": {
+      "bytes": 197217,
+      "sha256": "cc8f599b49c8cb0a0e4de0d0c449d4a39787b74a48cb00522becc912f88ae6e7",
+      "ok": true
+     },
+     "dl_data_zip": {
+      "bytes": 12027,
+      "sha256": "e43ba13e7a0aaff79667ff7bc8ec28e663ba940d8cda395e2b51952d69998739",
+      "ok": true
+     }
+    },
+    "harness_error": null,
+    "process": {
+     "exit": 0,
+     "seconds": 107.53,
+     "max_rss_mb": 267.7,
+     "timed_out": false
+    }
+   }
+  },
+  {
+   "id": "9TMF",
+   "dir": "9TMF",
+   "stratum": "S10",
+   "half": "tune",
+   "residues": 2793,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 13.12,
+   "draw_seconds": 11.74,
+   "peak_mb": "not measured",
+   "svg_bytes": 214675,
+   "png_bytes": 703525,
+   "process": {
+    "exit": 0,
+    "seconds": 29.11,
+    "max_rss_mb": 183.1,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "86b9b4f3ca6cb9845a6eb3952940f96c4d6101ad104c26b66d6885e7cca6b976",
+    "app.svg": "ac0082eb92f64c3fccd7021405b21fc68cb0e3a3a7ca9568c7a399c988614ed1",
+    "ui-data.json": "de5cf11b3920c711be7455bdf1bae5de83fe095a9f44dfca7311969d7023cd9e",
+    "ui-data.zip": "e0f20ddd76b20938efdfe6339e33700ed786291e87efa023bb677739709453da",
+    "ui-layout.yaml": "4b38a0c65ac4d0f66dad6674659fc06cf15fa00beab1581963e021e9881aa9d9",
+    "ui.pdf": "8027c72b5f0e7b4acfe25f9deb8106309130b887215e4db3821d0591c86ee4a6",
+    "ui.png": "86b9b4f3ca6cb9845a6eb3952940f96c4d6101ad104c26b66d6885e7cca6b976",
+    "ui.svg": "ac0082eb92f64c3fccd7021405b21fc68cb0e3a3a7ca9568c7a399c988614ed1"
+   },
+   "ui": {
+    "exception": null,
+    "errors": [],
+    "warnings": [],
+    "steps": [
+     "load",
+     "theme minimal",
+     "downloads"
+    ],
+    "stage": "edit",
+    "downloads": {
+     "dl_svg": {
+      "bytes": 214712,
+      "sha256": "ac0082eb92f64c3fccd7021405b21fc68cb0e3a3a7ca9568c7a399c988614ed1",
+      "ok": true
+     },
+     "dl_png": {
+      "bytes": 703525,
+      "sha256": "86b9b4f3ca6cb9845a6eb3952940f96c4d6101ad104c26b66d6885e7cca6b976",
+      "ok": true
+     },
+     "dl_pdf": {
+      "bytes": 84444,
+      "sha256": "8027c72b5f0e7b4acfe25f9deb8106309130b887215e4db3821d0591c86ee4a6",
+      "ok": true
+     },
+     "dl_layout": {
+      "bytes": 256,
+      "sha256": "4b38a0c65ac4d0f66dad6674659fc06cf15fa00beab1581963e021e9881aa9d9",
+      "ok": true
+     },
+     "dl_data_json": {
+      "bytes": 120000,
+      "sha256": "de5cf11b3920c711be7455bdf1bae5de83fe095a9f44dfca7311969d7023cd9e",
+      "ok": true
+     },
+     "dl_data_zip": {
+      "bytes": 7854,
+      "sha256": "e0f20ddd76b20938efdfe6339e33700ed786291e87efa023bb677739709453da",
+      "ok": true
+     }
+    },
+    "harness_error": null,
+    "process": {
+     "exit": 0,
+     "seconds": 47.29,
+     "max_rss_mb": 243.0,
+     "timed_out": false
+    }
+   }
+  },
+  {
+   "id": "34QD",
+   "dir": "34QD",
+   "stratum": "S10",
+   "half": "tune",
+   "residues": 502,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 2.8,
+   "draw_seconds": 2.69,
+   "peak_mb": "not measured",
+   "svg_bytes": 133177,
+   "png_bytes": 367586,
+   "process": {
+    "exit": 0,
+    "seconds": 13.98,
+    "max_rss_mb": 150.1,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "5b604388b45ec2e5ae70b20768e89852cfb50021255a3efd957b3600ae08f907",
+    "app.svg": "0f90a809bd16ea8005d64933907f989a1d690e794ad8e7edb1b6e3821138c1ed",
+    "ui-data.json": "6d47c65ef4081d0259e3433aea94e78bbd313ce613df9ec60a1e71fb727b1434",
+    "ui-data.zip": "94c84ddaf4465b3d6f1cd59e380725769f6b695dd01423cb6a09d46ec101864c",
+    "ui-layout.yaml": "417d9725e0c2a7022aa97662d573bb907aa9c4a4896519ec9d1bc7b0fa1aab12",
+    "ui.pdf": "be4563f8f7fb6999c1178a69ce3ad6545052f565aaab373e34fa5946f5000ce8",
+    "ui.png": "ee40da0bc1104f3031d999a160ee7d92b0e727fdd0f53d7cb13d2a46d534685e",
+    "ui.svg": "d23fc61b941eb1d242c1e52be10af183093cb33724857baf27146f1b8d0d9e87"
+   },
+   "ui": {
+    "exception": null,
+    "errors": [],
+    "warnings": [],
+    "steps": [
+     "load",
+     "theme minimal",
+     "downloads"
+    ],
+    "stage": "edit",
+    "downloads": {
+     "dl_svg": {
+      "bytes": 133556,
+      "sha256": "d23fc61b941eb1d242c1e52be10af183093cb33724857baf27146f1b8d0d9e87",
+      "ok": true
+     },
+     "dl_png": {
+      "bytes": 401878,
+      "sha256": "ee40da0bc1104f3031d999a160ee7d92b0e727fdd0f53d7cb13d2a46d534685e",
+      "ok": true
+     },
+     "dl_pdf": {
+      "bytes": 47686,
+      "sha256": "be4563f8f7fb6999c1178a69ce3ad6545052f565aaab373e34fa5946f5000ce8",
+      "ok": true
+     },
+     "dl_layout": {
+      "bytes": 252,
+      "sha256": "417d9725e0c2a7022aa97662d573bb907aa9c4a4896519ec9d1bc7b0fa1aab12",
+      "ok": true
+     },
+     "dl_data_json": {
+      "bytes": 52479,
+      "sha256": "6d47c65ef4081d0259e3433aea94e78bbd313ce613df9ec60a1e71fb727b1434",
+      "ok": true
+     },
+     "dl_data_zip": {
+      "bytes": 5081,
+      "sha256": "94c84ddaf4465b3d6f1cd59e380725769f6b695dd01423cb6a09d46ec101864c",
+      "ok": true
+     }
+    },
+    "harness_error": null,
+    "process": {
+     "exit": 0,
+     "seconds": 21.19,
+     "max_rss_mb": 222.9,
+     "timed_out": false
+    }
+   }
+  },
+  {
+   "id": "12KF",
+   "dir": "12KF",
+   "stratum": "S10",
+   "half": "tune",
+   "residues": 1476,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 7.16,
+   "draw_seconds": 5.44,
+   "peak_mb": "not measured",
+   "svg_bytes": 348715,
+   "png_bytes": 1003083,
+   "process": {
+    "exit": 0,
+    "seconds": 17.99,
+    "max_rss_mb": 171.2,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "1834cb1db5c09c9e005a74eff4fc35d4552405bf727bb72a8cdfcd419d9085e8",
+    "app.svg": "c2f39e8be520fcec6d6010f503c64c7660ecb7f13ebdd875fd17f58ca709817c",
+    "ui-data.json": "6c04f8ee691edbe7bd1c2968a40b6b939a034230898dafa3dae1d154445b1301",
+    "ui-data.zip": "5e8c10e99019e123b27690cc9e14edea523695526a544807acd59360e219b41f",
+    "ui-layout.yaml": "622d29273eaa965a0862dc06b808d2beff5fa9b06e4df3c0bac003afa00ff869",
+    "ui.pdf": "84c819243893f7c2a71fbde51ef481543893590df53651438d851a57af353821",
+    "ui.png": "1834cb1db5c09c9e005a74eff4fc35d4552405bf727bb72a8cdfcd419d9085e8",
+    "ui.svg": "c2f39e8be520fcec6d6010f503c64c7660ecb7f13ebdd875fd17f58ca709817c"
+   },
+   "ui": {
+    "exception": null,
+    "errors": [],
+    "warnings": [],
+    "steps": [
+     "load",
+     "theme minimal",
+     "downloads"
+    ],
+    "stage": "edit",
+    "downloads": {
+     "dl_svg": {
+      "bytes": 348749,
+      "sha256": "c2f39e8be520fcec6d6010f503c64c7660ecb7f13ebdd875fd17f58ca709817c",
+      "ok": true
+     },
+     "dl_png": {
+      "bytes": 1003083,
+      "sha256": "1834cb1db5c09c9e005a74eff4fc35d4552405bf727bb72a8cdfcd419d9085e8",
+      "ok": true
+     },
+     "dl_pdf": {
+      "bytes": 94790,
+      "sha256": "84c819243893f7c2a71fbde51ef481543893590df53651438d851a57af353821",
+      "ok": true
+     },
+     "dl_layout": {
+      "bytes": 256,
+      "sha256": "622d29273eaa965a0862dc06b808d2beff5fa9b06e4df3c0bac003afa00ff869",
+      "ok": true
+     },
+     "dl_data_json": {
+      "bytes": 127353,
+      "sha256": "6c04f8ee691edbe7bd1c2968a40b6b939a034230898dafa3dae1d154445b1301",
+      "ok": true
+     },
+     "dl_data_zip": {
+      "bytes": 7922,
+      "sha256": "5e8c10e99019e123b27690cc9e14edea523695526a544807acd59360e219b41f",
+      "ok": true
+     }
+    },
+    "harness_error": null,
+    "process": {
+     "exit": 0,
+     "seconds": 19.89,
+     "max_rss_mb": 233.7,
+     "timed_out": false
+    }
+   }
+  },
+  {
+   "id": "30CU",
+   "dir": "30CU",
+   "stratum": "S11",
+   "half": "tune",
+   "residues": 1401,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 4.12,
+   "draw_seconds": 3.98,
+   "peak_mb": "not measured",
+   "svg_bytes": 201653,
+   "png_bytes": 544105,
+   "process": {
+    "exit": 0,
+    "seconds": 16.14,
+    "max_rss_mb": 189.7,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "0e6237fb30f57e4a182f5e80dcc9f007ddbe6aaa3d31c2b2f29a4b56e1702671",
+    "app.svg": "810653596ab01485481cb288b549553947afd49ef13f691500ef455ab541d942",
+    "ui-data.json": "931e416f933a28f6d6ab1202868fef9d94d469e774fee8c9207ffb042c384277",
+    "ui-data.zip": "e7993f14d70609e28594978f681a179582bfaf60d75db4e4d338a9e1884fd54a",
+    "ui-layout.yaml": "1a2dc3357f92f7ff8b0441ba91035a526e0398bdad83f1dde178e157744edd06",
+    "ui.pdf": "b503b686649a4839d9cb4ef92a6c4170aab771b639b3ec3b22404bb50c7617c5",
+    "ui.png": "969021b8b4780c3c94d2fa6e5d1f19f9c16f229665f379b6df177d6dca0fd6d9",
+    "ui.svg": "8b4b5a33dd0bda658152bde1c6eee4c5ab1e61f213ff550b4360a70c6221198c"
+   },
+   "ui": {
+    "exception": null,
+    "errors": [],
+    "warnings": [],
+    "steps": [
+     "load",
+     "theme minimal",
+     "downloads"
+    ],
+    "stage": "edit",
+    "downloads": {
+     "dl_svg": {
+      "bytes": 201867,
+      "sha256": "8b4b5a33dd0bda658152bde1c6eee4c5ab1e61f213ff550b4360a70c6221198c",
+      "ok": true
+     },
+     "dl_png": {
+      "bytes": 601078,
+      "sha256": "969021b8b4780c3c94d2fa6e5d1f19f9c16f229665f379b6df177d6dca0fd6d9",
+      "ok": true
+     },
+     "dl_pdf": {
+      "bytes": 64746,
+      "sha256": "b503b686649a4839d9cb4ef92a6c4170aab771b639b3ec3b22404bb50c7617c5",
+      "ok": true
+     },
+     "dl_layout": {
+      "bytes": 252,
+      "sha256": "1a2dc3357f92f7ff8b0441ba91035a526e0398bdad83f1dde178e157744edd06",
+      "ok": true
+     },
+     "dl_data_json": {
+      "bytes": 51699,
+      "sha256": "931e416f933a28f6d6ab1202868fef9d94d469e774fee8c9207ffb042c384277",
+      "ok": true
+     },
+     "dl_data_zip": {
+      "bytes": 4612,
+      "sha256": "e7993f14d70609e28594978f681a179582bfaf60d75db4e4d338a9e1884fd54a",
+      "ok": true
+     }
+    },
+    "harness_error": null,
+    "process": {
+     "exit": 0,
+     "seconds": 24.94,
+     "max_rss_mb": 251.8,
+     "timed_out": false
+    }
+   }
+  },
+  {
+   "id": "30CV",
+   "dir": "30CV",
+   "stratum": "S11",
+   "half": "tune",
+   "residues": 1403,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 3.69,
+   "draw_seconds": 3.55,
+   "peak_mb": "not measured",
+   "svg_bytes": 208806,
+   "png_bytes": 616032,
+   "process": {
+    "exit": 0,
+    "seconds": 16.14,
+    "max_rss_mb": 196.7,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "22c8972781fff8a55c3224c5c02854a103d8a7380bfab895d3f2698a85ee63db",
+    "app.svg": "bd35ac869ed23eb0f0c59851ff442fcbffbabc0d60cbecf1303bd13420016b82",
+    "ui-data.json": "80d26dc37833e87be839636f5a072da6f9a9a4f37cdf29a925e397f83048ee2b",
+    "ui-data.zip": "3bcb7fdc418d20c84e5b68e00d9c1fbbdf123e8d9130483b7d7eef22e9fd60e2",
+    "ui-layout.yaml": "27fef4445b96c0375843c9172bb729baf28662e9587ffd2ae046482194f26494",
+    "ui.pdf": "0ee55cde4394659f5421029f8f7bd1463edcd20364b5bf90550fc47d35c4065b",
+    "ui.png": "cb0ed33f5bf4a968441a5a820ada878f8ac0aef30253ba0e1a70f225c0cecc19",
+    "ui.svg": "bddb84be3c128365d52119b5a84d85d0c60962240a0e2abf0721a79bccdf85a3"
+   },
+   "ui": {
+    "exception": null,
+    "errors": [],
+    "warnings": [],
+    "steps": [
+     "load",
+     "theme minimal",
+     "downloads"
+    ],
+    "stage": "edit",
+    "downloads": {
+     "dl_svg": {
+      "bytes": 209020,
+      "sha256": "bddb84be3c128365d52119b5a84d85d0c60962240a0e2abf0721a79bccdf85a3",
+      "ok": true
+     },
+     "dl_png": {
+      "bytes": 672641,
+      "sha256": "cb0ed33f5bf4a968441a5a820ada878f8ac0aef30253ba0e1a70f225c0cecc19",
+      "ok": true
+     },
+     "dl_pdf": {
+      "bytes": 66345,
+      "sha256": "0ee55cde4394659f5421029f8f7bd1463edcd20364b5bf90550fc47d35c4065b",
+      "ok": true
+     },
+     "dl_layout": {
+      "bytes": 252,
+      "sha256": "27fef4445b96c0375843c9172bb729baf28662e9587ffd2ae046482194f26494",
+      "ok": true
+     },
+     "dl_data_json": {
+      "bytes": 53583,
+      "sha256": "80d26dc37833e87be839636f5a072da6f9a9a4f37cdf29a925e397f83048ee2b",
+      "ok": true
+     },
+     "dl_data_zip": {
+      "bytes": 4630,
+      "sha256": "3bcb7fdc418d20c84e5b68e00d9c1fbbdf123e8d9130483b7d7eef22e9fd60e2",
+      "ok": true
+     }
+    },
+    "harness_error": null,
+    "process": {
+     "exit": 0,
+     "seconds": 25.19,
+     "max_rss_mb": 250.5,
+     "timed_out": false
+    }
+   }
+  },
+  {
+   "id": "9YLA",
+   "dir": "9YLA",
+   "stratum": "S11",
+   "half": "tune",
+   "residues": 343,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 2.37,
+   "draw_seconds": 2.26,
+   "peak_mb": "not measured",
+   "svg_bytes": 248132,
+   "png_bytes": 656919,
+   "process": {
+    "exit": 0,
+    "seconds": 12.78,
+    "max_rss_mb": 168.2,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "06ec605d61255666ac115d35c8e3176927e16d5029eaa67b3e413f7cea52adcb",
+    "app.svg": "fb928863db99f1735817d3a80429ff82f4fd94fdee39ca3068fd0e415536bcde",
+    "ui-data.json": "5fabc146d8ddf208f3a226a1ce65d036648e26d86d8ce61ea2df45ec34b7b845",
+    "ui-data.zip": "0d0a779a1beade056c829a7b728d3b63c141f9003fe10ab7c695b736fc03d248",
+    "ui-layout.yaml": "4b0c8d47fa6908760182ea1dbbb32c0f17e5f0ad3710b0f917729aa2cc2c767f",
+    "ui.pdf": "5f0380eef60e3bc0f3d70d9c2911da37c782eb0ccb47a20e283b6f7d77332d68",
+    "ui.png": "7866e669f562f576ac8d73218ca1940ad63dd87cf3f921d69ac8edaedabeb647",
+    "ui.svg": "51a8e14cc2ce1e7eb59571eba71cce6b98768ac8ab53cc4de8f59e7e5ace7790"
+   },
+   "ui": {
+    "exception": null,
+    "errors": [],
+    "warnings": [],
+    "steps": [
+     "load",
+     "theme minimal",
+     "downloads"
+    ],
+    "stage": "edit",
+    "downloads": {
+     "dl_svg": {
+      "bytes": 248172,
+      "sha256": "51a8e14cc2ce1e7eb59571eba71cce6b98768ac8ab53cc4de8f59e7e5ace7790",
+      "ok": true
+     },
+     "dl_png": {
+      "bytes": 745824,
+      "sha256": "7866e669f562f576ac8d73218ca1940ad63dd87cf3f921d69ac8edaedabeb647",
+      "ok": true
+     },
+     "dl_pdf": {
+      "bytes": 84297,
+      "sha256": "5f0380eef60e3bc0f3d70d9c2911da37c782eb0ccb47a20e283b6f7d77332d68",
+      "ok": true
+     },
+     "dl_layout": {
+      "bytes": 252,
+      "sha256": "4b0c8d47fa6908760182ea1dbbb32c0f17e5f0ad3710b0f917729aa2cc2c767f",
+      "ok": true
+     },
+     "dl_data_json": {
+      "bytes": 23237,
+      "sha256": "5fabc146d8ddf208f3a226a1ce65d036648e26d86d8ce61ea2df45ec34b7b845",
+      "ok": true
+     },
+     "dl_data_zip": {
+      "bytes": 3128,
+      "sha256": "0d0a779a1beade056c829a7b728d3b63c141f9003fe10ab7c695b736fc03d248",
+      "ok": true
+     }
+    },
+    "harness_error": null,
+    "process": {
+     "exit": 0,
+     "seconds": 19.18,
+     "max_rss_mb": 254.6,
+     "timed_out": false
+    }
+   }
+  },
+  {
+   "id": "9YLG",
+   "dir": "9YLG",
+   "stratum": "S11",
+   "half": "tune",
+   "residues": 341,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 2.32,
+   "draw_seconds": 2.21,
+   "peak_mb": "not measured",
+   "svg_bytes": 254072,
+   "png_bytes": 709047,
+   "process": {
+    "exit": 0,
+    "seconds": 12.98,
+    "max_rss_mb": 168.9,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "450fa3475a1fab7150197759fba30cf987aeff9226e911dd04d7adec6aaf4cd3",
+    "app.svg": "e0d5fd81d78b3c0f06e990fa8ee20e2527eca47859e7b8a7593ef1b1064f12ff",
+    "ui-data.json": "f946697bdb987b3f4bc6cc64b0296a2b5ed6ae037e6be1c082f3fb8856f42acd",
+    "ui-data.zip": "947fa2b91d0e6b166649fd6b29abd4f7e19f0c81c2088d83834400e521700d92",
+    "ui-layout.yaml": "eae9a142a17d3efc803e7c264d5cb28e7f7e84db328f5dde2878f6c4ca6cac5a",
+    "ui.pdf": "e02f042b3aa564929410eb24a85d2445f6db72dfd50e4e5a16326778bdaf7fa4",
+    "ui.png": "ceb3d75f716f2e81d76941607a4f2e0c91aee5997e6a88ec0ae59c92e039a0e0",
+    "ui.svg": "1aed87219bceb347b44660031ce24d0acc8bbd0878103104c2cb58f9cd550d85"
+   },
+   "ui": {
+    "exception": null,
+    "errors": [],
+    "warnings": [],
+    "steps": [
+     "load",
+     "theme minimal",
+     "downloads"
+    ],
+    "stage": "edit",
+    "downloads": {
+     "dl_svg": {
+      "bytes": 254112,
+      "sha256": "1aed87219bceb347b44660031ce24d0acc8bbd0878103104c2cb58f9cd550d85",
+      "ok": true
+     },
+     "dl_png": {
+      "bytes": 805369,
+      "sha256": "ceb3d75f716f2e81d76941607a4f2e0c91aee5997e6a88ec0ae59c92e039a0e0",
+      "ok": true
+     },
+     "dl_pdf": {
+      "bytes": 85393,
+      "sha256": "e02f042b3aa564929410eb24a85d2445f6db72dfd50e4e5a16326778bdaf7fa4",
+      "ok": true
+     },
+     "dl_layout": {
+      "bytes": 252,
+      "sha256": "eae9a142a17d3efc803e7c264d5cb28e7f7e84db328f5dde2878f6c4ca6cac5a",
+      "ok": true
+     },
+     "dl_data_json": {
+      "bytes": 24884,
+      "sha256": "f946697bdb987b3f4bc6cc64b0296a2b5ed6ae037e6be1c082f3fb8856f42acd",
+      "ok": true
+     },
+     "dl_data_zip": {
+      "bytes": 3240,
+      "sha256": "947fa2b91d0e6b166649fd6b29abd4f7e19f0c81c2088d83834400e521700d92",
+      "ok": true
+     }
+    },
+    "harness_error": null,
+    "process": {
+     "exit": 0,
+     "seconds": 19.63,
+     "max_rss_mb": 253.3,
+     "timed_out": false
+    }
+   }
+  },
+  {
+   "id": "32IL",
+   "dir": "32IL",
+   "stratum": "S11",
+   "half": "tune",
+   "residues": 730,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 0.78,
+   "draw_seconds": 0.65,
+   "peak_mb": "not measured",
+   "svg_bytes": 19156,
+   "png_bytes": 101974,
+   "process": {
+    "exit": 0,
+    "seconds": 7.77,
+    "max_rss_mb": 143.9,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "9a6335540e610eab673f6840c6161023b15971cd214d1447b447e2d63f68de0e",
+    "app.svg": "cac9b93c09225e95be0cf4380a6a4f064ebd38d2ba5ee3e4c23d033dab2a91eb",
+    "ui-data.json": "26891a5b2909d1c8178c37e1c70e187cfaeecbc4c04df0245ace5c5d3b3adb44",
+    "ui-data.zip": "e12201695d112db1a337bca3df68ed48a5a8455f430b2649fdfbbc2a4948b3a8",
+    "ui-layout.yaml": "faf9b841a59452f0173a3e8dfff3b1dd8e9a4357c7f91ac8a5e7fc6701ae4a2c",
+    "ui.pdf": "18b7d2982e6c4814582271e75f06177af8324424ffe42681eb0b178f7b20c246",
+    "ui.png": "5cb4a23f174d471b7d7cf55347b88df14e6d648f3944891aa56e428737b07e74",
+    "ui.svg": "fd281b7c8db410a370ed30ae411bc74f33818c205c00b97a7ff77d05d09c3f69"
+   },
+   "ui": {
+    "exception": null,
+    "errors": [],
+    "warnings": [],
+    "steps": [
+     "load",
+     "theme minimal",
+     "downloads"
+    ],
+    "stage": "edit",
+    "downloads": {
+     "dl_svg": {
+      "bytes": 19297,
+      "sha256": "fd281b7c8db410a370ed30ae411bc74f33818c205c00b97a7ff77d05d09c3f69",
+      "ok": true
+     },
+     "dl_png": {
+      "bytes": 102781,
+      "sha256": "5cb4a23f174d471b7d7cf55347b88df14e6d648f3944891aa56e428737b07e74",
+      "ok": true
+     },
+     "dl_pdf": {
+      "bytes": 34249,
+      "sha256": "18b7d2982e6c4814582271e75f06177af8324424ffe42681eb0b178f7b20c246",
+      "ok": true
+     },
+     "dl_layout": {
+      "bytes": 252,
+      "sha256": "faf9b841a59452f0173a3e8dfff3b1dd8e9a4357c7f91ac8a5e7fc6701ae4a2c",
+      "ok": true
+     },
+     "dl_data_json": {
+      "bytes": 20051,
+      "sha256": "26891a5b2909d1c8178c37e1c70e187cfaeecbc4c04df0245ace5c5d3b3adb44",
+      "ok": true
+     },
+     "dl_data_zip": {
+      "bytes": 2950,
+      "sha256": "e12201695d112db1a337bca3df68ed48a5a8455f430b2649fdfbbc2a4948b3a8",
+      "ok": true
+     }
+    },
+    "harness_error": null,
+    "process": {
+     "exit": 0,
+     "seconds": 8.72,
+     "max_rss_mb": 223.8,
+     "timed_out": false
+    }
+   }
+  },
+  {
+   "id": "9SXD",
+   "dir": "9SXD",
+   "stratum": "S11",
+   "half": "tune",
+   "residues": 627,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 0.95,
+   "draw_seconds": 0.81,
+   "peak_mb": "not measured",
+   "svg_bytes": 91125,
+   "png_bytes": 307203,
+   "process": {
+    "exit": 0,
+    "seconds": 8.22,
+    "max_rss_mb": 159.6,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "a7fef227e45d9e0cecca7edf3850cbaac57858465ef12f89e97f96c0fb008126",
+    "app.svg": "f0751786ff54c4161a2ebfadcbb974e50b1e6f8411b901463a444d4d81e45636",
+    "ui-data.json": "7e319a46a2d6c8a86b1b50a98ec8af9a2e3a9f7404f4207ea50382e669281cd3",
+    "ui-data.zip": "33125efb2dc0f45f91f0421908a3d3d2a2f287e3978f5f26df462ab16205c810",
+    "ui-layout.yaml": "599db688f4f0cc4185c149e78c7aff2eb90f8818f4525ee0799d6b55a6cbaa7c",
+    "ui.pdf": "09453ed0ee911341ec50bb3c3fc98bff87100def58d60b891543a5a46804e1fd",
+    "ui.png": "5bf2e3ec72e33688d2ad53d9d1ca910acda384a25a9132c281be8106a197fb09",
+    "ui.svg": "908673f20aa263e146ef40882b42b810c514cf13a77b910ebb38728dcc560f5d"
+   },
+   "ui": {
+    "exception": null,
+    "errors": [],
+    "warnings": [],
+    "steps": [
+     "load",
+     "theme minimal",
+     "downloads"
+    ],
+    "stage": "edit",
+    "downloads": {
+     "dl_svg": {
+      "bytes": 91114,
+      "sha256": "908673f20aa263e146ef40882b42b810c514cf13a77b910ebb38728dcc560f5d",
+      "ok": true
+     },
+     "dl_png": {
+      "bytes": 347718,
+      "sha256": "5bf2e3ec72e33688d2ad53d9d1ca910acda384a25a9132c281be8106a197fb09",
+      "ok": true
+     },
+     "dl_pdf": {
+      "bytes": 39482,
+      "sha256": "09453ed0ee911341ec50bb3c3fc98bff87100def58d60b891543a5a46804e1fd",
+      "ok": true
+     },
+     "dl_layout": {
+      "bytes": 252,
+      "sha256": "599db688f4f0cc4185c149e78c7aff2eb90f8818f4525ee0799d6b55a6cbaa7c",
+      "ok": true
+     },
+     "dl_data_json": {
+      "bytes": 30220,
+      "sha256": "7e319a46a2d6c8a86b1b50a98ec8af9a2e3a9f7404f4207ea50382e669281cd3",
+      "ok": true
+     },
+     "dl_data_zip": {
+      "bytes": 3637,
+      "sha256": "33125efb2dc0f45f91f0421908a3d3d2a2f287e3978f5f26df462ab16205c810",
+      "ok": true
+     }
+    },
+    "harness_error": null,
+    "process": {
+     "exit": 0,
+     "seconds": 10.57,
+     "max_rss_mb": 235.1,
+     "timed_out": false
+    }
+   }
+  },
+  {
+   "id": "9YLD",
+   "dir": "9YLD",
+   "stratum": "S11",
+   "half": "tune",
+   "residues": 341,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 1.08,
+   "draw_seconds": 0.98,
+   "peak_mb": "not measured",
+   "svg_bytes": 127693,
+   "png_bytes": 380430,
+   "process": {
+    "exit": 0,
+    "seconds": 8.62,
+    "max_rss_mb": 136.6,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "3b34cb858999a43fe1b1142b8611e4e457d242834e4e35ca78b234e39faa9544",
+    "app.svg": "20a079b635d31a6bfd4eadc8d27c6eae32b169ac02200b051f010e359f0d8a4d",
+    "ui-data.json": "592119ac1f82b08a30d51e4f5b4d8d6b0d078c17dce8f9fc3c580543a3057f4e",
+    "ui-data.zip": "808f80c166e1955702dc82ae03f09f9c28f5c08cea5b85719ad165889ef23598",
+    "ui-layout.yaml": "64bddb93f83b32e838406a9f1d994bf8e320cf81077f0fd6b51ea6a27e2d4997",
+    "ui.pdf": "fc8e963f2318290adcb415d96d8308766d622f411f4cbc36a208d38004f5631c",
+    "ui.png": "ac88856cdf4e8010c51c9a46d1549f71638e416443e55b466ec05103fc2ddceb",
+    "ui.svg": "8ccf0f66fc99eb54961e54b39dd892312afae87b9713ca5000446c16001a8792"
+   },
+   "ui": {
+    "exception": null,
+    "errors": [],
+    "warnings": [],
+    "steps": [
+     "load",
+     "theme minimal",
+     "downloads"
+    ],
+    "stage": "edit",
+    "downloads": {
+     "dl_svg": {
+      "bytes": 127712,
+      "sha256": "8ccf0f66fc99eb54961e54b39dd892312afae87b9713ca5000446c16001a8792",
+      "ok": true
+     },
+     "dl_png": {
+      "bytes": 437287,
+      "sha256": "ac88856cdf4e8010c51c9a46d1549f71638e416443e55b466ec05103fc2ddceb",
+      "ok": true
+     },
+     "dl_pdf": {
+      "bytes": 52246,
+      "sha256": "fc8e963f2318290adcb415d96d8308766d622f411f4cbc36a208d38004f5631c",
+      "ok": true
+     },
+     "dl_layout": {
+      "bytes": 252,
+      "sha256": "64bddb93f83b32e838406a9f1d994bf8e320cf81077f0fd6b51ea6a27e2d4997",
+      "ok": true
+     },
+     "dl_data_json": {
+      "bytes": 12037,
+      "sha256": "592119ac1f82b08a30d51e4f5b4d8d6b0d078c17dce8f9fc3c580543a3057f4e",
+      "ok": true
+     },
+     "dl_data_zip": {
+      "bytes": 2789,
+      "sha256": "808f80c166e1955702dc82ae03f09f9c28f5c08cea5b85719ad165889ef23598",
+      "ok": true
+     }
+    },
+    "harness_error": null,
+    "process": {
+     "exit": 0,
+     "seconds": 10.62,
+     "max_rss_mb": 223.6,
+     "timed_out": false
+    }
+   }
+  }
+ ]
+}

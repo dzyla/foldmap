@@ -1,0 +1,456 @@
+{
+ "kind": "campaign",
+ "source_stamp": {
+  "foldmap": "0.1.0",
+  "code_fingerprint": "893407124ec081be",
+  "package": "checkout",
+  "checkout_fingerprint": "893407124ec081be",
+  "installed_matches_checkout": true,
+  "git": {
+   "commit": "162e06751ebbc9dd183d3d0cfde1b82875fb4757",
+   "dirty": false,
+   "source": "asserted by runner"
+  },
+  "script": {
+   "name": "scripts/app29_light.py",
+   "sha256": "0c0620aaea06d2765d51404c644a81018b9e0f3464370717e1fda4f3661cd7f8"
+  },
+  "python": {
+   "version": "3.13.2",
+   "implementation": "CPython"
+  },
+  "platform": {
+   "platform": "Linux-6.8.0-138-generic-x86_64-with-glibc2.35",
+   "machine": "x86_64"
+  },
+  "packages": {
+   "gemmi": "0.7.5",
+   "numpy": "2.5.4",
+   "scipy": "1.18.1",
+   "networkx": "3.7",
+   "matplotlib": "3.11.2",
+   "PyYAML": "6.0.3"
+  }
+ },
+ "summary": {
+  "label": "the third sample (random100-third, default view): 64b03ad (main before plan 29's fixes) against the final commit",
+  "entries": [
+   100,
+   100
+  ],
+  "passed": [
+   82,
+   82
+  ],
+  "verdict": "moved",
+  "worse": [],
+  "better": [
+   "9FZL: fallback counts_hidden 2 -> 1",
+   "9FZL: fallback helix_name_moved 22 -> 0",
+   "9FZL: fallback page_text_small 1 -> 0"
+  ],
+  "moved": [
+   "7SPI: area 426.01 -> 338.03",
+   "9FZL: area 65458.72 -> 14561.27"
+  ],
+  "svg_moved": [
+   "1NID",
+   "3ABR",
+   "3G6E",
+   "3WAU",
+   "4GWY",
+   "5S4U",
+   "6IZP",
+   "6PO4",
+   "6VBG",
+   "7F5S",
+   "7SPI",
+   "7XBK",
+   "8EM7",
+   "9FZL"
+  ],
+  "differ": [
+   "1NID",
+   "3ABR",
+   "3G6E",
+   "3WAU",
+   "4GWY",
+   "5S4U",
+   "6IZP",
+   "6PO4",
+   "6VBG",
+   "7F5S",
+   "7SPI",
+   "7XBK",
+   "8EM7",
+   "9FZL"
+  ],
+  "stamps": [
+   {
+    "commit": "64b03ad81a4a0bcd1d2135ee10d42567f6087bfd",
+    "dirty": false,
+    "source": "asserted by runner"
+   },
+   {
+    "commit": "162e06751ebbc9dd183d3d0cfde1b82875fb4757",
+    "dirty": false,
+    "source": "asserted by runner"
+   }
+  ],
+  "reference": false
+ },
+ "rows": {
+  "keys": {
+   "1NID": [
+    {
+     "pass": true,
+     "failing": [
+      "S5"
+     ],
+     "fallbacks": {},
+     "area": 1197.48,
+     "seconds": 9.43,
+     "timed_failing": [],
+     "timed_detail": {},
+     "svg_sha256": "2a419d5db5d6e9437e56969dc7984d21b6d5d1b9b27e0f9430423907ed785ddb"
+    },
+    {
+     "pass": true,
+     "failing": [
+      "S5"
+     ],
+     "fallbacks": {},
+     "area": 1197.48,
+     "seconds": 8.77,
+     "timed_failing": [],
+     "timed_detail": {},
+     "svg_sha256": "b22e5ead4a9881ff278b8014c94d41ae39c45bd6a0dc4abd3c0c7ca54121625d"
+    }
+   ],
+   "3ABR": [
+    {
+     "pass": true,
+     "failing": [
+      "S5"
+     ],
+     "fallbacks": {},
+     "area": 1132.73,
+     "seconds": 9.87,
+     "timed_failing": [],
+     "timed_detail": {},
+     "svg_sha256": "29509ef4052247f538e0042cf23c2ecb6b9e4745eaa88c780bdb5bbc96e2ca14"
+    },
+    {
+     "pass": true,
+     "failing": [
+      "S5"
+     ],
+     "fallbacks": {},
+     "area": 1132.73,
+     "seconds": 10.38,
+     "timed_failing": [],
+     "timed_detail": {},
+     "svg_sha256": "dbfc2bdf47a7549b4c3175bc629e4c925cbdfbc89333c873638e55a89c1e7e16"
+    }
+   ],
+   "3G6E": [
+    {
+     "pass": false,
+     "failing": [
+      "A6",
+      "S5"
+     ],
+     "fallbacks": {
+      "glyph_width_guessed": 52
+     },
+     "area": 19741.12,
+     "seconds": 106.02,
+     "timed_failing": [],
+     "timed_detail": {},
+     "svg_sha256": "5aa5008e039b8fdc00762410adda1c9b6ec8478e6a063093fa3255532e4b3dbc"
+    },
+    {
+     "pass": false,
+     "failing": [
+      "A6",
+      "S5"
+     ],
+     "fallbacks": {
+      "glyph_width_guessed": 52
+     },
+     "area": 19741.12,
+     "seconds": 108.79,
+     "timed_failing": [],
+     "timed_detail": {},
+     "svg_sha256": "8cafadbc0fa0a9ee967abdc2853cb8b2954fd560e1b4b2d6c2d9bc3e93c0de01"
+    }
+   ],
+   "3WAU": [
+    {
+     "pass": true,
+     "failing": [
+      "S5"
+     ],
+     "fallbacks": {},
+     "area": 664.0,
+     "seconds": 8.72,
+     "timed_failing": [],
+     "timed_detail": {},
+     "svg_sha256": "c5914e3fd7d82c2c6c830158a4aba6b81427730e793f7317b3e47fc96e8abccb"
+    },
+    {
+     "pass": true,
+     "failing": [
+      "S5"
+     ],
+     "fallbacks": {},
+     "area": 664.0,
+     "seconds": 8.62,
+     "timed_failing": [],
+     "timed_detail": {},
+     "svg_sha256": "1126787e16b41ad736b1680606ec234323309e3ddbba2f5efe4c612eb1dfbd03"
+    }
+   ],
+   "4GWY": [
+    {
+     "pass": true,
+     "failing": [],
+     "fallbacks": {},
+     "area": 1633.59,
+     "seconds": 10.58,
+     "timed_failing": [],
+     "timed_detail": {},
+     "svg_sha256": "b409edb9c7d8baf54e9d365414d0a8a4204b9e8b4ccd5d58107586564a7f8426"
+    },
+    {
+     "pass": true,
+     "failing": [],
+     "fallbacks": {},
+     "area": 1633.59,
+     "seconds": 12.18,
+     "timed_failing": [],
+     "timed_detail": {},
+     "svg_sha256": "bba2fb9a6ecfaf666e0a62fa815b43f0275524bb9e34aabc6885f4b37b18d66b"
+    }
+   ],
+   "5S4U": [
+    {
+     "pass": true,
+     "failing": [],
+     "fallbacks": {},
+     "area": 4109.34,
+     "seconds": 12.28,
+     "timed_failing": [],
+     "timed_detail": {},
+     "svg_sha256": "01c280ad310c7e11e152963d3156d79eaa1ee699aee176b6c81f53a68c7a7f82"
+    },
+    {
+     "pass": true,
+     "failing": [],
+     "fallbacks": {},
+     "area": 4109.34,
+     "seconds": 12.63,
+     "timed_failing": [],
+     "timed_detail": {},
+     "svg_sha256": "1f3456bbad2a5734b10a3ebde910967c19a6321a7683270fa847831c87b88b72"
+    }
+   ],
+   "6IZP": [
+    {
+     "pass": true,
+     "failing": [],
+     "fallbacks": {},
+     "area": 85.29,
+     "seconds": 10.73,
+     "timed_failing": [],
+     "timed_detail": {},
+     "svg_sha256": "7effc6547c55d35040cb078f73e97b9c6211a5b81131b99c527f7521868f9c0e"
+    },
+    {
+     "pass": true,
+     "failing": [],
+     "fallbacks": {},
+     "area": 85.29,
+     "seconds": 11.08,
+     "timed_failing": [],
+     "timed_detail": {},
+     "svg_sha256": "0c97e061e89f10db05fb8c8b1a51d37e8e651a8a444e9bd671ace3d87c0fb370"
+    }
+   ],
+   "6PO4": [
+    {
+     "pass": true,
+     "failing": [],
+     "fallbacks": {},
+     "area": 643.66,
+     "seconds": 8.32,
+     "timed_failing": [],
+     "timed_detail": {},
+     "svg_sha256": "1c379428cc1227e96248c5544897730c3a3ccfc29490b34a191c75e2f73f7cf6"
+    },
+    {
+     "pass": true,
+     "failing": [],
+     "fallbacks": {},
+     "area": 643.66,
+     "seconds": 8.18,
+     "timed_failing": [],
+     "timed_detail": {},
+     "svg_sha256": "0c3b31f4ab1b39b312a33cd7c06bf7247f89ac047d7fdbdcf3bbe97b191bed88"
+    }
+   ],
+   "6VBG": [
+    {
+     "pass": true,
+     "failing": [],
+     "fallbacks": {},
+     "area": 834.19,
+     "seconds": 8.67,
+     "timed_failing": [],
+     "timed_detail": {},
+     "svg_sha256": "b93abbc20b4a0de88fc9ab792812c2bbfd34174e3704dcd1ae55cfe7a5c6a8dd"
+    },
+    {
+     "pass": true,
+     "failing": [],
+     "fallbacks": {},
+     "area": 834.19,
+     "seconds": 8.58,
+     "timed_failing": [],
+     "timed_detail": {},
+     "svg_sha256": "e00b2280386e7879e6a94669dd5ef5bbea54b4b3adcf59779ddbde54ee520ca0"
+    }
+   ],
+   "7F5S": [
+    {
+     "pass": true,
+     "failing": [],
+     "fallbacks": {
+      "counts_hidden": 5,
+      "glyph_width_guessed": 68
+     },
+     "area": 29136.7,
+     "seconds": 149.53,
+     "timed_failing": [],
+     "timed_detail": {},
+     "svg_sha256": "60090b3fe8289b79ccf9086845be17c8c43123b9ea2c3803aa8d588e72d3425e"
+    },
+    {
+     "pass": true,
+     "failing": [],
+     "fallbacks": {
+      "counts_hidden": 5,
+      "glyph_width_guessed": 68
+     },
+     "area": 29136.7,
+     "seconds": 151.29,
+     "timed_failing": [],
+     "timed_detail": {},
+     "svg_sha256": "e4eb0d36b231c31d89ca5af63e46f734742b9758436abd592aa4192944e0abef"
+    }
+   ],
+   "7SPI": [
+    {
+     "pass": true,
+     "failing": [],
+     "fallbacks": {},
+     "area": 426.01,
+     "seconds": 11.13,
+     "timed_failing": [],
+     "timed_detail": {},
+     "svg_sha256": "9db89245814f15e3c774c4ac635f582b9e5457e366459bc807a8b20354842004"
+    },
+    {
+     "pass": true,
+     "failing": [],
+     "fallbacks": {},
+     "area": 338.03,
+     "seconds": 10.73,
+     "timed_failing": [],
+     "timed_detail": {},
+     "svg_sha256": "f69e50d81cb4e1a90545009f3d3f293424a262befe24f219d984e3b75686b96d"
+    }
+   ],
+   "7XBK": [
+    {
+     "pass": true,
+     "failing": [],
+     "fallbacks": {},
+     "area": 3654.12,
+     "seconds": 14.33,
+     "timed_failing": [],
+     "timed_detail": {},
+     "svg_sha256": "b704b5d736f9889c59406c1f5ee87997e91ec61732168b161a9263cad0839d97"
+    },
+    {
+     "pass": true,
+     "failing": [],
+     "fallbacks": {},
+     "area": 3654.12,
+     "seconds": 15.43,
+     "timed_failing": [],
+     "timed_detail": {},
+     "svg_sha256": "ee2f3d8145ae42386ecd75862dbbbc3d00e3945db37eb267230eb674cb8c6da7"
+    }
+   ],
+   "8EM7": [
+    {
+     "pass": true,
+     "failing": [],
+     "fallbacks": {},
+     "area": 8239.72,
+     "seconds": 99.2,
+     "timed_failing": [
+      "A2"
+     ],
+     "timed_detail": {
+      "A2": "93.34 s (limit 60 s)"
+     },
+     "svg_sha256": "720caba713b9be96109bf5c571831d417310578cc5d2de598575fbda9f71f38c"
+    },
+    {
+     "pass": true,
+     "failing": [],
+     "fallbacks": {},
+     "area": 8239.72,
+     "seconds": 99.82,
+     "timed_failing": [
+      "A2"
+     ],
+     "timed_detail": {
+      "A2": "93.94 s (limit 60 s)"
+     },
+     "svg_sha256": "c5fb1bb29e4a9c0f40f3ef5562ad8db71b0a74699888d48c611b770f49aa1968"
+    }
+   ],
+   "9FZL": [
+    {
+     "pass": true,
+     "failing": [],
+     "fallbacks": {
+      "counts_hidden": 2,
+      "helix_name_moved": 22,
+      "page_text_small": 1
+     },
+     "area": 65458.72,
+     "seconds": 133.31,
+     "timed_failing": [],
+     "timed_detail": {},
+     "svg_sha256": "b6699754f61ffa36e5c4d597b8f07ca032de0be71de33a02ac563928d9621ea5"
+    },
+    {
+     "pass": true,
+     "failing": [],
+     "fallbacks": {
+      "counts_hidden": 1
+     },
+     "area": 14561.27,
+     "seconds": 152.29,
+     "timed_failing": [],
+     "timed_detail": {},
+     "svg_sha256": "742072edaa132f6acaf2bc46c09a21516e04928ff2aae5c536b482cf54f76c76"
+    }
+   ]
+  }
+ }
+}

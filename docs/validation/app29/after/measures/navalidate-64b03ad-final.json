@@ -1,0 +1,62 @@
+{
+ "kind": "navalidate",
+ "source_stamp": {
+  "foldmap": "0.1.0",
+  "code_fingerprint": "893407124ec081be",
+  "package": "checkout",
+  "checkout_fingerprint": "893407124ec081be",
+  "installed_matches_checkout": true,
+  "git": {
+   "commit": "162e06751ebbc9dd183d3d0cfde1b82875fb4757",
+   "dirty": false,
+   "source": "asserted by runner"
+  },
+  "script": {
+   "name": "scripts/app29_light.py",
+   "sha256": "0c0620aaea06d2765d51404c644a81018b9e0f3464370717e1fda4f3661cd7f8"
+  },
+  "python": {
+   "version": "3.13.2",
+   "implementation": "CPython"
+  },
+  "platform": {
+   "platform": "Linux-6.8.0-138-generic-x86_64-with-glibc2.35",
+   "machine": "x86_64"
+  },
+  "packages": {
+   "gemmi": "0.7.5",
+   "numpy": "2.5.4",
+   "scipy": "1.18.1",
+   "networkx": "3.7",
+   "matplotlib": "3.11.2",
+   "PyYAML": "6.0.3"
+  }
+ },
+ "summary": {
+  "label": "the NA campaign (scripts/na_validate.py, docs/validation/na)",
+  "entries": [
+   39,
+   39
+  ],
+  "passed": [
+   34,
+   34
+  ],
+  "differ": [],
+  "worse": {},
+  "better": {},
+  "stamps": [
+   {
+    "commit": "64b03ad81a4a0bcd1d2135ee10d42567f6087bfd",
+    "dirty": false,
+    "source": "asserted by runner"
+   },
+   {
+    "commit": "162e06751ebbc9dd183d3d0cfde1b82875fb4757",
+    "dirty": false,
+    "source": "asserted by runner"
+   }
+  ]
+ },
+ "rows": {}
+}
