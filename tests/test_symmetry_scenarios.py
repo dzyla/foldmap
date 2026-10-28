@@ -520,3 +520,26 @@ def test_bundles_are_cut_only_between_two_protomers(chains, sector, kept):
     by_id = {s.id: s for s in sses}
     out = _within_protomers([[s.id for s in sses]], by_id, sector)
     assert [[by_id[k].chain for k in g] for g in out] == kept
+
+
+def test_a_long_filament_is_found_without_fitting_every_copy_to_every_copy_for_every_screw(tmp_path, monkeypatch):
+    """Plan 29 Task 6: _helical tried every pair of copies as the screw and, for each, every copy against every member
+    of its cluster: n^4/2 pair fits (23FR's 42 copies, 1.26 million). The pair fits are now each copy against each
+    member once, plus each candidate once; the screw found is the same (docs/validation/app29/fix-screw)."""
+    from foldmap import symmetry
+
+    n = len(NAMES)
+    ops = [(rot((0, 0, 1), 33 * k), np.array([0, 0, 9.0 * k])) for k in range(n)]
+    bb, _, _ = pipeline(build(tmp_path, ops, offset=(15.0, 0.0, 0.0)))
+    calls = {"pair": 0}
+    pair = symmetry._Assembly.pair
+
+    def count_pair(self, a, b):
+        calls["pair"] += 1
+        return pair(self, a, b)
+
+    monkeypatch.setattr(symmetry._Assembly, "pair", count_pair)
+    best = symmetry._helical(symmetry._Assembly(bb), symmetry.TOLERANCE, symmetry.MIN_HELIX_COPIES)
+    assert best is not None and best[5] == [list(NAMES)]  # one path, in order along the filament, as built
+    assert best[1] == pytest.approx(np.radians(33), abs=np.radians(2)) and best[4] == pytest.approx(9.0, abs=0.5)
+    assert calls["pair"] <= n * n + n * (n - 1) // 2  # 376; before: 23,768 for these 16 copies

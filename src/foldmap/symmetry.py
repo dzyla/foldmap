@@ -330,7 +330,16 @@ def _dihedral(asm: _Assembly, axis: np.ndarray, centre: np.ndarray, tol: float) 
 
 def _helical(asm: _Assembly, tol: float, min_copies: int):
     """A screw that walks each copy onto the next, chaining every clustered subunit along one axis in paths of at
-    least `min_copies`."""
+    least `min_copies`.
+
+    Each candidate screw takes every copy onto the first member of its cluster, in cluster order, that it lands on
+    within `tol`. A fit's RMSD is at least the distance between the moved and the target centroids of its matched
+    atoms (the mean square is the squared mean plus the spread), so a member whose centroid lands farther than `tol`
+    is passed over unfitted: the same member is taken as by fitting every one (plan 29 Task 6: 23FR's 42 copies made
+    1.26 million fits, n^4/2), the fits left being the near ones."""
+    members = _within(asm)
+    images: list = []  # (copy, member of its cluster, matched atoms), copies in `members` order, members in cluster
+    # order; with their centroids. Gathered at the first screw that passes (none passes: no fit beyond the candidates)
     best = None
     for cl in asm.clusters:
         for i, a in enumerate(cl):
@@ -345,14 +354,22 @@ def _helical(asm: _Assembly, tol: float, min_copies: int):
                 twist = angle
                 if rise < 0:  # a left-handed screw: point the axis along the rise; the turn becomes negative
                     ax, rise, twist = -ax, -rise, -angle
+                if not images:
+                    for c in members:
+                        for d in asm.clusters[asm.cluster_of[c]]:
+                            pp, qq = asm.pair(c, d)
+                            if len(pp) >= MIN_RES:
+                                images.append((c, d, pp, qq))
+                    from_mean = np.array([pp.mean(axis=0) for _, _, pp, _ in images]).reshape(-1, 3)
+                    to_mean = np.array([qq.mean(axis=0) for _, _, _, qq in images]).reshape(-1, 3)
                 step = {}
-                for c in _within(asm):
-                    for d in asm.clusters[asm.cluster_of[c]]:
-                        pp, qq = asm.pair(c, d)
-                        if len(pp) >= MIN_RES and np.sqrt(((pp @ r.T + t - qq) ** 2).sum(axis=1).mean()) <= tol:
-                            step[c] = d
-                            break
-                chains = _helix_chains(step, _within(asm), min_copies)
+                # 1e-6 Å for rounding: a centroid is summed in another order than the fit
+                near = np.sqrt(((from_mean @ r.T + t - to_mean) ** 2).sum(axis=1)) <= tol + 1e-6
+                for k in np.flatnonzero(near):
+                    c, d, pp, qq = images[k]
+                    if c not in step and np.sqrt(((pp @ r.T + t - qq) ** 2).sum(axis=1).mean()) <= tol:
+                        step[c] = d
+                chains = _helix_chains(step, members, min_copies)
                 if chains is None:
                     continue
                 score = (len(chains[0]), -abs(rise))

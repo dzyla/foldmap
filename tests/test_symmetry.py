@@ -440,3 +440,25 @@ def test_copies_that_need_more_room_are_kept_alike_when_free_items_yield():
         assert (items[i].cx - items[j].cx, items[i].cy - items[j].cy) == pytest.approx(
             (items[2].cx - items[0].cx, items[2].cy - items[0].cy), abs=1e-12
         )
+
+
+def test_the_pilus_screw_is_found_with_a_ninth_of_the_pair_fits(monkeypatch):
+    """Plan 29 Task 6: 6Y7S's six FimA copies on one screw, found as before (115° and 7.9 Å per copy, A to F) with 51
+    pair fits where the search made 470 (docs/validation/app29/fix-screw: the same answer on 664 structures)."""
+    from foldmap import symmetry
+
+    bb, _, _ = pipeline(DATA / "6Y7S.cif")
+    calls = {"pair": 0}
+    pair = symmetry._Assembly.pair
+
+    def count_pair(self, a, b):
+        calls["pair"] += 1
+        return pair(self, a, b)
+
+    monkeypatch.setattr(symmetry._Assembly, "pair", count_pair)
+    best = symmetry._helical(symmetry._Assembly(bb), symmetry.TOLERANCE, symmetry.MIN_HELIX_COPIES)
+    _, twist, _, _, rise, paths, rmsd = best
+    assert paths == [list("ABCDEF")]
+    assert np.degrees(twist) == pytest.approx(115.0, abs=0.01) and rise == pytest.approx(7.876, abs=0.001)
+    assert rmsd == pytest.approx(0.171, abs=0.001)
+    assert calls["pair"] * 9 <= 470  # 470 before plan 29 Task 6

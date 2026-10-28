@@ -82,11 +82,11 @@ every correction of a rule are by hand.
 | constant | 588 | 62 | 25 | 28 | 34 | 102 | 337 |
 | default | 33 | 0 | 0 | 0 | 0 | 3 | 30 |
 | local | 1 | 0 | 0 | 0 | 0 | 0 | 1 |
-| comparison | 300 | 0 | 0 | 0 | 0 | 158 | 142 |
-| argument | 672 | 0 | 1 | 0 | 0 | 191 | 480 |
+| comparison | 301 | 0 | 0 | 0 | 0 | 159 | 142 |
+| argument | 674 | 0 | 1 | 0 | 0 | 193 | 480 |
 | fallback | 24 | 0 | 0 | 0 | 4 | 1 | 19 |
 | fallback-marker | 29 | 0 | 0 | 0 | 3 | 0 | 26 |
-| all | 1647 | 62 | 26 | 28 | 41 | 455 | 1035 |
+| all | 1650 | 62 | 26 | 28 | 41 | 458 | 1035 |
 
 Of the 41 named-entry rows, 30 rest on the comment at the item and 11 on git (evidence starting `git:`: a commit whose message ties the value to the entries).
 
@@ -172,7 +172,7 @@ Of the 41 named-entry rows, 30 rest on the comment at the item and 11 on git (ev
 
 | id | kind | value | at | origin | evidence | tests naming it | check |
 |---|---|---|---|---|---|---|---|
-| `app:LAYOUT_DEFAULTS` | constant | { "mode": "projected", "rotate": 0.0, "symmetry": "auto", "assembly": "auto", "rename": "", "swap": "", "move": "", "ti… | LAYOUT_DEFAULTS = { | convention | the app's default settings; earliest in this file: 0438931 2026-10-09 Rename to foldmap; add README | app, app_controls, app_edits, domain_confidence +1 | - |
+| `app:LAYOUT_DEFAULTS` | constant | { "mode": "projected", "rotate": 0.0, "symmetry": "auto", "assembly": "auto", "rename": "", "swap": "", "move": "", "ti… | LAYOUT_DEFAULTS = { | convention | the app's default settings; earliest in this file: 0438931 2026-10-09 Rename to foldmap; add README | app, app_controls, app_edits, domain_confidence +2 | - |
 | `app:TITLE_MAX` | constant | 200 | TITLE_MAX = 200 # characters of a layout file's title | convention | an input limit; earliest in this file: 81aec46 2026-10-12 User YAML: no anchors or aliases in layout, names and style files; every layout … | - | - |
 | `app:TEXT_MAX` | constant | 2000 | TEXT_MAX = 2000 # characters of any other text a layout file gives (a path, a mark list, a reference) | convention | an input limit; earliest in this file: 81aec46 2026-10-12 User YAML: no anchors or aliases in layout, names and style files; every layout … | - | - |
 | `app:IDS_MAX` | constant | 20_000 | IDS_MAX = 20_000 # characters of a list of chain ids, joined (a capsid has hundreds of chains) | convention | an input limit; earliest in this file: 81aec46 2026-10-12 User YAML: no anchors or aliases in layout, names and style files; every layout … | - | - |
@@ -535,8 +535,8 @@ Of the 41 named-entry rows, 30 rest on the comment at the item and 11 on git (ev
 
 | id | kind | value | at | origin | evidence | tests naming it | check |
 |---|---|---|---|---|---|---|---|
-| `floor:measures:argument:3@ead16c7c` | argument | 3 | "text_pt": None if text is None else round(text, 3), | convention | rounding digits | app29, floor | - |
-| `floor:measures:argument:3@11773890` | argument | 3 | "smallest_pt": None if smallest is None else round(smallest, 3), | convention | rounding digits | app29, floor | - |
+| `floor:measures:argument:3@ead16c7c` | argument | 3 | "text_pt": None if text is None else round(text, 3), | convention | rounding digits | app29, copies, floor | - |
+| `floor:measures:argument:3@11773890` | argument | 3 | "smallest_pt": None if smallest is None else round(smallest, 3), | convention | rounding digits | app29, copies, floor | - |
 | `floor:reasons_of:comparison:1e-6@027f97a0` | comparison | 1e-6 | if text is not None and text < MIN_TEXT_PT - 1e-6: | convention | a floating-point tolerance | floor | - |
 
 ## frame
@@ -675,7 +675,7 @@ Of the 41 named-entry rows, 30 rest on the comment at the item and 11 on git (ev
 | `layout:IN_PER_UNIT` | constant | 0.30 | IN_PER_UNIT = 0.30 # render: inches per page unit, at most | unknown | earliest in this file: 7104faa 2026-10-11 C6/C10 follow-ups from the rerun: a gap the grid cannot route is curved before i… | page_text | - |
 | `layout:MAX_WIDTH_IN` | constant | 7.2 | MAX_WIDTH_IN = 7.2 # render: a figure is drawn at most this wide (double column), inches, while its text stays ... | convention | "double column" page width; earliest in this file: 7104faa 2026-10-11 C6/C10 follow-ups from the rerun: a gap the grid cannot route is curved before i… | page_text | - |
 | `layout:MIN_TEXT_PT` | constant | 6.0 | MIN_TEXT_PT = 6.0 # ... this size or larger: a wider page grows past MAX_WIDTH_IN instead (random-100 C4 ruling) | convention | the smallest text size printed (random-100 C4 ruling); earliest in this file: a3cf24d 2026-10-15 C4 (random-100, batch C1): text has a 6 pt floor and the page grows instead; leg… | floor, page_text | - |
-| `layout:MAX_PAGE_IN` | constant | 48.0 | MAX_PAGE_IN = 48.0 # render: the longest side a page grows to (A0's, about); past it the whole figure, its text | convention | "A0's, about"; earliest in this file: a3cf24d 2026-10-15 C4 (random-100, batch C1): text has a 6 pt floor and the page grows instead; leg… | app_jobs, app_paths, floor, heldout_budgets +2 | - |
+| `layout:MAX_PAGE_IN` | constant | 48.0 | MAX_PAGE_IN = 48.0 # render: the longest side a page grows to (A0's, about); past it the whole figure, its text | convention | "A0's, about"; earliest in this file: a3cf24d 2026-10-15 C4 (random-100, batch C1): text has a 6 pt floor and the page grows instead; leg… | app_jobs, app_paths, floor, focus +3 | - |
 | `layout:_MAX_ROW` | constant | 30.0 | _MAX_ROW = 30.0 | unknown | earliest in this file: 0438931 2026-10-09 Rename to foldmap; add README | membrane, route | - |
 | `layout:_MIN_STRAND` | constant | 1.0 | _MIN_STRAND = 1.0 # shortest drawn strand (room for the arrow head) | unknown | earliest in this file: 0438931 2026-10-09 Rename to foldmap; add README | - | - |
 | `layout:_PAIR_ENERGY_ABOVE` | constant | 200 | _PAIR_ENERGY_ABOVE = 200 | unknown | earliest in this file: d1fa11e 2026-10-10 Tests compare the pair-list energy with the production dense energy | optimiser, perf | - |
@@ -1377,7 +1377,7 @@ Of the 41 named-entry rows, 30 rest on the comment at the item and 11 on git (ev
 | `render:_TETHER_REACH` | constant | 6.5 | _TETHER_REACH = 6.5 # page units: a tether target farther than this from the heaviest one is another pocket | unknown | earliest in this file: 8b5b8bb 2026-10-11 Ligand tethers go to the ligand's own chain and stay within reach of its pocket … | ligands | - |
 | `render:_SPOT_RADIUS` | constant | 3.0 | _SPOT_RADIUS = 3.0 # the spot search stops at this ring radius | unknown | earliest in this file: 8b5b8bb 2026-10-11 Ligand tethers go to the ligand's own chain and stay within reach of its pocket … | ligands, text_clear | - |
 | `render:_SPOT_FAR` | constant | 3 | _SPOT_FAR = 3 # ... and, when nothing is clear within it, at this many times it (then the mark goes on its anchor) | named-entry:7QUP | git: b98171e's message: "the search widens to _SPOT_FAR (3) times the radius ... 7QUP: GTP:9E500 marked again" | ligands, text_clear | - |
-| `render:_SPOT_MORE_RINGS` | constant | 4 | _SPOT_MORE_RINGS = 4 # rings past the first clear spot's where a spot whose tethers cross fewer bodies is looked for | named-entry:7LX9,9YLM,3MHT,1GOX | git: ac828a3's message: "_mark_spot looks up to 4 rings further ... 7LX9 1.15 -> 0, 3MHT 0.56 -> 0, 9YLM 3.15 -> 2.5, 1GOX-A 12.0 -> 11.3" | - | - |
+| `render:_SPOT_MORE_RINGS` | constant | 4 | _SPOT_MORE_RINGS = 4 # rings past the first clear spot's where a spot whose tethers cross fewer bodies is looked for | named-entry:7LX9,9YLM,3MHT,1GOX | git: ac828a3's message: "_mark_spot looks up to 4 rings further ... 7LX9 1.15 -> 0, 3MHT 0.56 -> 0, 9YLM 3.15 -> 2.5, 1GOX-A 12.0 -> 11.3" | ligands | - |
 | `render:_ALONG_NEAR` | constant | 0.15 | _ALONG_NEAR, _ALONG_TURN = ( | unknown | earliest in this file: 2317e7e 2026-10-15 C9 (random-100, batch C2a): a ligand's spot counts the length its tethers run al… | - | - |
 | `render:_ALONG_TURN` | constant | np.radians(20) | _ALONG_NEAR, _ALONG_TURN = ( | unknown | earliest in this file: 2317e7e 2026-10-15 C9 (random-100, batch C2a): a ligand's spot counts the length its tethers run al… | - | - |
 | `render:_RAIL_GRAZE` | constant | 0.3 | _RAIL_GRAZE = 0.3 # page units a tether may run inside a stem past the entry its target needs and not count as crossing | unknown | earliest in this file: 7e0f1e8 2026-10-17 A ligand held by nucleotides alone judges every clear spot by the stems its teth… | - | - |
@@ -1991,13 +1991,13 @@ Of the 41 named-entry rows, 30 rest on the comment at the item and 11 on git (ev
 
 | id | kind | value | at | origin | evidence | tests naming it | check |
 |---|---|---|---|---|---|---|---|
-| `symmetry:TOLERANCE` | constant | 3.0 | TOLERANCE = 3.0 # Å, CA RMSD between a copy and its image | unknown | earliest in this file: 0438931 2026-10-09 Rename to foldmap; add README | - | - |
+| `symmetry:TOLERANCE` | constant | 3.0 | TOLERANCE = 3.0 # Å, CA RMSD between a copy and its image | unknown | earliest in this file: 0438931 2026-10-09 Rename to foldmap; add README | symmetry, symmetry_scenarios | - |
 | `symmetry:SAME` | constant | 0.9 | SAME = 0.9 # aligned identity for two chains to be copies | unknown | earliest in this file: 0438931 2026-10-09 Rename to foldmap; add README | - | - |
 | `symmetry:MIN_RES` | constant | 10 | MIN_RES = 10 # chains shorter than this are left out | unknown | earliest in this file: 0438931 2026-10-09 Rename to foldmap; add README | - | - |
 | `symmetry:MIN_TURN` | constant | np.radians(10) | MIN_TURN = np.radians(10) # smaller rotations are lattice-like translations, not symmetry | unknown | earliest in this file: 0438931 2026-10-09 Rename to foldmap; add README | - | - |
 | `symmetry:MIN_RISE` | constant | 2.0 | MIN_RISE = 2.0 # Å along the axis per copy for a helical filament | unknown | earliest in this file: 0438931 2026-10-09 Rename to foldmap; add README | - | - |
 | `symmetry:MIN_TWIST` | constant | np.radians(3.0) | MIN_TWIST = np.radians(3.0) # a helical filament turns at least this much per copy (less: a translation) | unknown | earliest in this file: 24e5d40 2026-10-09 Symmetry: a helical filament needs a real twist (CI found pure translations read… | - | - |
-| `symmetry:MIN_HELIX_COPIES` | constant | 4 | MIN_HELIX_COPIES = 4 # copies on a screw before auto calls it helical (three: crystal packing, as in 1URN) | named-entry:1URN | "…before auto calls it helical (three: crystal packing, as in 1URN)"; earliest in this file: 19b1916 2026-10-11 Protein-only ASUs with several copies draw assembly 1; a 3-copy screw is no long… | prune | - |
+| `symmetry:MIN_HELIX_COPIES` | constant | 4 | MIN_HELIX_COPIES = 4 # copies on a screw before auto calls it helical (three: crystal packing, as in 1URN) | named-entry:1URN | "…before auto calls it helical (three: crystal packing, as in 1URN)"; earliest in this file: 19b1916 2026-10-11 Protein-only ASUs with several copies draw assembly 1; a 3-copy screw is no long… | prune, symmetry, symmetry_scenarios | - |
 | `symmetry:MIN_HELIX_COPIES_ASKED` | constant | 3 | MIN_HELIX_COPIES_ASKED = 3 # ... and when the user asks for "helical" | unknown | earliest in this file: b1c2790 2026-10-11 Tests at the helical threshold and the kind gate; the explicit-helical copy coun… | - | - |
 | `symmetry:_PSEUDO_21` | constant | 170.0 | _PSEUDO_21 = 170.0 # degrees: a helix turning more than this per copy is a pseudo-2₁ screw, its hand not named | unknown | earliest in this file: d184032 2026-10-09 Symmetry: a pseudo-2₁ screw reports its signed twist without naming a hand | - | - |
 | `symmetry:MAX_ORDER` | constant | 24 | MAX_ORDER = 24 | unknown | earliest in this file: 0438931 2026-10-09 Rename to foldmap; add README | - | - |
@@ -2015,6 +2015,9 @@ Of the 41 named-entry rows, 30 rest on the comment at the item and 11 on git (ev
 | `symmetry:_cubic:comparison:5@20ef9c0f` | comparison | 5 | return "I" if 5 in found else "O" if 4 in found else "T" | unknown | - | - | - |
 | `symmetry:_cubic:comparison:4@20ef9c0f` | comparison | 4 | return "I" if 5 in found else "O" if 4 in found else "T" | unknown | - | - | - |
 | `symmetry:_dihedral:comparison:0.15@50676257` | comparison | 0.15 | if abs(ax @ axis) < 0.15 and _cyclic(asm, ax, centre, 2, tol) is not None: | unknown | - | - | - |
+| `symmetry:_helical:argument:3@50fdbb06` | argument | 3 | from_mean = np.array([pp.mean(axis=0) for _, _, pp, _ in images]).reshape(-1, 3) | convention | an array's shape | symmetry, symmetry_scenarios | - |
+| `symmetry:_helical:argument:3@c120d82f` | argument | 3 | to_mean = np.array([qq.mean(axis=0) for _, _, _, qq in images]).reshape(-1, 3) | convention | an array's shape | symmetry, symmetry_scenarios | - |
+| `symmetry:_helical:comparison:1e-6@edb35fde` | comparison | 1e-6 | near = np.sqrt(((from_mean @ r.T + t - to_mean) ** 2).sum(axis=1)) <= tol + 1e-6 | convention | a floating-point tolerance | symmetry, symmetry_scenarios | - |
 | `symmetry:_around:comparison:1e-6@cd227575` | comparison | 1e-6 | while out and a < last - 1e-6: | convention | a floating-point tolerance | - | - |
 | `symmetry:_from_user:argument:15@a7596102` | argument | 15 | if abs(rise) >= MIN_RISE and abs(angle - 2 * np.pi / n) > np.radians(15): | unknown | - | - | - |
 | `symmetry:detect_symmetry:comparison:3@9c5bcb2e` | comparison | 3 | cubic = _cubic(asm, centre, tolerance) if dihedral or order >= 3 else None | unknown | - | assembly, copies, focus, symmetry +1 | - |
