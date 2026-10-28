@@ -634,6 +634,9 @@ def floor_part(args, tune: list[dict]) -> dict:
             worse.append(f"{name}: now under the floor")
         if role == "control" and (now.get("focus_chains") or now.get("floor")):
             worse.append(f"{name}: a control no longer drawn whole above the floor")
+        for what, x, y in (("app view", app_a, app_b), ("drawing", was, now)):
+            if y.get("error") and not x.get("error"):
+                worse.append(f"{name}: the {what} now errs ({str(y['error'])[:80]})")
         if app_b.get("refused") and not app_a.get("refused"):
             worse.append(f"{name}: the app view now refused ({app_b['refused']})")
         if (app_b.get("seconds") or 0) > LIMITS_APP_S >= (app_a.get("seconds") or 0):
