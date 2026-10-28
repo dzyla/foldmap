@@ -1,0 +1,99 @@
+{
+ "kind": "navalidate",
+ "source_stamp": {
+  "foldmap": "0.1.0",
+  "code_fingerprint": "893407124ec081be",
+  "package": "checkout",
+  "checkout_fingerprint": "893407124ec081be",
+  "installed_matches_checkout": true,
+  "git": {
+   "commit": "8919aa362a5f132281f14db4af71399db6fad153",
+   "dirty": false,
+   "dirty_paths": [],
+   "source": "git"
+  },
+  "script": {
+   "name": "scripts/app29_light.py",
+   "sha256": "b5a428357e5d307a9058bc81efd4c2eca5c8c3705ded84967ecfebac52d7e1a0"
+  },
+  "python": {
+   "version": "3.12.9",
+   "implementation": "CPython"
+  },
+  "platform": {
+   "platform": "Linux-6.18.33.1-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+   "machine": "x86_64"
+  },
+  "packages": {
+   "gemmi": "0.7.5",
+   "numpy": "2.5.3",
+   "scipy": "1.18.1",
+   "networkx": "3.7",
+   "matplotlib": "3.11.2",
+   "PyYAML": "6.0.3"
+  }
+ },
+ "summary": {
+  "label": "the NA campaign (scripts/na_validate.py, docs/validation/na)",
+  "entries": [
+   39,
+   39
+  ],
+  "passed": [
+   34,
+   34
+  ],
+  "differ": [
+   "1URN",
+   "5F9R"
+  ],
+  "worse": {
+   "1URN": [
+    "na_protein_crossings"
+   ]
+  },
+  "better": {
+   "5F9R": [
+    "na_protein_crossings"
+   ]
+  },
+  "stamps": [
+   {
+    "commit": "66c1a3ddc11bbc25499d1ba91125dfdcba0d2b54",
+    "dirty": false,
+    "source": "asserted by runner"
+   },
+   {
+    "commit": "87952c120e561fb9d6ab59ec20be63ca02dda25f",
+    "dirty": false,
+    "source": "asserted by runner"
+   }
+  ]
+ },
+ "rows": {
+  "1URN": {
+   "changed": {
+    "na_protein_crossings": [
+     1,
+     2
+    ]
+   },
+   "worse": [
+    "na_protein_crossings"
+   ],
+   "better": []
+  },
+  "5F9R": {
+   "changed": {
+    "na_protein_crossings": [
+     7,
+     6
+    ]
+   },
+   "worse": [],
+   "better": [
+    "na_protein_crossings"
+   ]
+  }
+ }
+}
