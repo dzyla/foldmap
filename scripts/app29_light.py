@@ -437,6 +437,7 @@ def cmd_campaign(args) -> int:
         "svg_moved": svg,
         "differ": sorted({line.split(":")[0] for k in ("worse", "better", "moved") for line in verdict[k]} | set(svg)),
         "stamps": [(r.get("source_stamp") or {}).get("git") for r in reps],
+        "reference": bool(args.reference),
     }
     rows = {"keys": {i: [keys[0].get(i), keys[1].get(i)] for i in summary["differ"]}}
     if args.na:
@@ -512,6 +513,10 @@ def _campaign_lines(m: dict, fix: dict) -> list[str]:
         ]
         for i, d in sorted(m["rows"].get("na", {}).items()):
             lines.append(f"  - {i}: " + "; ".join(f"{k} {a} -> {b}" for k, (a, b) in sorted(d["changed"].items())))
+    if s.get("reference"):
+        lines.insert(2, "For reference, not judged: the before is older code, so its differences are not this fix's.")
+        lines.insert(3, "")
+        return lines + [""]
     for i in s["differ"]:
         lines.append(f"- **{i}**: {why.get(i, 'NOT EXPLAINED')}")
     return lines + [""]
@@ -537,6 +542,8 @@ def _navalidate_lines(m: dict, fix: dict) -> list[str]:
 
 def _measure_ok(m: dict, explained: set) -> bool:
     s = m["summary"]
+    if m["kind"] == "campaign" and s.get("reference"):  # older code against the fix: said, not judged
+        return True
     if m["kind"] == "campaign":
         return not s["worse"] and not (s.get("na") or {}).get("worse") and set(s["differ"]) <= explained
     if m["kind"] == "navalidate":
@@ -744,6 +751,7 @@ def main(argv=None) -> int:
     g.add_argument("--label", required=True)
     g.add_argument("--out", required=True)
     g.add_argument("--na", action="store_true", help="also each entry's A17 measures (na_fixes_record._row)")
+    g.add_argument("--reference", action="store_true", help="for reference only: said, never judged (older code)")
     v = sub.add_parser("navalidate", help="two na_validate reports before and after")
     v.add_argument("--before", required=True)
     v.add_argument("--after", required=True)
