@@ -26,6 +26,32 @@ record. A record whose number the paper quotes is regenerated before the paper q
 | `inventory/` and its freeze baseline | b730a05 | the table must match the release's code (`tests/test_inventory.py` fails otherwise) | `scripts/inventory.py`; `scripts/freeze_baseline.py` only shrinks |
 | the paper's numbers, tables and figures | 838c579 and later | everything quoted | `scripts/paper/run_all.sh TAG HARNESS` (HARNESS: the commit adding the fourth sample), `figures.sh`; inputs outside git rebuilt first (`scripts/paper/README.md`) |
 
+### Plan 29's records (`docs/validation/app29/`)
+
+Plan 29 (the app on a fresh random sample, 2026-10-27/28) added these records. The paper quotes none of them; each
+is a before/after measurement of one plan, kept as it is at its commit (as `random100-third/` is), and rerun at the
+release only if the paper comes to quote it (`scripts/app29.py run --ui --record`, then the record's builder).
+
+| record | what | made at (record commit, stamp) |
+|---|---|---|
+| `sample.json` | the sample (79 entries, released 2026-10-13 to 10-27) and its tune/check split | 851144d |
+| `before/` | the app's code path on both halves before the fixes (the check half sealed in `report-check.json`) | f538981, 549bef9 |
+| `triage.md` | the tune half's faults by mechanism, ranked; ruling P29-7's fix list | 2319029 |
+| `fix-ligand/` | Task 4: ligand marks clear of loop lines; the tether-reach step | 5880df6, fa95efc |
+| `fix-floor/` | Task 5: focus auto takes one subunit of a two-copy complex below the floor | 3d6c798, f62c899 |
+| `fix-screw/` | Task 6: the screw search without n^4 pair fits (figures byte-identical) | 6b83673, 4ccb38f |
+| `fix-ghost/` | Task 7: a lent ghost is no barrel strand (S3 only) | cf16ce9, e8f1e47 |
+| `diagnosis-t8.md` | Task 8: 26EL's empty page and 22MZ's letters, diagnosed | cdd315f |
+| `fix-copies/` | Task 8b: copies modelled in part are one protein to focus auto (26EL) | 749648c, 1a15466 |
+| `fix-letters/` | Task 8b: a base letter nearest its own strand (22MZ): rejected and reverted, the patch kept | f8388fc, 8919aa3 |
+| `after/` | Task N+1: the after run, the before commit rerun on the same host, the before/after table per half (the check half opened once) and the parked measures (third sample, NA controls, science over the download cache) | 657e127; the run at 162e067, its table at b84ebc3 |
+| `look.md` | Task N+1: the look test's before/after pairs, their sha256, the controller's verdicts | 657e127, b84ebc3 (verdicts by hand) |
+
+**The bench baseline.** `bench-before.json` (`.superpowers/sdd/2026-10-17-15-heldout-failures/`, the gate's
+`bench.py --check --exact`) is regenerated once, at the freeze, in its own commit with a record listing every entry
+the fix records explained (ruling P29-1); plan 29's fix records explained none, since the bench stayed 22 of 22
+identical through every fix and at the after measurement.
+
 `tests/test_domain_confidence.py` pins the README's and the MCP docstring's "S5 failures from 12 to 19" to the
 sensitivity record: a rerun that moves it fails there until every copy is changed.
 
