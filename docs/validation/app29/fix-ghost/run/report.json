@@ -1,0 +1,1633 @@
+{
+ "source_stamp": {
+  "foldmap": "0.1.0",
+  "code_fingerprint": "b871e2b918355e71",
+  "package": "checkout",
+  "checkout_fingerprint": "b871e2b918355e71",
+  "installed_matches_checkout": true,
+  "git": {
+   "commit": "e8f1e47916319ee293072e847927e1168431e963",
+   "dirty": false,
+   "source": "asserted by runner"
+  },
+  "script": {
+   "name": "scripts/app29.py",
+   "sha256": "cdf60fa1e05239c2d5fcd93ce5d5945f8e260122ff9af7ed8a25b61ffa6f605e"
+  },
+  "python": {
+   "version": "3.13.13",
+   "implementation": "CPython"
+  },
+  "platform": {
+   "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+   "machine": "x86_64"
+  },
+  "packages": {
+   "gemmi": "0.7.5",
+   "numpy": "2.5.4",
+   "scipy": "1.18.1",
+   "networkx": "3.7",
+   "matplotlib": "3.11.2",
+   "PyYAML": "6.0.3"
+  }
+ },
+ "entry_code": {
+  "b871e2b918355e71+cdf60fa1e05239c2": 47
+ },
+ "mixed_code": false,
+ "sample": {
+  "path": "docs/validation/app29/sample.json",
+  "sha256": "b3ed519636c18f0f72064b7c84c69387ffcd2e2dc84e1b26785b4f330b961b14",
+  "seed": 20261027,
+  "query_date": "2026-10-27",
+  "released_after": "2026-10-13",
+  "split": {
+   "tune": 47,
+   "check": 32
+  },
+  "strata": [
+   {
+    "stratum": "S1",
+    "title": "X-ray, 1 protein chain",
+    "target": 12,
+    "drawn": 12,
+    "short": 0
+   },
+   {
+    "stratum": "S2",
+    "title": "X-ray homo-oligomer (symmetric)",
+    "target": 12,
+    "drawn": 10,
+    "short": 2
+   },
+   {
+    "stratum": "S3",
+    "title": "X-ray hetero-complex",
+    "target": 10,
+    "drawn": 6,
+    "short": 4
+   },
+   {
+    "stratum": "S4",
+    "title": "cryo-EM",
+    "target": 15,
+    "drawn": 15,
+    "short": 0
+   },
+   {
+    "stratum": "S5",
+    "title": "NMR, multi-model",
+    "target": 8,
+    "drawn": 7,
+    "short": 1
+   },
+   {
+    "stratum": "S6",
+    "title": "Membrane",
+    "target": 8,
+    "drawn": 0,
+    "short": 8
+   },
+   {
+    "stratum": "S7",
+    "title": "Protein-DNA",
+    "target": 7,
+    "drawn": 6,
+    "short": 1
+   },
+   {
+    "stratum": "S8",
+    "title": "Protein-RNA",
+    "target": 7,
+    "drawn": 6,
+    "short": 1
+   },
+   {
+    "stratum": "S9",
+    "title": "RNA only",
+    "target": 3,
+    "drawn": 3,
+    "short": 0
+   },
+   {
+    "stratum": "S10",
+    "title": "Glycoproteins",
+    "target": 5,
+    "drawn": 4,
+    "short": 1
+   },
+   {
+    "stratum": "S11",
+    "title": "One protein, two states (5 pairs)",
+    "target": 10,
+    "drawn": 10,
+    "short": 0
+   },
+   {
+    "stratum": "S12",
+    "title": "AlphaFold DB models",
+    "target": 3,
+    "drawn": 0,
+    "short": 3,
+    "not_drawn": "not drawn (--no-alphafold): an AlphaFold DB pool has no release window (ruling Q61)"
+   }
+  ]
+ },
+ "totals": {
+  "tune": {
+   "entries": 47,
+   "drawn": 47,
+   "refused": 0,
+   "error": 0,
+   "not_measured": 0,
+   "png_error": 0,
+   "criteria_failed": 0,
+   "floor_failed": 0,
+   "ui_run": 0,
+   "ui_failed": 0
+  },
+  "check": {
+   "entries": 0,
+   "drawn": 0,
+   "refused": 0,
+   "error": 0,
+   "not_measured": 0,
+   "png_error": 0,
+   "criteria_failed": 0,
+   "floor_failed": 0,
+   "ui_run": 0,
+   "ui_failed": 0
+  },
+  "all": {
+   "entries": 47,
+   "drawn": 47,
+   "refused": 0,
+   "error": 0,
+   "not_measured": 0,
+   "png_error": 0,
+   "criteria_failed": 0,
+   "floor_failed": 0,
+   "ui_run": 0,
+   "ui_failed": 0
+  }
+ },
+ "entries": [
+  {
+   "id": "30CY",
+   "dir": "30CY",
+   "stratum": "S2",
+   "half": "tune",
+   "residues": 704,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 1.0,
+   "draw_seconds": 0.97,
+   "peak_mb": "not measured",
+   "svg_bytes": 200135,
+   "png_bytes": 557739,
+   "process": {
+    "exit": 0,
+    "seconds": 4.26,
+    "max_rss_mb": 180.6,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "fe2dbba685722e6246533ee784cfd303e90a1761395935833509d4f9bf37cfd3",
+    "app.svg": "3912c24fc4690030869fa5b2f281d8967439c02c5e4306c7b9961bcce6961d2a"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "38NR",
+   "dir": "38NR",
+   "stratum": "S3",
+   "half": "tune",
+   "residues": 987,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 0.29,
+   "draw_seconds": 0.25,
+   "peak_mb": "not measured",
+   "svg_bytes": 165513,
+   "png_bytes": 480918,
+   "process": {
+    "exit": 0,
+    "seconds": 2.05,
+    "max_rss_mb": 148.2,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "bd8093261e67aa712d5ec71783a76df6297a86f3ec91197a890e14e3243addcf",
+    "app.svg": "8430c7f2b925e9bf2b914621c0a3af857efd46ccdce13f701134573ca0a58824"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "12XK",
+   "dir": "12XK",
+   "stratum": "S4",
+   "half": "tune",
+   "residues": 1470,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 1.24,
+   "draw_seconds": 1.19,
+   "peak_mb": "not measured",
+   "svg_bytes": 447659,
+   "png_bytes": 1322868,
+   "process": {
+    "exit": 0,
+    "seconds": 5.26,
+    "max_rss_mb": 211.2,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "3066741bee859050da9121e19acd26485f752a0fd64b66f6000cb5cc3ffd9e6c",
+    "app.svg": "66e63dea39506e02885d5ffbb5326aa855a787b8147d8795130e4f15931c0b10"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "9Z0S",
+   "dir": "9Z0S",
+   "stratum": "S3",
+   "half": "tune",
+   "residues": 2682,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 1.43,
+   "draw_seconds": 1.38,
+   "peak_mb": "not measured",
+   "svg_bytes": 80192,
+   "png_bytes": 260883,
+   "process": {
+    "exit": 0,
+    "seconds": 5.21,
+    "max_rss_mb": 167.7,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "d888065444103ba221bbcdc7dd7ca56ecc462ace64847f21185f8922f0573492",
+    "app.svg": "1f89d02905ffffd7626d88d076889ebe89a427cc6ce9f3cb56c0cd749a2a3fd4"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "45JF",
+   "dir": "45JF",
+   "stratum": "S5",
+   "half": "tune",
+   "residues": 32,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 0.12,
+   "draw_seconds": 0.08,
+   "peak_mb": "not measured",
+   "svg_bytes": 6090,
+   "png_bytes": 12829,
+   "process": {
+    "exit": 0,
+    "seconds": 1.4,
+    "max_rss_mb": 142.1,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "91827b66f9dbf54767aba93bf983a84e2098ad53e0d5c8c9f66eaa2cd6e1c66e",
+    "app.svg": "91dc51f0de0dcfd4a8e6411e1c7f01c1ed4b459fb6a4ba4f2e8a92b772eaf6c1"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "35VC",
+   "dir": "35VC",
+   "stratum": "S4",
+   "half": "tune",
+   "residues": 1560,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 1.23,
+   "draw_seconds": 1.19,
+   "peak_mb": "not measured",
+   "svg_bytes": 522066,
+   "png_bytes": 1563299,
+   "process": {
+    "exit": 0,
+    "seconds": 5.36,
+    "max_rss_mb": 176.1,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "e56eb882ff01f7ac5c66630bf5e9ad1a56dc30c704ba86a9c5e12f5c253bac3e",
+    "app.svg": "d8770aed3a68aa049b980678e4ee10ba38dab0381da958cf0e380c569c743705"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "31FD",
+   "dir": "31FD",
+   "stratum": "S4",
+   "half": "tune",
+   "residues": 4174,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 15.21,
+   "draw_seconds": 14.12,
+   "peak_mb": "not measured",
+   "svg_bytes": 708552,
+   "png_bytes": 2466939,
+   "process": {
+    "exit": 0,
+    "seconds": 31.3,
+    "max_rss_mb": 258.6,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "3d3e2742100edaf84c4ec75063fc50372f68dbec4ab6e6094e8d76f4777fea0e",
+    "app.svg": "c1d847a64133612194d3b37fc96bcc49588647d70d562eb71f92e7aa04fa2a5e"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "30CU",
+   "dir": "30CU",
+   "stratum": "S11",
+   "half": "tune",
+   "residues": 1401,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 1.02,
+   "draw_seconds": 0.97,
+   "peak_mb": "not measured",
+   "svg_bytes": 201653,
+   "png_bytes": 544105,
+   "process": {
+    "exit": 0,
+    "seconds": 4.36,
+    "max_rss_mb": 191.7,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "0e6237fb30f57e4a182f5e80dcc9f007ddbe6aaa3d31c2b2f29a4b56e1702671",
+    "app.svg": "810653596ab01485481cb288b549553947afd49ef13f691500ef455ab541d942"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "9YPK",
+   "dir": "9YPK",
+   "stratum": "S8",
+   "half": "tune",
+   "residues": 6687,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 23.19,
+   "draw_seconds": 20.84,
+   "peak_mb": "not measured",
+   "svg_bytes": 1732439,
+   "png_bytes": 5186408,
+   "process": {
+    "exit": 0,
+    "seconds": 47.18,
+    "max_rss_mb": 377.6,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "cccc03f7d60869a9c912a71219462546eaf03a33e4fe164785b2b45859e10269",
+    "app.svg": "07094c9b4a1853e9145b1e862f2c98450d760d8de425656b504486585d02bed6"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "30CV",
+   "dir": "30CV",
+   "stratum": "S11",
+   "half": "tune",
+   "residues": 1403,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 0.99,
+   "draw_seconds": 0.95,
+   "peak_mb": "not measured",
+   "svg_bytes": 208806,
+   "png_bytes": 616032,
+   "process": {
+    "exit": 0,
+    "seconds": 4.26,
+    "max_rss_mb": 195.0,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "22c8972781fff8a55c3224c5c02854a103d8a7380bfab895d3f2698a85ee63db",
+    "app.svg": "bd35ac869ed23eb0f0c59851ff442fcbffbabc0d60cbecf1303bd13420016b82"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "9YLG",
+   "dir": "9YLG",
+   "stratum": "S11",
+   "half": "tune",
+   "residues": 341,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 0.65,
+   "draw_seconds": 0.62,
+   "peak_mb": "not measured",
+   "svg_bytes": 254072,
+   "png_bytes": 709047,
+   "process": {
+    "exit": 0,
+    "seconds": 3.25,
+    "max_rss_mb": 169.0,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "450fa3475a1fab7150197759fba30cf987aeff9226e911dd04d7adec6aaf4cd3",
+    "app.svg": "e0d5fd81d78b3c0f06e990fa8ee20e2527eca47859e7b8a7593ef1b1064f12ff"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "9WXY",
+   "dir": "9WXY",
+   "stratum": "S5",
+   "half": "tune",
+   "residues": 16,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 0.05,
+   "draw_seconds": 0.03,
+   "peak_mb": "not measured",
+   "svg_bytes": 1133,
+   "png_bytes": 9862,
+   "process": {
+    "exit": 0,
+    "seconds": 1.15,
+    "max_rss_mb": 132.9,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "a23ebe956673253e380deae2200bbe69f68ac700e80633567212ff13a5312319",
+    "app.svg": "b5bd24092542bb74e60db4a07d198aebac10d137c272e963f6c8d15c16271ddc"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "9ZSJ",
+   "dir": "9ZSJ",
+   "stratum": "S7",
+   "half": "tune",
+   "residues": 1729,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 2.63,
+   "draw_seconds": 2.57,
+   "peak_mb": "not measured",
+   "svg_bytes": 463545,
+   "png_bytes": 1810603,
+   "process": {
+    "exit": 0,
+    "seconds": 9.82,
+    "max_rss_mb": 218.4,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "7d1c670a6fe2e5f31dcb99695dde8a1014169d4587061ed0a6e6799dc7889873",
+    "app.svg": "bf6b3d97efb5722858f908dd59f48ffda44b435806a0ad1420cf80dce9d981e6"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "9SXY",
+   "dir": "9SXY",
+   "stratum": "S1",
+   "half": "tune",
+   "residues": 339,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 0.25,
+   "draw_seconds": 0.22,
+   "peak_mb": "not measured",
+   "svg_bytes": 89076,
+   "png_bytes": 275479,
+   "process": {
+    "exit": 0,
+    "seconds": 1.8,
+    "max_rss_mb": 138.1,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "6766fdd7633f3ecf952616c3c6400f1febf860a32d6c9b62b770fd11d436a174",
+    "app.svg": "e9d6fd57e29737c5d10e1162f7ef3013ac310d3f991bc3e5a0687d69bee16947"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "9NYA",
+   "dir": "9NYA",
+   "stratum": "S5",
+   "half": "tune",
+   "residues": 86,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 0.13,
+   "draw_seconds": 0.1,
+   "peak_mb": "not measured",
+   "svg_bytes": 21784,
+   "png_bytes": 79775,
+   "process": {
+    "exit": 0,
+    "seconds": 1.4,
+    "max_rss_mb": 136.3,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "893fba744b1df257df367fc7b4834c59e76ac935fbce357e1f6e5d5ebdcf2cbe",
+    "app.svg": "b0e3ea17429eff9d076b4a9cf66986d9f792ab05d208c3c17ac76c065e1d23dd"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "23CX",
+   "dir": "23CX",
+   "stratum": "S4",
+   "half": "tune",
+   "residues": 1085,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 1.32,
+   "draw_seconds": 1.28,
+   "peak_mb": "not measured",
+   "svg_bytes": 253029,
+   "png_bytes": 805969,
+   "process": {
+    "exit": 0,
+    "seconds": 5.16,
+    "max_rss_mb": 155.1,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "5a18c6884134894f9962ac693b5fba0846a68bd5353b05a0f6795c9ab05dfbfa",
+    "app.svg": "ede6abf2463ed4b4de193f075d6eb3fb98ca41442c2d518f0fecf480c3ba42b6"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "9T57",
+   "dir": "9T57",
+   "stratum": "S1",
+   "half": "tune",
+   "residues": 258,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 0.34,
+   "draw_seconds": 0.31,
+   "peak_mb": "not measured",
+   "svg_bytes": 47906,
+   "png_bytes": 174937,
+   "process": {
+    "exit": 0,
+    "seconds": 2.1,
+    "max_rss_mb": 135.2,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "22153bafbc33f0398cd4c40e25f55de764603daebfe124bae45da1b02654f083",
+    "app.svg": "b89177d39525e55a56330fbd2622ef87400238a62b16e38d5cd9d4c3db41b572"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "9YOA",
+   "dir": "9YOA",
+   "stratum": "S3",
+   "half": "tune",
+   "residues": 1048,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 3.6,
+   "draw_seconds": 3.55,
+   "peak_mb": "not measured",
+   "svg_bytes": 220279,
+   "png_bytes": 690556,
+   "process": {
+    "exit": 0,
+    "seconds": 12.22,
+    "max_rss_mb": 170.3,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "2984a51a544c1d062737b166eaba860ad4857a0ab5b6ce0ac5f8ef79155ac467",
+    "app.svg": "4ffc93613b6049cb891a9358124abb1979131255ca1b562903bf829c4fff8224"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "9SXF",
+   "dir": "9SXF",
+   "stratum": "S1",
+   "half": "tune",
+   "residues": 295,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 0.23,
+   "draw_seconds": 0.2,
+   "peak_mb": "not measured",
+   "svg_bytes": 78393,
+   "png_bytes": 267929,
+   "process": {
+    "exit": 0,
+    "seconds": 1.75,
+    "max_rss_mb": 136.2,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "93daecabe505e2b375c87deeb64a06f0c6c62c47d7eb6906e1509a684c77a87d",
+    "app.svg": "7ae2b11572053103377143cc0f56fd10cc16fb76c2e406651a928b6f77ad8528"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "9SXU",
+   "dir": "9SXU",
+   "stratum": "S1",
+   "half": "tune",
+   "residues": 342,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 0.26,
+   "draw_seconds": 0.23,
+   "peak_mb": "not measured",
+   "svg_bytes": 88824,
+   "png_bytes": 248813,
+   "process": {
+    "exit": 0,
+    "seconds": 1.85,
+    "max_rss_mb": 137.3,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "34a1835be6147dc6c9fb4e8ff0f13f4fd43d834373a938255d4b024b606619bc",
+    "app.svg": "9119951be551a59122b8f985a6ccd7b08cf52726de0f87deeead4aec4536c1e5"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "9WVR",
+   "dir": "9WVR",
+   "stratum": "S2",
+   "half": "tune",
+   "residues": 170,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 0.27,
+   "draw_seconds": 0.24,
+   "peak_mb": "not measured",
+   "svg_bytes": 99467,
+   "png_bytes": 299471,
+   "process": {
+    "exit": 0,
+    "seconds": 1.9,
+    "max_rss_mb": 137.1,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "2792560c5439ba2d804a16f75395a68721fdbe5370344c3aa2e09276b55635cd",
+    "app.svg": "135c6f746856f9888b3bb586099d43f61628c1976d948097151aa62b1f297eea"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "9YL9",
+   "dir": "9YL9",
+   "stratum": "S2",
+   "half": "tune",
+   "residues": 343,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 0.61,
+   "draw_seconds": 0.58,
+   "peak_mb": "not measured",
+   "svg_bytes": 242387,
+   "png_bytes": 629321,
+   "process": {
+    "exit": 0,
+    "seconds": 3.0,
+    "max_rss_mb": 169.1,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "f37239ef83e4bb238c585eb5120c4d0f1d0f927566916efae6a438ebe8a2a650",
+    "app.svg": "9ff1a9ac9bd0055a7bef194401aeb2c024f44d8ac89afdc49b4e568d41efdd70"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "29LB",
+   "dir": "29LB",
+   "stratum": "S1",
+   "half": "tune",
+   "residues": 265,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 0.23,
+   "draw_seconds": 0.2,
+   "peak_mb": "not measured",
+   "svg_bytes": 65177,
+   "png_bytes": 204001,
+   "process": {
+    "exit": 0,
+    "seconds": 1.75,
+    "max_rss_mb": 139.8,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "46b8dcbe210fc3dcb1ac721ea34e58cf9b82727ca43454cf0e1e408873c6bdd7",
+    "app.svg": "8ab9d46700bd3a3619edb5dbb917aaea7433a0c01380bd0a94166d4ddf762034"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "44LS",
+   "dir": "44LS",
+   "stratum": "S2",
+   "half": "tune",
+   "residues": 1048,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 1.21,
+   "draw_seconds": 1.16,
+   "peak_mb": "not measured",
+   "svg_bytes": 185362,
+   "png_bytes": 633639,
+   "process": {
+    "exit": 0,
+    "seconds": 5.01,
+    "max_rss_mb": 191.1,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "96be2f652338bf5308977f70ae1b421babc791141fd29e4e3ba7c5ee8c6189eb",
+    "app.svg": "b0c882c647cd89322c08efe5c575d9bf01979f28f4e8e2d7b81825804cf1bdca"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "9XIC",
+   "dir": "9XIC",
+   "stratum": "S10",
+   "half": "tune",
+   "residues": 5496,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 9.44,
+   "draw_seconds": 8.54,
+   "peak_mb": "not measured",
+   "svg_bytes": 355515,
+   "png_bytes": 1182331,
+   "process": {
+    "exit": 0,
+    "seconds": 19.78,
+    "max_rss_mb": 229.8,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "dbd367086e9e0baf73749f06eaf3da21768292423068a641b66cda13d82a099b",
+    "app.svg": "c5a4f99a1240bef868dbbbb3349b39eea034805966ad226131a589b310293fcc"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "14CU",
+   "dir": "14CU",
+   "stratum": "S2",
+   "half": "tune",
+   "residues": 3404,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 1.21,
+   "draw_seconds": 1.1,
+   "peak_mb": "not measured",
+   "svg_bytes": 526697,
+   "png_bytes": 1958736,
+   "process": {
+    "exit": 0,
+    "seconds": 5.66,
+    "max_rss_mb": 212.1,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "649a56f443a1b1e930b2b835524285c211125bc250224a85ddfdcd24d02acc8f",
+    "app.svg": "45608a03bc7bf6684aa77fa755bbf4e0f5741a9ed1be34dd80470057fd65ad58"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "29TB",
+   "dir": "29TB",
+   "stratum": "S1",
+   "half": "tune",
+   "residues": 257,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 0.32,
+   "draw_seconds": 0.29,
+   "peak_mb": "not measured",
+   "svg_bytes": 50500,
+   "png_bytes": 191279,
+   "process": {
+    "exit": 0,
+    "seconds": 2.05,
+    "max_rss_mb": 137.2,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "f1703fb9e63f43a83f3783c41ee578f34306272a2da78f49d4bdec69b2987113",
+    "app.svg": "9ec3c71fe08dc76d95b26eb47fad4e8ba57a20dd55174a191e33d8f3f9528d16"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "9YLD",
+   "dir": "9YLD",
+   "stratum": "S11",
+   "half": "tune",
+   "residues": 341,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 0.27,
+   "draw_seconds": 0.24,
+   "peak_mb": "not measured",
+   "svg_bytes": 127693,
+   "png_bytes": 380430,
+   "process": {
+    "exit": 0,
+    "seconds": 1.9,
+    "max_rss_mb": 135.9,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "3b34cb858999a43fe1b1142b8611e4e457d242834e4e35ca78b234e39faa9544",
+    "app.svg": "20a079b635d31a6bfd4eadc8d27c6eae32b169ac02200b051f010e359f0d8a4d"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "34QD",
+   "dir": "34QD",
+   "stratum": "S10",
+   "half": "tune",
+   "residues": 502,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 0.78,
+   "draw_seconds": 0.75,
+   "peak_mb": "not measured",
+   "svg_bytes": 133177,
+   "png_bytes": 367586,
+   "process": {
+    "exit": 0,
+    "seconds": 3.55,
+    "max_rss_mb": 145.4,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "5b604388b45ec2e5ae70b20768e89852cfb50021255a3efd957b3600ae08f907",
+    "app.svg": "0f90a809bd16ea8005d64933907f989a1d690e794ad8e7edb1b6e3821138c1ed"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "9TCF",
+   "dir": "9TCF",
+   "stratum": "S3",
+   "half": "tune",
+   "residues": 1828,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 0.88,
+   "draw_seconds": 0.83,
+   "peak_mb": "not measured",
+   "svg_bytes": 467290,
+   "png_bytes": 1285043,
+   "process": {
+    "exit": 0,
+    "seconds": 4.31,
+    "max_rss_mb": 176.5,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "958c9118e95f0b181476a87560d42d47625bc98c67c3c4d8d4558128401e380f",
+    "app.svg": "84c2b6eb1843f6100ddec3999729db72ca2d2bd73d9ea0bdde189ffa1d9b8785"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "22VF",
+   "dir": "22VF",
+   "stratum": "S4",
+   "half": "tune",
+   "residues": 4194,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 1.45,
+   "draw_seconds": 1.35,
+   "peak_mb": "not measured",
+   "svg_bytes": 547962,
+   "png_bytes": 1605883,
+   "process": {
+    "exit": 0,
+    "seconds": 6.26,
+    "max_rss_mb": 269.5,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "4b92c35de0122f0f9edfe9c4551ee9e0e418ce9060fd3d86161562a146293cf1",
+    "app.svg": "626ac9ed8eac5a6ef662c6c17c2931bb6f43e8888d0671413b1104c54480851a"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "9SXG",
+   "dir": "9SXG",
+   "stratum": "S1",
+   "half": "tune",
+   "residues": 292,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 0.24,
+   "draw_seconds": 0.21,
+   "peak_mb": "not measured",
+   "svg_bytes": 77809,
+   "png_bytes": 284020,
+   "process": {
+    "exit": 0,
+    "seconds": 1.85,
+    "max_rss_mb": 137.8,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "eeb6cb7b6cf9e551b796bc8cb9e97da24847bb764c461e85ddaef27a0eef3f83",
+    "app.svg": "e35c46af2be70fa6f9b9dc81b6beead097b86b8b92bec108aad639fd399c67fc"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "9X4L",
+   "dir": "9X4L",
+   "stratum": "S4",
+   "half": "tune",
+   "residues": 8692,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 16.59,
+   "draw_seconds": 14.42,
+   "peak_mb": "not measured",
+   "svg_bytes": 2383468,
+   "png_bytes": 5100177,
+   "process": {
+    "exit": 0,
+    "seconds": 33.5,
+    "max_rss_mb": 353.1,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "6532c02c245c1b1680253d3c2be37f550f875eca0ecb9ac61f5b39f2fcc7a457",
+    "app.svg": "606eecd5cd80a9ae3d8085ea0774be7ad4e4c380c755649968e7e589fd54fba3"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "22MZ",
+   "dir": "22MZ",
+   "stratum": "S9",
+   "half": "tune",
+   "residues": 76,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 0.41,
+   "draw_seconds": 0.38,
+   "peak_mb": "not measured",
+   "svg_bytes": 46851,
+   "png_bytes": 280260,
+   "process": {
+    "exit": 0,
+    "seconds": 2.55,
+    "max_rss_mb": 134.8,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "faec85c3d363147323f5317c5ed3a6fccd52ae00f5fa8ab1434f61a38b134055",
+    "app.svg": "be0980f27ca123db4cda973c2ce0fdd9d58912194f1743f531b37e8fc43046e7"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "32IL",
+   "dir": "32IL",
+   "stratum": "S11",
+   "half": "tune",
+   "residues": 730,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 0.17,
+   "draw_seconds": 0.14,
+   "peak_mb": "not measured",
+   "svg_bytes": 19156,
+   "png_bytes": 101974,
+   "process": {
+    "exit": 0,
+    "seconds": 1.55,
+    "max_rss_mb": 140.0,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "9a6335540e610eab673f6840c6161023b15971cd214d1447b447e2d63f68de0e",
+    "app.svg": "cac9b93c09225e95be0cf4380a6a4f064ebd38d2ba5ee3e4c23d033dab2a91eb"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "9YLA",
+   "dir": "9YLA",
+   "stratum": "S11",
+   "half": "tune",
+   "residues": 343,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 0.67,
+   "draw_seconds": 0.64,
+   "peak_mb": "not measured",
+   "svg_bytes": 248132,
+   "png_bytes": 656919,
+   "process": {
+    "exit": 0,
+    "seconds": 3.26,
+    "max_rss_mb": 171.1,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "06ec605d61255666ac115d35c8e3176927e16d5029eaa67b3e413f7cea52adcb",
+    "app.svg": "fb928863db99f1735817d3a80429ff82f4fd94fdee39ca3068fd0e415536bcde"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "34XH",
+   "dir": "34XH",
+   "stratum": "S5",
+   "half": "tune",
+   "residues": 23,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 0.13,
+   "draw_seconds": 0.11,
+   "peak_mb": "not measured",
+   "svg_bytes": 11967,
+   "png_bytes": 38827,
+   "process": {
+    "exit": 0,
+    "seconds": 1.45,
+    "max_rss_mb": 157.6,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "53d7c372112dcc225bb852a2ae5097481b56f13988974f5eef1d2b3272e630bf",
+    "app.svg": "2d79b096570761031ba4b3b411fba079f18ee2d403c03edfaafa785d0d8a4c58"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "9WNE",
+   "dir": "9WNE",
+   "stratum": "S8",
+   "half": "tune",
+   "residues": 1310,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 1.46,
+   "draw_seconds": 1.42,
+   "peak_mb": "not measured",
+   "svg_bytes": 394625,
+   "png_bytes": 1274386,
+   "process": {
+    "exit": 0,
+    "seconds": 5.96,
+    "max_rss_mb": 166.5,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "99bbd474190d8ea8050f788c22fc7a965e377f7a8dcb8b7cc41d93908cc74f4e",
+    "app.svg": "138613e329e5ca33a7a11b668f269e72418c7656760970d7944d9414dae1952d"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "28HY",
+   "dir": "28HY",
+   "stratum": "S4",
+   "half": "tune",
+   "residues": 972,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 0.47,
+   "draw_seconds": 0.42,
+   "peak_mb": "not measured",
+   "svg_bytes": 320908,
+   "png_bytes": 1015796,
+   "process": {
+    "exit": 0,
+    "seconds": 2.65,
+    "max_rss_mb": 168.7,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "64c317a4b1164fc643bd60ea423c406ec1ee36e805c98192b3aa5995ce40ec4f",
+    "app.svg": "aef6edf6d792c7c4c95e541df432d484ea4706beb0d2d088e8e137e29f937b48"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "26EL",
+   "dir": "26EL",
+   "stratum": "S4",
+   "half": "tune",
+   "residues": 12238,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 1.6,
+   "draw_seconds": 1.41,
+   "peak_mb": "not measured",
+   "svg_bytes": 265384,
+   "png_bytes": 933004,
+   "process": {
+    "exit": 0,
+    "seconds": 6.61,
+    "max_rss_mb": 292.7,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "92778371853563fbffd353c823db4e21809809b1e07bed60329cbdfd9453edc2",
+    "app.svg": "06964d4e7ba9e9587b0b7bef9c1b454435a7cb3b50738f639631e46fc64e744d"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "23FR",
+   "dir": "23FR",
+   "stratum": "S4",
+   "half": "tune",
+   "residues": 5754,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 1.03,
+   "draw_seconds": 0.72,
+   "peak_mb": "not measured",
+   "svg_bytes": 29346,
+   "png_bytes": 123908,
+   "process": {
+    "exit": 0,
+    "seconds": 3.86,
+    "max_rss_mb": 219.1,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "b985be64133c064827953d429a873a9f822adb817ac93a4958e2cb636e8e0355",
+    "app.svg": "3fcf53839f051c5ad59cf4e46b94c469e4e996b4f871ad7c8109c61e106fb9e8"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "9TMF",
+   "dir": "9TMF",
+   "stratum": "S10",
+   "half": "tune",
+   "residues": 2793,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 3.35,
+   "draw_seconds": 3.29,
+   "peak_mb": "not measured",
+   "svg_bytes": 214675,
+   "png_bytes": 703525,
+   "process": {
+    "exit": 0,
+    "seconds": 11.37,
+    "max_rss_mb": 181.7,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "86b9b4f3ca6cb9845a6eb3952940f96c4d6101ad104c26b66d6885e7cca6b976",
+    "app.svg": "ac0082eb92f64c3fccd7021405b21fc68cb0e3a3a7ca9568c7a399c988614ed1"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "20XT",
+   "dir": "20XT",
+   "stratum": "S2",
+   "half": "tune",
+   "residues": 806,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 0.71,
+   "draw_seconds": 0.67,
+   "peak_mb": "not measured",
+   "svg_bytes": 231065,
+   "png_bytes": 694189,
+   "process": {
+    "exit": 0,
+    "seconds": 3.5,
+    "max_rss_mb": 181.7,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "0baffdfbebdaa698c816c804ae17a3acd634c0e52586009d41bce752e5e51bbc",
+    "app.svg": "f6b41cd7886cf90ab547af668fbe0aa86eb07001438a692ac173adb6dcbb8dea"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "9SXD",
+   "dir": "9SXD",
+   "stratum": "S11",
+   "half": "tune",
+   "residues": 627,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 0.26,
+   "draw_seconds": 0.23,
+   "peak_mb": "not measured",
+   "svg_bytes": 91125,
+   "png_bytes": 307203,
+   "process": {
+    "exit": 0,
+    "seconds": 1.9,
+    "max_rss_mb": 155.1,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "a7fef227e45d9e0cecca7edf3850cbaac57858465ef12f89e97f96c0fb008126",
+    "app.svg": "f0751786ff54c4161a2ebfadcbb974e50b1e6f8411b901463a444d4d81e45636"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "12KF",
+   "dir": "12KF",
+   "stratum": "S10",
+   "half": "tune",
+   "residues": 1476,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 1.47,
+   "draw_seconds": 1.43,
+   "peak_mb": "not measured",
+   "svg_bytes": 348715,
+   "png_bytes": 1003083,
+   "process": {
+    "exit": 0,
+    "seconds": 5.86,
+    "max_rss_mb": 164.5,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "1834cb1db5c09c9e005a74eff4fc35d4552405bf727bb72a8cdfcd419d9085e8",
+    "app.svg": "c2f39e8be520fcec6d6010f503c64c7660ecb7f13ebdd875fd17f58ca709817c"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "9ZFX",
+   "dir": "9ZFX",
+   "stratum": "S2",
+   "half": "tune",
+   "residues": 1335,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 0.6,
+   "draw_seconds": 0.56,
+   "peak_mb": "not measured",
+   "svg_bytes": 182092,
+   "png_bytes": 501597,
+   "process": {
+    "exit": 0,
+    "seconds": 2.95,
+    "max_rss_mb": 197.8,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "c691bdace8a2ab6cc57caa076b985336b8c0341505ebe69da9d7653a070b89ff",
+    "app.svg": "50221514dde692f75e2d759eeb7b7fa990ff31e6524f20f29e701fb00086c6b5"
+   },
+   "ui": "not run"
+  },
+  {
+   "id": "9YPN",
+   "dir": "9YPN",
+   "stratum": "S8",
+   "half": "tune",
+   "residues": 6481,
+   "refused": null,
+   "error": null,
+   "measure_error": null,
+   "png_error": null,
+   "criteria_failed": [],
+   "criteria_detail": {},
+   "floor_ok": true,
+   "floor_reasons": [],
+   "seconds": 19.53,
+   "draw_seconds": 17.36,
+   "peak_mb": "not measured",
+   "svg_bytes": 1676095,
+   "png_bytes": 4342283,
+   "process": {
+    "exit": 0,
+    "seconds": 40.56,
+    "max_rss_mb": 385.1,
+    "timed_out": false
+   },
+   "files": {
+    "app.png": "005ca6274f39d38f3ed8eeb598850591ca62f654063a1baa231a3d160dc3b5aa",
+    "app.svg": "45713ce4c32c4238df4ae0629993f193a2cae8ded07805b5e3f0de95e35f29ac"
+   },
+   "ui": "not run"
+  }
+ ]
+}

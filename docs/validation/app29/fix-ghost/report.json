@@ -1,0 +1,147 @@
+{
+ "name": "fix-ghost",
+ "source_stamp": {
+  "foldmap": "0.1.0",
+  "code_fingerprint": "b871e2b918355e71",
+  "package": "checkout",
+  "checkout_fingerprint": "b871e2b918355e71",
+  "installed_matches_checkout": true,
+  "git": {
+   "commit": "e8f1e47916319ee293072e847927e1168431e963",
+   "dirty": false,
+   "dirty_paths": [],
+   "source": "git"
+  },
+  "script": {
+   "name": "scripts/app29_light.py",
+   "sha256": "acea48308a99e46e83e7a71fe7f985c8b08788846d140bfac70061f0b7d4648b"
+  },
+  "python": {
+   "version": "3.12.9",
+   "implementation": "CPython"
+  },
+  "platform": {
+   "platform": "Linux-6.18.33.1-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+   "machine": "x86_64"
+  },
+  "packages": {
+   "gemmi": "0.7.5",
+   "numpy": "2.5.3",
+   "scipy": "1.18.1",
+   "networkx": "3.7",
+   "matplotlib": "3.11.2",
+   "PyYAML": "6.0.3"
+  }
+ },
+ "fix": {
+  "title": "Plan 29 Task 7: a lent ghost is no barrel strand (triage proposal 4, ruling P29-7)",
+  "mechanism": "figcheck.science_checks counted every ghost lent to a barrel block (layout._unwrap: a neighbouring copy's strand drawn across an unrolled ring's cut leaves its ghost where it pairs) as a ring strand. 9X4L's sheet 7 (chain 3's 5-strand barrel) holds the ghost of 7:7-8, lent beside the accessory 3:208-213 and paired with it alone: ring 6 against science.pairing_cycle's 5. science.barrel_finding now counts a lent ghost in the ring only when it is joined to a ring strand in the pairing graph (pairing_cycle's own edge rule, science._joined), directly or through another such ghost (science.lent_ring); the others are counted as accessories are. A check fix: no figure may change.",
+  "named": [
+   "9X4L"
+  ],
+  "expected": "9X4L's S3 only (foldmap check; the app does not show S3); every figure byte-identical",
+  "may_change": [
+   "9X4L"
+  ],
+  "control": "No barrel block in tests/data or the tune half holds a ring strand lent across a cut: the measles F sheets (8UTF) and the other blocks with lent ghosts (8UUP, 1SLV, 4V4F-ring, 14CU) are drawn open, judged by science.open_finding, which this fix leaves as it was. The guard is a synthetic ring (tests/test_science.py::test_a_ring_strand_lent_across_the_cut_still_counts); the barrels whose S3 passes (1EMA, 1TIM, 1BXW-A: tests/test_science.py::test_a_control_barrel_figure_passes_and_a_moved_strand_fails) and 8UTF's S3 are pinned."
+ },
+ "before": "docs/validation/app29/fix-floor/run",
+ "after": "docs/validation/app29/fix-ghost/run",
+ "tune": {
+  "entries": [
+   47,
+   47
+  ],
+  "missing": [],
+  "svg_changed": [],
+  "png_changed": [],
+  "criteria_changed": [],
+  "named_seconds": {
+   "9X4L": {
+    "draw": [
+     14.61,
+     14.42
+    ],
+    "entry": [
+     16.85,
+     16.59
+    ]
+   }
+  },
+  "draw_seconds_total": [
+   118.76,
+   109.74
+  ],
+  "stamps": [
+   {
+    "commit": "975f33637ebbe8fa4c6ed861d8b95844f0cf5313",
+    "dirty": false,
+    "source": "asserted by runner"
+   },
+   {
+    "commit": "e8f1e47916319ee293072e847927e1168431e963",
+    "dirty": false,
+    "source": "asserted by runner"
+   }
+  ]
+ },
+ "bench": {
+  "exit": 0,
+  "entries": 22,
+  "identical": 22,
+  "notes": {
+   "1BL8": "identical",
+   "1C3W": "identical",
+   "1EMA": "identical",
+   "1LMB": "identical",
+   "1TIM": "identical",
+   "1UBQ": "identical",
+   "1ZAA": "identical",
+   "25IN": "identical",
+   "2HHB": "identical",
+   "2JTY": "identical",
+   "2LZM": "identical",
+   "4CH9": "identical",
+   "5NKT": "identical",
+   "6R74": "identical",
+   "6Y7S": "identical",
+   "6ZS5": "identical",
+   "6ZYA": "identical",
+   "8UTF": "identical",
+   "8UUP": "identical",
+   "9TX7": "identical",
+   "AF-P04637": "identical",
+   "big32": "identical"
+  }
+ },
+ "measure": {
+  "file": "science.json",
+  "kind": "science",
+  "summary": {
+   "entries": 139,
+   "judged": 139,
+   "errors": [],
+   "differ": [
+    "9X4L"
+   ],
+   "new_findings": {},
+   "changes": {
+    "9X4L": {
+     "S3": [
+      [
+       "sheet 7: 6 barrel strands drawn, the pairing cycle has 5"
+      ],
+      []
+     ]
+    }
+   },
+   "S3_before": {
+    "9X4L": [
+     "sheet 7: 6 barrel strands drawn, the pairing cycle has 5"
+    ]
+   },
+   "S3_after": {}
+  }
+ },
+ "verdict": "kept"
+}
