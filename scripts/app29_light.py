@@ -5,6 +5,7 @@ measured on the tune half and the bench only, plus its own measure, written as r
 with the code that wrote them (foldmap.source_stamp).
 
     python scripts/app29_light.py helical --old FILE --out FILE [--jobs N] [--max-copies 64]
+    python scripts/app29_light.py science --old FILE --out FILE [--jobs N]
     python scripts/app29_light.py report --name NAME --before RUN --after RUN --bench FILE --measure FILE --out DIR
 
 helical (Task 6) runs symmetry._helical as it was (--old: that symmetry.py, e.g. `git show <commit>:src/foldmap/
@@ -14,12 +15,18 @@ compares the two returns exactly (floats bit for bit), counts _Assembly.pair cal
 MIN_HELIX_COPIES and MIN_HELIX_COPIES_ASKED. A structure whose largest cluster holds more than --max-copies copies is
 skipped for time (the old search is n^4). Exit 1 when any return differs.
 
+science (Task 7) draws plan 29's tune half and every .cif/.cif.gz under tests/data as `foldmap check` does
+(spec.draw_spec(spec.figure_spec(path)): the default view) and judges each drawing with figcheck.science_checks as it
+was (--old: that figcheck.py) and as it is: S1-S6 before and after, per entry, and the entries whose findings
+changed, and whether any finding is new.
+
 report reads two scripts/app29.py run records of the tune half (load_tune: report.json alone; RUN, a folder with it),
 the bench's --check --exact output (bench.txt, then "bench exit N") and the fix's own measure (--measure, a JSON
 file this script's other commands wrote; it is copied into the record), and says: every tune entry whose figure (the
-app's SVG and PNG, sha256) or criteria changed, the draw seconds of the entries the fix names (NAMED), the bench's
-verdict, and the measure's summary. The verdict is P29-13's: kept only when every figure is byte-identical and the
-bench is identical on every entry."""
+app's SVG and PNG, sha256) or criteria changed, the draw seconds of the entries the fix names (FIXES' named), the
+bench's verdict, and the measure's summary. The verdict is P29-13's: kept only when every figure is byte-identical,
+the bench is identical on every entry, and the measure changed only what the fix may change (FIXES' may_change),
+with no new finding."""
 
 from __future__ import annotations
 
@@ -46,6 +53,26 @@ FIXES: dict[str, dict] = {
         "first member within the tolerance, in cluster order, is the one the full search took.",
         "named": ["23FR"],
         "expected": "23FR's time only; every figure byte-identical",
+        "may_change": [],
+    },
+    "fix-ghost": {
+        "title": "Plan 29 Task 7: a lent ghost is no barrel strand (triage proposal 4, ruling P29-7)",
+        "mechanism": "figcheck.science_checks counted every ghost lent to a barrel block (layout._unwrap: a "
+        "neighbouring copy's strand drawn across an unrolled ring's cut leaves its ghost where it pairs) as a ring "
+        "strand. 9X4L's sheet 7 (chain 3's 5-strand barrel) holds the ghost of 7:7-8, lent beside the accessory "
+        "3:208-213 and paired with it alone: ring 6 against science.pairing_cycle's 5. science.barrel_finding now "
+        "counts a lent ghost in the ring only when it is joined to a ring strand in the pairing graph (pairing_cycle's "
+        "own edge rule, science._joined), directly or through another such ghost (science.lent_ring); the others "
+        "are counted as accessories are. A check fix: no figure may change.",
+        "named": ["9X4L"],
+        "expected": "9X4L's S3 only (foldmap check; the app does not show S3); every figure byte-identical",
+        "may_change": ["9X4L"],
+        "control": "No barrel block in tests/data or the tune half holds a ring strand lent across a cut: the "
+        "measles F sheets (8UTF) and the other blocks with lent ghosts (8UUP, 1SLV, 4V4F-ring, 14CU) are drawn "
+        "open, judged by science.open_finding, which this fix leaves as it was. The guard is a synthetic ring "
+        "(tests/test_science.py::test_a_ring_strand_lent_across_the_cut_still_counts); the barrels whose S3 passes "
+        "(1EMA, 1TIM, 1BXW-A: tests/test_science.py::test_a_control_barrel_figure_passes_and_a_moved_strand_fails) "
+        "and 8UTF's S3 are pinned.",
     },
 }
 
@@ -212,6 +239,78 @@ def _helical_lines(m: dict, named: list[str]) -> list[str]:
     return lines
 
 
+# ------------------------------------------------------------------------------------------------ science
+
+
+def science_one(path: str, old_file: str) -> dict:
+    from foldmap import figcheck
+    from foldmap.spec import draw_spec, figure_spec
+
+    old = _module(Path(old_file), "_figcheck_before")
+    name = Path(path).name.split(".")[0]
+    try:
+        drawn = draw_spec(figure_spec(path))
+    except Exception as e:  # not drawn: said, not judged
+        return {"name": name, "error": f"{type(e).__name__}: {e}"[:200]}
+    before, after = old.science_checks(drawn), figcheck.science_checks(drawn)
+    return {"name": name, "before": before, "after": after, "changed": before != after}
+
+
+def cmd_science(args) -> int:
+    tune, _ = _halves()
+    from foldmap.fetch import fetch
+
+    paths = {str(fetch(i)): "tune" for i in tune}
+    for p in sorted((ROOT / "tests" / "data").rglob("*")):
+        if p.is_file() and p.name.endswith((".cif", ".cif.gz")):
+            paths.setdefault(str(p), "tests/data")
+    with ProcessPoolExecutor(max_workers=max(1, args.jobs)) as pool:
+        futs = [(pool.submit(science_one, p, args.old), src) for p, src in paths.items()]
+        rows = [{**f.result(), "source": src} for f, src in futs]
+    changed = [r for r in rows if r.get("changed")]
+
+    def new_findings(r) -> list[str]:
+        return [
+            f"{k}: {t}" for k, found in r["after"].items() for t in found or [] if t not in (r["before"].get(k) or [])
+        ]
+
+    summary = {
+        "entries": len(rows),
+        "judged": sum(1 for r in rows if "after" in r),
+        "errors": sorted(f"{r['name']}: {r['error']}" for r in rows if "error" in r),
+        "differ": sorted(r["name"] for r in changed),
+        "new_findings": {r["name"]: new_findings(r) for r in changed if new_findings(r)},
+        "changes": {
+            r["name"]: {k: [r["before"][k], r["after"][k]] for k in r["after"] if r["before"].get(k) != r["after"][k]}
+            for r in changed
+        },
+        "S3_before": {r["name"]: r["before"]["S3"] for r in rows if r.get("before", {}).get("S3")},
+        "S3_after": {r["name"]: r["after"]["S3"] for r in rows if r.get("after", {}).get("S3")},
+    }
+    doc = {"kind": "science", "source_stamp": _stamp(), "summary": summary, "rows": rows}
+    Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+    Path(args.out).write_text(json.dumps(doc, indent=1) + "\n", encoding="utf-8")
+    print(json.dumps(summary, indent=1))
+    return 0
+
+
+def _science_lines(m: dict, fix: dict) -> list[str]:
+    s = m["summary"]
+    lines = [
+        f"- {s['judged']} entries judged of {s['entries']} (the tune half and tests/data, drawn as foldmap check "
+        f"draws), {len(s['errors'])} not drawn{': ' + '; '.join(s['errors']) if s['errors'] else ''}",
+        f"- science findings changed on: {', '.join(s['differ']) or 'none'}; new findings: "
+        f"{', '.join(s['new_findings']) or 'none'}",
+    ]
+    for name, ch in s["changes"].items():
+        for k, (a, b) in ch.items():
+            lines.append(f"- {name} {k}: {a or 'none'} -> {b or 'none'}")
+    lines.append(f"- S3 findings left after: {', '.join(f'{n}: {v}' for n, v in s['S3_after'].items()) or 'none'}")
+    if fix.get("control"):
+        lines += ["", "### The control", "", fix["control"]]
+    return lines
+
+
 # ------------------------------------------------------------------------------------------------ report
 
 
@@ -278,7 +377,8 @@ def cmd_report(args) -> int:
     b = bench(Path(args.bench))
     identical = not (t["svg_changed"] or t["png_changed"] or t["missing"])
     bench_ok = b["exit"] == 0 and b["identical"] == b["entries"]
-    own_ok = not measure["summary"].get("differ")
+    may = set(fix.get("may_change", []))
+    own_ok = set(measure["summary"].get("differ", [])) <= may and not measure["summary"].get("new_findings")
     verdict = "kept" if identical and bench_ok and own_ok else "rejected"
     rep = {
         "name": args.name,
@@ -339,6 +439,8 @@ def render(rep: dict, measure: dict) -> str:
     lines += ["", f"## The fix's own measure ({rep['measure']['file']})", ""]
     if measure["kind"] == "helical":
         lines += _helical_lines(measure, fix["named"])
+    elif measure["kind"] == "science":
+        lines += _science_lines(measure, fix)
     lines.append("")
     return "\n".join(lines)
 
@@ -351,6 +453,10 @@ def main(argv=None) -> int:
     h.add_argument("--out", required=True)
     h.add_argument("--jobs", type=int, default=24)
     h.add_argument("--max-copies", type=int, default=64)
+    c = sub.add_parser("science", help="figcheck.science_checks before and after on the tune half and tests/data")
+    c.add_argument("--old", required=True, help="figcheck.py as it was")
+    c.add_argument("--out", required=True)
+    c.add_argument("--jobs", type=int, default=24)
     r = sub.add_parser("report", help="the short record")
     r.add_argument("--name", required=True, choices=sorted(FIXES))
     r.add_argument("--before", required=True)
@@ -359,7 +465,7 @@ def main(argv=None) -> int:
     r.add_argument("--measure", required=True)
     r.add_argument("--out", required=True)
     args = ap.parse_args(argv)
-    return {"helical": cmd_helical, "report": cmd_report}[args.cmd](args)
+    return {"helical": cmd_helical, "science": cmd_science, "report": cmd_report}[args.cmd](args)
 
 
 if __name__ == "__main__":
