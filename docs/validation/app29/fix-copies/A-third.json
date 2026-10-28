@@ -1,0 +1,124 @@
+{
+ "kind": "campaign",
+ "source_stamp": {
+  "foldmap": "0.1.0",
+  "code_fingerprint": "893407124ec081be",
+  "package": "checkout",
+  "checkout_fingerprint": "893407124ec081be",
+  "installed_matches_checkout": true,
+  "git": {
+   "commit": "1a15466c6d77d1de09b3c1d598a2d9655d18c758",
+   "dirty": false,
+   "dirty_paths": [],
+   "source": "git"
+  },
+  "script": {
+   "name": "scripts/app29_light.py",
+   "sha256": "61a8f2313bb0f11dfb70c46aac28eb1641c7e90abcd23b31725b4009f2ab7d4d"
+  },
+  "python": {
+   "version": "3.12.9",
+   "implementation": "CPython"
+  },
+  "platform": {
+   "platform": "Linux-6.18.33.1-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+   "machine": "x86_64"
+  },
+  "packages": {
+   "gemmi": "0.7.5",
+   "numpy": "2.5.3",
+   "scipy": "1.18.1",
+   "networkx": "3.7",
+   "matplotlib": "3.11.2",
+   "PyYAML": "6.0.3"
+  }
+ },
+ "summary": {
+  "label": "the third sample (random100-third, default view)",
+  "entries": [
+   100,
+   100
+  ],
+  "passed": [
+   82,
+   82
+  ],
+  "verdict": "moved",
+  "worse": [],
+  "better": [],
+  "moved": [
+   "7SPI: area 426.01 -> 338.03"
+  ],
+  "svg_moved": [
+   "7SPI"
+  ],
+  "differ": [
+   "7SPI"
+  ],
+  "stamps": [
+   {
+    "commit": "cdd315f89fe0694ca3f2683d71a050f31d611c8e",
+    "dirty": false,
+    "source": "asserted by runner"
+   },
+   {
+    "commit": "66c1a3ddc11bbc25499d1ba91125dfdcba0d2b54",
+    "dirty": false,
+    "source": "asserted by runner"
+   }
+  ],
+  "reference": false,
+  "na": {
+   "entries": [
+    100,
+    100
+   ],
+   "failing_a17": [
+    [
+     "3EGZ",
+     "6QIK",
+     "6ZY7",
+     "8VBG",
+     "8XJV"
+    ],
+    [
+     "3EGZ",
+     "6QIK",
+     "6ZY7",
+     "8VBG",
+     "8XJV"
+    ]
+   ],
+   "changed": [],
+   "worse": {},
+   "better": {}
+  }
+ },
+ "rows": {
+  "keys": {
+   "7SPI": [
+    {
+     "pass": true,
+     "failing": [],
+     "fallbacks": {},
+     "area": 426.01,
+     "seconds": 3.91,
+     "timed_failing": [],
+     "timed_detail": {},
+     "svg_sha256": "9db89245814f15e3c774c4ac635f582b9e5457e366459bc807a8b20354842004"
+    },
+    {
+     "pass": true,
+     "failing": [],
+     "fallbacks": {},
+     "area": 338.03,
+     "seconds": 4.37,
+     "timed_failing": [],
+     "timed_detail": {},
+     "svg_sha256": "f69e50d81cb4e1a90545009f3d3f293424a262befe24f219d984e3b75686b96d"
+    }
+   ]
+  },
+  "na": {}
+ }
+}

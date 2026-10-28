@@ -1,0 +1,113 @@
+{
+ "kind": "campaign",
+ "source_stamp": {
+  "foldmap": "0.1.0",
+  "code_fingerprint": "893407124ec081be",
+  "package": "checkout",
+  "checkout_fingerprint": "893407124ec081be",
+  "installed_matches_checkout": true,
+  "git": {
+   "commit": "1a15466c6d77d1de09b3c1d598a2d9655d18c758",
+   "dirty": false,
+   "dirty_paths": [],
+   "source": "git"
+  },
+  "script": {
+   "name": "scripts/app29_light.py",
+   "sha256": "61a8f2313bb0f11dfb70c46aac28eb1641c7e90abcd23b31725b4009f2ab7d4d"
+  },
+  "python": {
+   "version": "3.12.9",
+   "implementation": "CPython"
+  },
+  "platform": {
+   "platform": "Linux-6.18.33.1-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+   "machine": "x86_64"
+  },
+  "packages": {
+   "gemmi": "0.7.5",
+   "numpy": "2.5.3",
+   "scipy": "1.18.1",
+   "networkx": "3.7",
+   "matplotlib": "3.11.2",
+   "PyYAML": "6.0.3"
+  }
+ },
+ "summary": {
+  "label": "the NA cases, controls and campaign entries (default view)",
+  "entries": [
+   69,
+   69
+  ],
+  "passed": [
+   54,
+   54
+  ],
+  "verdict": "identical",
+  "worse": [],
+  "better": [],
+  "moved": [],
+  "svg_moved": [],
+  "differ": [],
+  "stamps": [
+   {
+    "commit": "cdd315f89fe0694ca3f2683d71a050f31d611c8e",
+    "dirty": false,
+    "source": "asserted by runner"
+   },
+   {
+    "commit": "66c1a3ddc11bbc25499d1ba91125dfdcba0d2b54",
+    "dirty": false,
+    "source": "asserted by runner"
+   }
+  ],
+  "reference": false,
+  "na": {
+   "entries": [
+    69,
+    69
+   ],
+   "failing_a17": [
+    [
+     "1YTB",
+     "30QM",
+     "3CRX",
+     "3EGZ",
+     "3KTQ",
+     "4PJO",
+     "4YBB",
+     "6QIK",
+     "6ZY7",
+     "8BW5",
+     "8VBG",
+     "8XJV",
+     "9K4F",
+     "9YLM"
+    ],
+    [
+     "1YTB",
+     "30QM",
+     "3CRX",
+     "3EGZ",
+     "3KTQ",
+     "4PJO",
+     "4YBB",
+     "6QIK",
+     "6ZY7",
+     "8BW5",
+     "8VBG",
+     "8XJV",
+     "9K4F",
+     "9YLM"
+    ]
+   ],
+   "changed": [],
+   "worse": {},
+   "better": {}
+  }
+ },
+ "rows": {
+  "keys": {},
+  "na": {}
+ }
+}

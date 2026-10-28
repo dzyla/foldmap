@@ -1,0 +1,802 @@
+{
+ "structures": 710,
+ "skipped": [],
+ "paralog_pairs": [
+  {
+   "entry": "9TCF",
+   "a": "E",
+   "b": "G",
+   "entities": [
+    "1",
+    "2"
+   ],
+   "identity": 0.998,
+   "common": 457,
+   "shift": 0,
+   "unk_or_ala_alike": 47,
+   "n": [
+    457,
+    457
+   ],
+   "ratio": 0.998,
+   "homolog_joined": true
+  },
+  {
+   "entry": "9TCF",
+   "a": "E",
+   "b": "I",
+   "entities": [
+    "1",
+    "2"
+   ],
+   "identity": 0.998,
+   "common": 457,
+   "shift": 0,
+   "unk_or_ala_alike": 47,
+   "n": [
+    457,
+    457
+   ],
+   "ratio": 0.998,
+   "homolog_joined": true
+  },
+  {
+   "entry": "9TCF",
+   "a": "E",
+   "b": "K",
+   "entities": [
+    "1",
+    "2"
+   ],
+   "identity": 0.998,
+   "common": 457,
+   "shift": 0,
+   "unk_or_ala_alike": 47,
+   "n": [
+    457,
+    457
+   ],
+   "ratio": 0.998,
+   "homolog_joined": true
+  },
+  {
+   "entry": "22VF",
+   "a": "C",
+   "b": "E",
+   "entities": [
+    "2",
+    "3"
+   ],
+   "identity": 0.989,
+   "common": 176,
+   "shift": 0,
+   "unk_or_ala_alike": 11,
+   "n": [
+    177,
+    177
+   ],
+   "ratio": 0.983,
+   "homolog_joined": true
+  },
+  {
+   "entry": "22VF",
+   "a": "C",
+   "b": "F",
+   "entities": [
+    "2",
+    "3"
+   ],
+   "identity": 0.989,
+   "common": 176,
+   "shift": 0,
+   "unk_or_ala_alike": 11,
+   "n": [
+    177,
+    177
+   ],
+   "ratio": 0.983,
+   "homolog_joined": true
+  },
+  {
+   "entry": "22VF",
+   "a": "D",
+   "b": "E",
+   "entities": [
+    "2",
+    "3"
+   ],
+   "identity": 0.989,
+   "common": 176,
+   "shift": 0,
+   "unk_or_ala_alike": 11,
+   "n": [
+    177,
+    177
+   ],
+   "ratio": 0.983,
+   "homolog_joined": true
+  },
+  {
+   "entry": "22VF",
+   "a": "D",
+   "b": "F",
+   "entities": [
+    "2",
+    "3"
+   ],
+   "identity": 0.989,
+   "common": 176,
+   "shift": 0,
+   "unk_or_ala_alike": 11,
+   "n": [
+    177,
+    177
+   ],
+   "ratio": 0.983,
+   "homolog_joined": true
+  },
+  {
+   "entry": "1HYS",
+   "a": "A",
+   "b": "B",
+   "entities": [
+    "3",
+    "4"
+   ],
+   "identity": 1.0,
+   "common": 425,
+   "shift": 0,
+   "unk_or_ala_alike": 15,
+   "n": [
+    553,
+    425
+   ],
+   "ratio": 0.869,
+   "homolog_joined": true
+  },
+  {
+   "entry": "2VBO",
+   "a": "A",
+   "b": "B",
+   "entities": [
+    "1",
+    "2"
+   ],
+   "identity": 0.967,
+   "common": 152,
+   "shift": 0,
+   "unk_or_ala_alike": 7,
+   "n": [
+    153,
+    152
+   ],
+   "ratio": 0.964,
+   "homolog_joined": true
+  },
+  {
+   "entry": "4YBB",
+   "a": "CD",
+   "b": "DD",
+   "entities": [
+    "25",
+    "54"
+   ],
+   "identity": 0.995,
+   "common": 209,
+   "shift": 0,
+   "unk_or_ala_alike": 19,
+   "n": [
+    209,
+    209
+   ],
+   "ratio": 0.995,
+   "homolog_joined": true
+  },
+  {
+   "entry": "6V6S",
+   "a": "N",
+   "b": "V",
+   "entities": [
+    "6",
+    "8"
+   ],
+   "identity": 1.0,
+   "common": 28,
+   "shift": 0,
+   "unk_or_ala_alike": 28,
+   "n": [
+    35,
+    62
+   ],
+   "ratio": 0.722,
+   "homolog_joined": true
+  },
+  {
+   "entry": "6V6S",
+   "a": "N",
+   "b": "Y",
+   "entities": [
+    "6",
+    "8"
+   ],
+   "identity": 1.0,
+   "common": 35,
+   "shift": 0,
+   "unk_or_ala_alike": 35,
+   "n": [
+    35,
+    57
+   ],
+   "ratio": 0.761,
+   "homolog_joined": true
+  },
+  {
+   "entry": "6V6S",
+   "a": "O",
+   "b": "V",
+   "entities": [
+    "6",
+    "8"
+   ],
+   "identity": 1.0,
+   "common": 30,
+   "shift": 0,
+   "unk_or_ala_alike": 30,
+   "n": [
+    40,
+    62
+   ],
+   "ratio": 0.784,
+   "homolog_joined": true
+  },
+  {
+   "entry": "6V6S",
+   "a": "O",
+   "b": "Y",
+   "entities": [
+    "6",
+    "8"
+   ],
+   "identity": 1.0,
+   "common": 40,
+   "shift": 0,
+   "unk_or_ala_alike": 40,
+   "n": [
+    40,
+    57
+   ],
+   "ratio": 0.825,
+   "homolog_joined": true
+  },
+  {
+   "entry": "6V6S",
+   "a": "Q",
+   "b": "V",
+   "entities": [
+    "6",
+    "8"
+   ],
+   "identity": 1.0,
+   "common": 29,
+   "shift": 0,
+   "unk_or_ala_alike": 29,
+   "n": [
+    38,
+    62
+   ],
+   "ratio": 0.76,
+   "homolog_joined": true
+  },
+  {
+   "entry": "6V6S",
+   "a": "Q",
+   "b": "Y",
+   "entities": [
+    "6",
+    "8"
+   ],
+   "identity": 1.0,
+   "common": 38,
+   "shift": 0,
+   "unk_or_ala_alike": 38,
+   "n": [
+    38,
+    57
+   ],
+   "ratio": 0.8,
+   "homolog_joined": true
+  },
+  {
+   "entry": "6V6S",
+   "a": "R",
+   "b": "V",
+   "entities": [
+    "6",
+    "8"
+   ],
+   "identity": 1.0,
+   "common": 29,
+   "shift": 0,
+   "unk_or_ala_alike": 29,
+   "n": [
+    39,
+    62
+   ],
+   "ratio": 0.772,
+   "homolog_joined": true
+  },
+  {
+   "entry": "6V6S",
+   "a": "R",
+   "b": "Y",
+   "entities": [
+    "6",
+    "8"
+   ],
+   "identity": 1.0,
+   "common": 39,
+   "shift": 0,
+   "unk_or_ala_alike": 39,
+   "n": [
+    39,
+    57
+   ],
+   "ratio": 0.812,
+   "homolog_joined": true
+  },
+  {
+   "entry": "6V6S",
+   "a": "S",
+   "b": "V",
+   "entities": [
+    "6",
+    "8"
+   ],
+   "identity": 1.0,
+   "common": 30,
+   "shift": 0,
+   "unk_or_ala_alike": 30,
+   "n": [
+    40,
+    62
+   ],
+   "ratio": 0.784,
+   "homolog_joined": true
+  },
+  {
+   "entry": "6V6S",
+   "a": "S",
+   "b": "Y",
+   "entities": [
+    "6",
+    "8"
+   ],
+   "identity": 1.0,
+   "common": 40,
+   "shift": 0,
+   "unk_or_ala_alike": 40,
+   "n": [
+    40,
+    57
+   ],
+   "ratio": 0.825,
+   "homolog_joined": true
+  },
+  {
+   "entry": "6V6S",
+   "a": "V",
+   "b": "W",
+   "entities": [
+    "8",
+    "9"
+   ],
+   "identity": 1.0,
+   "common": 32,
+   "shift": 0,
+   "unk_or_ala_alike": 32,
+   "n": [
+    62,
+    155
+   ],
+   "ratio": 0.571,
+   "homolog_joined": true
+  },
+  {
+   "entry": "6V6S",
+   "a": "V",
+   "b": "X",
+   "entities": [
+    "8",
+    "10"
+   ],
+   "identity": 1.0,
+   "common": 34,
+   "shift": 0,
+   "unk_or_ala_alike": 34,
+   "n": [
+    62,
+    254
+   ],
+   "ratio": 0.392,
+   "homolog_joined": true
+  },
+  {
+   "entry": "6V6S",
+   "a": "W",
+   "b": "X",
+   "entities": [
+    "9",
+    "10"
+   ],
+   "identity": 1.0,
+   "common": 132,
+   "shift": 0,
+   "unk_or_ala_alike": 132,
+   "n": [
+    155,
+    254
+   ],
+   "ratio": 0.758,
+   "homolog_joined": true
+  },
+  {
+   "entry": "6V6S",
+   "a": "X",
+   "b": "Y",
+   "entities": [
+    "10",
+    "8"
+   ],
+   "identity": 1.0,
+   "common": 20,
+   "shift": 0,
+   "unk_or_ala_alike": 20,
+   "n": [
+    254,
+    57
+   ],
+   "ratio": 0.367,
+   "homolog_joined": true
+  },
+  {
+   "entry": "7F1V",
+   "a": "A",
+   "b": "B",
+   "entities": [
+    "1",
+    "2"
+   ],
+   "identity": 0.997,
+   "common": 392,
+   "shift": 0,
+   "unk_or_ala_alike": 51,
+   "n": [
+    396,
+    392
+   ],
+   "ratio": 0.992,
+   "homolog_joined": true
+  },
+  {
+   "entry": "7F1V",
+   "a": "A",
+   "b": "D",
+   "entities": [
+    "1",
+    "2"
+   ],
+   "identity": 0.997,
+   "common": 392,
+   "shift": 0,
+   "unk_or_ala_alike": 51,
+   "n": [
+    396,
+    392
+   ],
+   "ratio": 0.992,
+   "homolog_joined": true
+  },
+  {
+   "entry": "7F1V",
+   "a": "B",
+   "b": "C",
+   "entities": [
+    "2",
+    "1"
+   ],
+   "identity": 0.997,
+   "common": 392,
+   "shift": 0,
+   "unk_or_ala_alike": 51,
+   "n": [
+    392,
+    392
+   ],
+   "ratio": 0.997,
+   "homolog_joined": true
+  },
+  {
+   "entry": "7F1V",
+   "a": "C",
+   "b": "D",
+   "entities": [
+    "1",
+    "2"
+   ],
+   "identity": 0.997,
+   "common": 392,
+   "shift": 0,
+   "unk_or_ala_alike": 51,
+   "n": [
+    392,
+    392
+   ],
+   "ratio": 0.997,
+   "homolog_joined": true
+  },
+  {
+   "entry": "8VBG",
+   "a": "A",
+   "b": "B",
+   "entities": [
+    "1",
+    "2"
+   ],
+   "identity": 0.997,
+   "common": 396,
+   "shift": 0,
+   "unk_or_ala_alike": 15,
+   "n": [
+    542,
+    396
+   ],
+   "ratio": 0.842,
+   "homolog_joined": true
+  }
+ ],
+ "reach": [
+  {
+   "id": "26EL",
+   "sym": "C2",
+   "protomer0": [
+    "A",
+    "B",
+    "C",
+    "D",
+    "M",
+    "F",
+    "L",
+    "H",
+    "O",
+    "P"
+   ],
+   "one_before": [
+    "A",
+    "F",
+    "M"
+   ],
+   "one_after": [
+    "A"
+   ],
+   "focus_before": [
+    "A",
+    "F",
+    "M"
+   ],
+   "focus_after": [
+    "A"
+   ],
+   "subunits": [
+    7,
+    20
+   ],
+   "context": [
+    "1 of 7 subunits shown \u00b7 C2 symmetry",
+    "1 of 20 subunits shown \u00b7 C2 symmetry"
+   ]
+  },
+  {
+   "id": "32IQ",
+   "sym": null
+  },
+  {
+   "id": "3L4G",
+   "sym": null
+  },
+  {
+   "id": "4B2T",
+   "sym": null
+  },
+  {
+   "id": "4ZH4",
+   "sym": null
+  },
+  {
+   "id": "6QUE",
+   "sym": null
+  },
+  {
+   "id": "6V6S",
+   "sym": null
+  },
+  {
+   "id": "7SPB",
+   "sym": "C13",
+   "protomer0": [
+    "A1",
+    "B1",
+    "C1",
+    "D1",
+    "E1",
+    "F1"
+   ],
+   "one_before": [
+    "A1",
+    "B1",
+    "C1",
+    "E1"
+   ],
+   "one_after": [
+    "A1",
+    "C1",
+    "E1"
+   ],
+   "focus_before": [
+    "A1",
+    "B1",
+    "C1",
+    "E1"
+   ],
+   "focus_after": [
+    "A1",
+    "C1",
+    "E1"
+   ],
+   "subunits": [
+    20,
+    26
+   ],
+   "context": [
+    "1 of 20 subunits shown \u00b7 C13 symmetry",
+    "1 of 26 subunits shown \u00b7 C13 symmetry"
+   ]
+  },
+  {
+   "id": "7SPI",
+   "sym": "C13",
+   "protomer0": [
+    "A1",
+    "B1",
+    "C1",
+    "D1",
+    "E1",
+    "F1"
+   ],
+   "one_before": [
+    "A1",
+    "B1",
+    "C1",
+    "E1"
+   ],
+   "one_after": [
+    "A1",
+    "C1",
+    "E1"
+   ],
+   "focus_before": [
+    "A1",
+    "B1",
+    "C1",
+    "E1"
+   ],
+   "focus_after": [
+    "A1",
+    "C1",
+    "E1"
+   ],
+   "subunits": [
+    20,
+    26
+   ],
+   "context": [
+    "1 of 20 subunits shown \u00b7 C13 symmetry",
+    "1 of 26 subunits shown \u00b7 C13 symmetry"
+   ]
+  },
+  {
+   "id": "8VBG",
+   "sym": null
+  },
+  {
+   "id": "8XJV",
+   "sym": null
+  },
+  {
+   "id": "9GTP",
+   "sym": "C6",
+   "protomer0": [
+    "k",
+    "1j",
+    "2j",
+    "3j",
+    "1l",
+    "2l",
+    "Q",
+    "C",
+    "X",
+    "a"
+   ],
+   "one_before": [
+    "1l",
+    "2l",
+    "3j",
+    "C",
+    "Q",
+    "X",
+    "a",
+    "k"
+   ],
+   "one_after": [
+    "2l",
+    "3j",
+    "C",
+    "Q",
+    "X",
+    "a",
+    "k"
+   ],
+   "focus_before": [
+    "1l",
+    "2l",
+    "3j",
+    "C",
+    "Q",
+    "X",
+    "a",
+    "k"
+   ],
+   "focus_after": [
+    "2l",
+    "3j",
+    "C",
+    "Q",
+    "X",
+    "a",
+    "k"
+   ],
+   "subunits": [
+    8,
+    9
+   ],
+   "context": [
+    "1 of 8 subunits shown \u00b7 C6 symmetry",
+    "1 of 9 subunits shown \u00b7 C6 symmetry"
+   ]
+  },
+  {
+   "id": "/home/dzyla/foldmap/tests/data/9TX7.cif",
+   "sym": "C3",
+   "protomer0": [
+    "A",
+    "B"
+   ],
+   "one_before": [
+    "A",
+    "B"
+   ],
+   "one_after": [
+    "A"
+   ],
+   "focus_before": null,
+   "focus_after": null,
+   "subunits": [
+    3,
+    6
+   ],
+   "context": [
+    "1 of 3 subunits shown \u00b7 C3 symmetry",
+    "1 of 6 subunits shown \u00b7 C3 symmetry"
+   ]
+  }
+ ]
+}
