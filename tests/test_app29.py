@@ -430,3 +430,25 @@ def test_random100_is_loaded_once_and_whole_from_many_threads():
         importlib.util.module_from_spec = real
     assert seen_while_loading == [None]  # loaded once, and not published while it ran
     assert all(m is got[0] for m in got) and hasattr(got[0], "run_child")
+
+
+def test_the_after_table_counts_each_outcome_and_brackets_its_quantiles():
+    """Plan 29 Task N+1 (scripts/app29_after.py): pass is drawn, judged, no criterion failed and above the floor; a
+    quantile's interval is the order statistics at n x the Wilson interval of its share."""
+    after = _load("app29_after")
+    wilson = after._common().wilson
+    got = after.quantile_interval(list(range(1, 101)), 0.5, wilson)
+    assert got == {"n": 100, "value": 50.5, "ci": [40, 60]}  # wilson(50, 100) = (0.404, 0.596)
+    assert after.quantile_interval([], 0.5, wilson) == {"n": 0}
+    base = {"error": None, "refused": None, "measure_error": None, "criteria_failed": [], "floor_ok": True}
+    rows = [
+        {**base, "seconds": 1.0, "draw_seconds": 0.5},
+        {**base, "criteria_failed": ["A20"], "seconds": 2.0, "draw_seconds": 1.5},
+        {**base, "floor_ok": False, "seconds": 3.0, "draw_seconds": 2.5},
+        {**base, "refused": "too large", "floor_ok": None},
+        {**base, "error": "no result (timed out)", "floor_ok": None},
+    ]
+    s = after.half_stats(rows, wilson)
+    assert [s[k]["k"] for k in ("pass", "crash", "refused", "floor", "criteria")] == [1, 1, 1, 1, 1]
+    assert s["entries"] == 5 and s["pass"]["n"] == 5 and s["seconds"]["median"]["value"] == 2.0  # drawn only
+    assert [after.outcome(r) for r in rows] == ["pass", "fail A20", "fail floor", "refused", "error"]
