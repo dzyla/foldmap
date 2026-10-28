@@ -1068,8 +1068,8 @@ title. The rest is in sections:
 - **Layout file**: load one saved from Download (or by `foldmap plot --save-layout`) to restore every setting.
 
 **Part of the file.** When foldmap draws part of the file on its own (assembly 1 when the file holds several
-copies of a complex, or one subunit of a cage, a filament or a large ring), a bar above the figure says what was
-drawn and how many of the file's chains, as in "Drawn: one of 24 subunits of an O cage — 1 of 24 chains."
+copies of a complex, one subunit of a cage, a filament or a large ring, or one of two subunits whose whole figure
+falls below the readability floor), a bar above the figure says what was drawn and how many of the file's chains, as in "Drawn: one of 24 subunits of an O cage — 1 of 24 chains."
 **Show all chains** draws every chain; **Keep this** hides the bar for that structure. When every chain is too large for the online app, the bar gives the command that draws it instead.
 
 **Share links.** A structure loaded by PDB ID or accession puts its id and theme in the address, as in
