@@ -142,8 +142,40 @@ FIXES: dict[str, dict] = {
         "named": ["22MZ"],
         "expected": "22MZ's letters (7 nearer another strand -> 3); elsewhere only letters whose first clear spot was "
         "nearer another strand",
-        "explained": {},
+        "explained": {
+            **dict.fromkeys(
+                (
+                    "1EHZ 1GID 1HQ1 1MSW 1QTQ 1RLG 1Y26 1Z43 2GIS 2NZ4 2OEU 30QM 3D0U 3EGZ 3IGI 4AS1 4LVV 4OO8 4P9R "
+                    "4PJO 4YBB 6QIK 7F5S 7XSP 8XJV 9K4F 9OWM"
+                ).split(),
+                "base letters moved off spots nearer another strand (the SVG only); no key moved",
+            ),
+            "22MZ": "the named entry: letters nearer another strand 7 -> 3 (0:50 G, 0:56 C, 0:67 G stay: no spot "
+            "beside or along the strand both clear and nearest their own); no criterion moved",
+            "9YPK": "letters nearer another strand 408 -> 130 of 1196 (262 moved; 2 newly nearer another strand); "
+            "moved letters' median distance to their nucleotide 1.0 -> 1.24 NT_ROW; no criterion moved",
+            "9YPN": "letters nearer another strand 347 -> 103 of 1144 (219 moved; 2 newly nearer another strand); no "
+            "criterion moved",
+            "3G6E": "better: A6 now passes (FAIL -> PASS)",
+            "6IZP": "area 85.29 -> 77.33 (moved); letters moved",
+            "9IWF": "area 232.25 -> 229.37 (moved); letters moved",
+            "5F9R": "better: na_protein_crossings 7 -> 6",
+            "2GDI": "WORSE: A6 now fails, a letter on a tie (na:nt:X:45 x na:tie:20-45): the letter moved to a spot "
+            "nearest its own strand, where the tie's label is placed after it",
+            "9WB3": "WORSE: A6 now fails, a letter on a tie mark (na:nt:R:75 x na:tie:43-75:mark), as 2GDI",
+            "1URN": "WORSE: na_protein_crossings 1 -> 2 (a protein loop routed across a moved letter's strand)",
+        },
         "control": "",
+        "notes": "Rejected and reverted (43e7637); the code is kept as reverted.patch beside this record. Measured at "
+        "87952c1 against Fix A's runs (749648c's code), on zyla-office: the NA set (na_fixes_record's cases and "
+        "controls plus the NA campaign's entries, 69, default view) 54 -> 52 pass, 2GDI and 9WB3 failing A6, 1URN "
+        "one more NA-protein crossing; so the keys are not identical or better (ruling P29-14). Also against it: "
+        "tests/test_snapshots.py's 1EHZ-trna (na:nt:A:15 moves about 40 px) and 30QM-ncrna (7 nucleotides move) "
+        "fail, and the moves do not read clearly better; _place_letters on the whole 4YBB SSU RNA takes 1.30 -> "
+        "2.40 s on one host (gpu-desktop, 6 runs each), over test_na_layout's 1.5 s limit there (_own_nearest "
+        "measures every strand segment for every spot; a cell hash would bound it, but not the A6 failures). The "
+        "outline-pass variant (3 -> 0 on 22MZ, letters 3.8 rows out) was not taken. 22MZ's letters stay as they "
+        "were (7 of 26 nearer another strand), for the author.",
     },
 }
 
