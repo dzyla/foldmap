@@ -1,6 +1,6 @@
 # The app on a fresh random sample
 
-Plan 29. Written by: foldmap 0.1.0, git 76fbad7c760c (asserted by runner, dirty False), code fingerprint 5ef865ec11fd82a1, scripts/app29.py sha256 cdf60fa1e052; Python 3.13.13 on Linux-7.0.0-38-generic-x86_64-with-glibc2.43; gemmi 0.7.5, numpy 2.5.4, scipy 1.18.1, networkx 3.7, matplotlib 3.11.2, PyYAML 6.0.3
+Plan 29. Written by: foldmap 0.1.0, git 975f33637ebb (asserted by runner, dirty False), code fingerprint e7899c9a1dca0a67, scripts/app29.py sha256 cdf60fa1e052; Python 3.13.13 on Linux-7.0.0-38-generic-x86_64-with-glibc2.43; gemmi 0.7.5, numpy 2.5.4, scipy 1.18.1, networkx 3.7, matplotlib 3.11.2, PyYAML 6.0.3
 
 Every entry drawn the app's way (scripts/app29.py run: random100.app_view, the size check and app_jobs.draw_job under the hosted limits, the app's default settings, the PNG download) and the figure judged as `foldmap check` judges it: A1-A20 and R1, the readability floor.
 
@@ -39,52 +39,52 @@ The check half is reported in the totals only: its ids are never shown beside an
 
 | id | stratum | half | residues | outcome | criteria failed | floor | seconds | draw s |
 |---|---|---|---|---|---|---|---|---|
-| 9SXY | S1 | tune | 339 | drawn | - | pass | 0.26 | 0.23 |
-| 9SXU | S1 | tune | 342 | drawn | - | pass | 0.27 | 0.24 |
-| 9SXF | S1 | tune | 295 | drawn | - | pass | 0.24 | 0.22 |
-| 9SXG | S1 | tune | 292 | drawn | - | pass | 0.25 | 0.22 |
-| 29LB | S1 | tune | 265 | drawn | - | pass | 0.24 | 0.21 |
-| 29TB | S1 | tune | 257 | drawn | - | pass | 0.34 | 0.32 |
-| 9T57 | S1 | tune | 258 | drawn | - | pass | 0.34 | 0.31 |
-| 9ZFX | S2 | tune | 1335 | drawn | - | pass | 0.59 | 0.55 |
-| 14CU | S2 | tune | 3404 | drawn | - | pass | 1.22 | 1.11 |
+| 9SXY | S1 | tune | 339 | drawn | - | pass | 0.27 | 0.24 |
+| 9SXU | S1 | tune | 342 | drawn | - | pass | 0.28 | 0.25 |
+| 9SXF | S1 | tune | 295 | drawn | - | pass | 0.26 | 0.23 |
+| 9SXG | S1 | tune | 292 | drawn | - | pass | 0.27 | 0.24 |
+| 29LB | S1 | tune | 265 | drawn | - | pass | 0.25 | 0.22 |
+| 29TB | S1 | tune | 257 | drawn | - | pass | 0.35 | 0.32 |
+| 9T57 | S1 | tune | 258 | drawn | - | pass | 0.35 | 0.32 |
+| 9ZFX | S2 | tune | 1335 | drawn | - | pass | 0.63 | 0.58 |
+| 14CU | S2 | tune | 3404 | drawn | - | pass | 1.26 | 1.15 |
 | 30CY | S2 | tune | 704 | drawn | - | pass | 0.92 | 0.88 |
-| 44LS | S2 | tune | 1048 | drawn | - | pass | 1.21 | 1.16 |
-| 9YL9 | S2 | tune | 343 | drawn | - | pass | 0.62 | 0.59 |
+| 44LS | S2 | tune | 1048 | drawn | - | pass | 1.22 | 1.17 |
+| 9YL9 | S2 | tune | 343 | drawn | - | pass | 0.64 | 0.61 |
 | 20XT | S2 | tune | 806 | drawn | - | pass | 0.73 | 0.69 |
-| 9WVR | S2 | tune | 170 | drawn | - | pass | 0.27 | 0.24 |
-| 9Z0S | S3 | tune | 2682 | drawn | - | pass | 1.28 | 1.23 |
-| 9TCF | S3 | tune | 1828 | drawn | - | pass | 0.89 | 0.83 |
-| 9YOA | S3 | tune | 1048 | drawn | - | pass | 3.63 | 3.59 |
-| 38NR | S3 | tune | 987 | drawn | - | pass | 0.27 | 0.23 |
-| 23FR | S4 | tune | 5754 | drawn | - | pass | 16.99 | 8.62 |
-| 31FD | S4 | tune | 4174 | drawn | - | pass | 15.09 | 13.99 |
-| 22VF | S4 | tune | 4194 | drawn | - | pass | 1.49 | 1.37 |
-| 12XK | S4 | tune | 1470 | drawn | - | pass | 1.13 | 1.08 |
-| 35VC | S4 | tune | 1560 | drawn | - | pass | 1.11 | 1.06 |
+| 9WVR | S2 | tune | 170 | drawn | - | pass | 0.28 | 0.24 |
+| 9Z0S | S3 | tune | 2682 | drawn | - | pass | 1.3 | 1.26 |
+| 9TCF | S3 | tune | 1828 | drawn | - | pass | 0.91 | 0.85 |
+| 9YOA | S3 | tune | 1048 | drawn | - | pass | 3.63 | 3.58 |
+| 38NR | S3 | tune | 987 | drawn | - | pass | 0.27 | 0.24 |
+| 23FR | S4 | tune | 5754 | drawn | - | pass | 17.2 | 8.82 |
+| 31FD | S4 | tune | 4174 | drawn | - | pass | 15.12 | 13.96 |
+| 22VF | S4 | tune | 4194 | drawn | - | pass | 1.48 | 1.37 |
+| 12XK | S4 | tune | 1470 | drawn | - | pass | 1.16 | 1.1 |
+| 35VC | S4 | tune | 1560 | drawn | - | pass | 1.09 | 1.04 |
 | 23CX | S4 | tune | 1085 | drawn | - | pass | 1.27 | 1.23 |
-| 28HY | S4 | tune | 972 | drawn | - | pass | 0.45 | 0.41 |
-| 26EL | S4 | tune | 12238 | drawn | - | pass | 1.54 | 1.35 |
-| 9X4L | S4 | tune | 8692 | drawn | - | pass | 16.46 | 14.26 |
-| 9NYA | S5 | tune | 86 | drawn | - | pass | 0.13 | 0.1 |
-| 45JF | S5 | tune | 32 | drawn | - | pass | 0.1 | 0.07 |
-| 34XH | S5 | tune | 23 | drawn | - | pass | 0.13 | 0.1 |
-| 9WXY | S5 | tune | 16 | drawn | - | pass | 0.05 | 0.03 |
-| 9ZSJ | S7 | tune | 1729 | drawn | - | pass | 2.64 | 2.58 |
-| 9YPK | S8 | tune | 6687 | drawn | - | pass | 23.33 | 20.97 |
-| 9YPN | S8 | tune | 6481 | drawn | - | pass | 20.42 | 18.15 |
+| 28HY | S4 | tune | 972 | drawn | - | pass | 0.47 | 0.43 |
+| 26EL | S4 | tune | 12238 | drawn | - | pass | 1.52 | 1.33 |
+| 9X4L | S4 | tune | 8692 | drawn | - | pass | 16.85 | 14.61 |
+| 9NYA | S5 | tune | 86 | drawn | - | pass | 0.14 | 0.11 |
+| 45JF | S5 | tune | 32 | drawn | - | pass | 0.11 | 0.08 |
+| 34XH | S5 | tune | 23 | drawn | - | pass | 0.14 | 0.11 |
+| 9WXY | S5 | tune | 16 | drawn | - | pass | 0.06 | 0.03 |
+| 9ZSJ | S7 | tune | 1729 | drawn | - | pass | 2.64 | 2.57 |
+| 9YPK | S8 | tune | 6687 | drawn | - | pass | 23.41 | 21.01 |
+| 9YPN | S8 | tune | 6481 | drawn | - | pass | 20.54 | 18.26 |
 | 9WNE | S8 | tune | 1310 | drawn | - | pass | 1.45 | 1.41 |
-| 22MZ | S9 | tune | 76 | drawn | - | pass | 0.43 | 0.4 |
-| 9XIC | S10 | tune | 5496 | drawn | - | pass | 9.51 | 8.58 |
-| 9TMF | S10 | tune | 2793 | drawn | - | pass | 3.33 | 3.27 |
-| 34QD | S10 | tune | 502 | drawn | - | pass | 0.79 | 0.75 |
-| 12KF | S10 | tune | 1476 | drawn | - | pass | 1.46 | 1.41 |
-| 30CU | S11 | tune | 1401 | drawn | - | pass | 0.95 | 0.9 |
-| 30CV | S11 | tune | 1403 | drawn | - | pass | 1.0 | 0.95 |
-| 9YLA | S11 | tune | 343 | drawn | - | pass | 0.68 | 0.64 |
+| 22MZ | S9 | tune | 76 | drawn | - | pass | 0.47 | 0.44 |
+| 9XIC | S10 | tune | 5496 | drawn | - | pass | 9.48 | 8.56 |
+| 9TMF | S10 | tune | 2793 | drawn | - | pass | 3.38 | 3.32 |
+| 34QD | S10 | tune | 502 | drawn | - | pass | 0.78 | 0.74 |
+| 12KF | S10 | tune | 1476 | drawn | - | pass | 1.49 | 1.45 |
+| 30CU | S11 | tune | 1401 | drawn | - | pass | 0.97 | 0.92 |
+| 30CV | S11 | tune | 1403 | drawn | - | pass | 1.01 | 0.97 |
+| 9YLA | S11 | tune | 343 | drawn | - | pass | 0.64 | 0.61 |
 | 9YLG | S11 | tune | 341 | drawn | - | pass | 0.65 | 0.62 |
-| 32IL | S11 | tune | 730 | drawn | - | pass | 0.17 | 0.14 |
-| 9SXD | S11 | tune | 627 | drawn | - | pass | 0.26 | 0.22 |
+| 32IL | S11 | tune | 730 | drawn | - | pass | 0.17 | 0.13 |
+| 9SXD | S11 | tune | 627 | drawn | - | pass | 0.27 | 0.23 |
 | 9YLD | S11 | tune | 341 | drawn | - | pass | 0.26 | 0.23 |
 
 ## The page (run --ui)

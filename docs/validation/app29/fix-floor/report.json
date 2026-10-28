@@ -1,19 +1,19 @@
 {
  "source_stamp": {
   "foldmap": "0.1.0",
-  "code_fingerprint": "5ef865ec11fd82a1",
+  "code_fingerprint": "e7899c9a1dca0a67",
   "package": "checkout",
-  "checkout_fingerprint": "5ef865ec11fd82a1",
+  "checkout_fingerprint": "e7899c9a1dca0a67",
   "installed_matches_checkout": true,
   "git": {
-   "commit": "9869e37568f4cbbb9d2c47397ea93bfd35f15d03",
+   "commit": "f62c899c11cdf4303e43d2ad46396637df11830c",
    "dirty": false,
    "dirty_paths": [],
    "source": "git"
   },
   "script": {
    "name": "scripts/app29_fix.py",
-   "sha256": "f554f34e1941b32e0502f81f37449cb99f1a39ce9c89a3e2d94486aadb06a2d5"
+   "sha256": "4acb6511bf8b4cc8c138631a86c6f3d1b27c6d3b6f874d6410f7efcc8655b688"
   },
   "python": {
    "version": "3.12.9",
@@ -70,12 +70,12 @@
   "after_record": "docs/validation/app29/fix-floor/run",
   "after_stamp": {
    "foldmap": "0.1.0",
-   "code_fingerprint": "5ef865ec11fd82a1",
+   "code_fingerprint": "e7899c9a1dca0a67",
    "package": "checkout",
-   "checkout_fingerprint": "5ef865ec11fd82a1",
+   "checkout_fingerprint": "e7899c9a1dca0a67",
    "installed_matches_checkout": true,
    "git": {
-    "commit": "76fbad7c760cc54b45b5a9d2a85ff5043d37b70b",
+    "commit": "975f33637ebbe8fa4c6ed861d8b95844f0cf5313",
     "dirty": false,
     "source": "asserted by runner"
    },
@@ -134,12 +134,12 @@
   },
   "runs_after_stamp": {
    "foldmap": "0.1.0",
-   "code_fingerprint": "5ef865ec11fd82a1",
+   "code_fingerprint": "e7899c9a1dca0a67",
    "package": "checkout",
-   "checkout_fingerprint": "5ef865ec11fd82a1",
+   "checkout_fingerprint": "e7899c9a1dca0a67",
    "installed_matches_checkout": true,
    "git": {
-    "commit": "76fbad7c760cc54b45b5a9d2a85ff5043d37b70b",
+    "commit": "975f33637ebbe8fa4c6ed861d8b95844f0cf5313",
     "dirty": false,
     "source": "asserted by runner"
    },
@@ -166,7 +166,7 @@
   },
   "leads_before_foldmap": "/tmp/claude-1000/-home-dzyla-foldmap/23e71d62-5b86-4ba7-832d-8711a9baf021/scratchpad/t5/base/src/foldmap",
   "leads_after_foldmap": "/home/dzyla/foldmap/src/foldmap",
-  "tune_flags": "/tmp/claude-1000/-home-dzyla-foldmap/23e71d62-5b86-4ba7-832d-8711a9baf021/scratchpad/t5/m-after/tune-flags.json"
+  "tune_flags": "/tmp/claude-1000/-home-dzyla-foldmap/23e71d62-5b86-4ba7-832d-8711a9baf021/scratchpad/t5/m-after2/tune-flags.json"
  },
  "tune": {
   "entries": 47,
@@ -203,7 +203,7 @@
     ],
     "seconds": [
      0.27,
-     0.26
+     0.27
     ]
    },
    {
@@ -235,7 +235,7 @@
     ],
     "seconds": [
      0.28,
-     0.27
+     0.28
     ]
    },
    {
@@ -267,7 +267,7 @@
     ],
     "seconds": [
      0.25,
-     0.24
+     0.26
     ]
    },
    {
@@ -299,7 +299,7 @@
     ],
     "seconds": [
      0.26,
-     0.25
+     0.27
     ]
    },
    {
@@ -331,7 +331,7 @@
     ],
     "seconds": [
      0.24,
-     0.24
+     0.25
     ]
    },
    {
@@ -363,7 +363,7 @@
     ],
     "seconds": [
      0.36,
-     0.34
+     0.35
     ]
    },
    {
@@ -395,7 +395,7 @@
     ],
     "seconds": [
      0.36,
-     0.34
+     0.35
     ]
    },
    {
@@ -427,7 +427,7 @@
     ],
     "seconds": [
      0.57,
-     0.59
+     0.63
     ]
    },
    {
@@ -459,7 +459,7 @@
     ],
     "seconds": [
      1.24,
-     1.22
+     1.26
     ]
    },
    {
@@ -523,7 +523,7 @@
     ],
     "seconds": [
      1.17,
-     1.21
+     1.22
     ]
    },
    {
@@ -555,7 +555,7 @@
     ],
     "seconds": [
      0.63,
-     0.62
+     0.64
     ]
    },
    {
@@ -619,7 +619,7 @@
     ],
     "seconds": [
      0.29,
-     0.27
+     0.28
     ]
    },
    {
@@ -651,7 +651,7 @@
     ],
     "seconds": [
      1.25,
-     1.28
+     1.3
     ]
    },
    {
@@ -683,7 +683,7 @@
     ],
     "seconds": [
      0.91,
-     0.89
+     0.91
     ]
    },
    {
@@ -779,7 +779,7 @@
     ],
     "seconds": [
      17.24,
-     16.99
+     17.2
     ]
    },
    {
@@ -811,7 +811,7 @@
     ],
     "seconds": [
      12.97,
-     15.09
+     15.12
     ]
    },
    {
@@ -843,7 +843,7 @@
     ],
     "seconds": [
      1.52,
-     1.49
+     1.48
     ]
    },
    {
@@ -875,7 +875,7 @@
     ],
     "seconds": [
      1.18,
-     1.13
+     1.16
     ]
    },
    {
@@ -907,7 +907,7 @@
     ],
     "seconds": [
      1.16,
-     1.11
+     1.09
     ]
    },
    {
@@ -971,7 +971,7 @@
     ],
     "seconds": [
      0.46,
-     0.45
+     0.47
     ]
    },
    {
@@ -1003,7 +1003,7 @@
     ],
     "seconds": [
      1.57,
-     1.54
+     1.52
     ]
    },
    {
@@ -1035,7 +1035,7 @@
     ],
     "seconds": [
      16.46,
-     16.46
+     16.85
     ]
    },
    {
@@ -1067,7 +1067,7 @@
     ],
     "seconds": [
      0.14,
-     0.13
+     0.14
     ]
    },
    {
@@ -1099,7 +1099,7 @@
     ],
     "seconds": [
      0.1,
-     0.1
+     0.11
     ]
    },
    {
@@ -1131,7 +1131,7 @@
     ],
     "seconds": [
      0.13,
-     0.13
+     0.14
     ]
    },
    {
@@ -1163,7 +1163,7 @@
     ],
     "seconds": [
      0.05,
-     0.05
+     0.06
     ]
    },
    {
@@ -1227,7 +1227,7 @@
     ],
     "seconds": [
      23.51,
-     23.33
+     23.41
     ]
    },
    {
@@ -1259,7 +1259,7 @@
     ],
     "seconds": [
      20.49,
-     20.42
+     20.54
     ]
    },
    {
@@ -1323,7 +1323,7 @@
     ],
     "seconds": [
      0.42,
-     0.43
+     0.47
     ]
    },
    {
@@ -1355,7 +1355,7 @@
     ],
     "seconds": [
      9.53,
-     9.51
+     9.48
     ]
    },
    {
@@ -1387,7 +1387,7 @@
     ],
     "seconds": [
      3.41,
-     3.33
+     3.38
     ]
    },
    {
@@ -1419,7 +1419,7 @@
     ],
     "seconds": [
      0.78,
-     0.79
+     0.78
     ]
    },
    {
@@ -1451,7 +1451,7 @@
     ],
     "seconds": [
      1.48,
-     1.46
+     1.49
     ]
    },
    {
@@ -1483,7 +1483,7 @@
     ],
     "seconds": [
      0.96,
-     0.95
+     0.97
     ]
    },
    {
@@ -1515,7 +1515,7 @@
     ],
     "seconds": [
      1.0,
-     1.0
+     1.01
     ]
    },
    {
@@ -1547,7 +1547,7 @@
     ],
     "seconds": [
      0.68,
-     0.68
+     0.64
     ]
    },
    {
@@ -1643,7 +1643,7 @@
     ],
     "seconds": [
      0.27,
-     0.26
+     0.27
     ]
    },
    {
@@ -1761,7 +1761,7 @@
   "inputs": {
    "leads_before_foldmap": "/tmp/claude-1000/-home-dzyla-foldmap/23e71d62-5b86-4ba7-832d-8711a9baf021/scratchpad/t5/base/src/foldmap",
    "leads_after_foldmap": "/home/dzyla/foldmap/src/foldmap",
-   "tune_flags": "/tmp/claude-1000/-home-dzyla-foldmap/23e71d62-5b86-4ba7-832d-8711a9baf021/scratchpad/t5/m-after/tune-flags.json"
+   "tune_flags": "/tmp/claude-1000/-home-dzyla-foldmap/23e71d62-5b86-4ba7-832d-8711a9baf021/scratchpad/t5/m-after2/tune-flags.json"
   },
   "tune_floor_failed": [
    1,
@@ -1901,8 +1901,8 @@
        "ok": true,
        "reasons": []
       },
-      "seconds": 14.62,
-      "draw_seconds": 13.59,
+      "seconds": 14.31,
+      "draw_seconds": 13.29,
       "residues": 4174
      }
     ],
@@ -1928,7 +1928,7 @@
       "context": null
      },
      {
-      "seconds": 13.75,
+      "seconds": 13.47,
       "floor": [],
       "page_in": [
        20.52,
@@ -1950,7 +1950,7 @@
      }
     ],
     "none": {
-     "seconds": 11.73,
+     "seconds": 10.77,
      "floor": [
       "its text is 5.0 pt, under 6 pt, on its 48 x 9 in page (its smallest text 3.0 pt)"
      ],
@@ -1970,7 +1970,7 @@
      "context": null
     },
     "protomer": {
-     "seconds": 2.62,
+     "seconds": 2.31,
      "floor": [],
      "page_in": [
       20.52,
@@ -2014,8 +2014,8 @@
        "ok": true,
        "reasons": []
       },
-      "seconds": 21.4,
-      "draw_seconds": 20.25,
+      "seconds": 22.32,
+      "draw_seconds": 21.15,
       "residues": 5293
      }
     ],
@@ -2041,7 +2041,7 @@
       "context": null
      },
      {
-      "seconds": 22.41,
+      "seconds": 20.64,
       "floor": [],
       "page_in": [
        26.37,
@@ -2063,7 +2063,7 @@
      }
     ],
     "none": {
-     "seconds": 17.82,
+     "seconds": 16.51,
      "floor": [
       "its text is 4.5 pt, under 6 pt, on its 48 x 9 in page (its smallest text 2.7 pt)"
      ],
@@ -2083,7 +2083,7 @@
      "context": null
     },
     "protomer": {
-     "seconds": 4.38,
+     "seconds": 4.03,
      "floor": [],
      "page_in": [
       26.37,
@@ -2127,8 +2127,8 @@
        "ok": true,
        "reasons": []
       },
-      "seconds": 62.67,
-      "draw_seconds": 60.03,
+      "seconds": 63.44,
+      "draw_seconds": 60.84,
       "residues": 16196
      }
     ],
@@ -2154,7 +2154,7 @@
       "context": null
      },
      {
-      "seconds": 58.88,
+      "seconds": 60.82,
       "floor": [],
       "page_in": [
        45.54,
@@ -2176,7 +2176,7 @@
      }
     ],
     "none": {
-     "seconds": 47.33,
+     "seconds": 47.65,
      "floor": [
       "its text is 2.0 pt, under 6 pt, on its 48 x 10 in page (its smallest text 1.2 pt)"
      ],
@@ -2196,7 +2196,7 @@
      "context": null
     },
     "protomer": {
-     "seconds": 13.44,
+     "seconds": 12.7,
      "floor": [],
      "page_in": [
       45.54,
@@ -2243,7 +2243,7 @@
       "context": null
      },
      {
-      "seconds": 0.32,
+      "seconds": 0.38,
       "floor": [],
       "page_in": [
        10.78,
@@ -2262,7 +2262,7 @@
      }
     ],
     "none": {
-     "seconds": 0.32,
+     "seconds": 0.37,
      "floor": [],
      "page_in": [
       10.78,
@@ -2280,7 +2280,7 @@
      "context": null
     },
     "protomer": {
-     "seconds": 0.21,
+     "seconds": 0.25,
      "floor": [],
      "page_in": [
       9.37,
@@ -2322,8 +2322,8 @@
        "ok": true,
        "reasons": []
       },
-      "seconds": 1.02,
-      "draw_seconds": 0.99,
+      "seconds": 1.15,
+      "draw_seconds": 1.11,
       "residues": 1049
      }
     ],
@@ -2347,7 +2347,7 @@
       "context": null
      },
      {
-      "seconds": 0.81,
+      "seconds": 0.8,
       "floor": [],
       "page_in": [
        18.25,
@@ -2366,7 +2366,7 @@
      }
     ],
     "none": {
-     "seconds": 0.89,
+     "seconds": 0.79,
      "floor": [],
      "page_in": [
       18.25,
@@ -2384,7 +2384,7 @@
      "context": null
     },
     "protomer": {
-     "seconds": 0.69,
+     "seconds": 0.67,
      "floor": [],
      "page_in": [
       16.59,
@@ -2410,6 +2410,31 @@
    "drawings": 20,
    "agree": 20,
    "largest_gap_pt": 0.015
+  },
+  "since": {
+   "label": "f83fe7d",
+   "files": [
+    {
+     "id": "31FD",
+     "file": "ui-data.json",
+     "cause": "the Data download describes the subunit the figure draws (I1: datafile.spec_data takes the figure's decision)"
+    },
+    {
+     "id": "31FD",
+     "file": "ui-data.zip",
+     "cause": "the same, as CSV tables (I1)"
+    }
+   ],
+   "r100": [],
+   "r100_keys": "identical",
+   "na": [],
+   "na_keys": "identical"
+  },
+  "notes": {
+   "time bound (M3)": "drawing twice costs a C2 complex under the floor its whole figure's time plus its subunit's, about 1.3 times the whole (9FZL: whole 47.3 s, subunit 13.4 s). A C2 complex whose whole figure takes about 70 to 85 s would pass the hosted 90 s (A2b) drawn twice, where drawn once it showed a figure with a floor warning. No measured entry comes near: 9FZL, at 62.7 s for the app's job, is the worst measured case. A bound, not a measured failure; the cost falls only on C2 complexes under the floor",
+   "make_figure (M4)": "cli.make_figure lays out once and keeps an assembly of two whole, as draw_spec does before judging its floor. It is used only by scripts/build_site.py, scripts/make_previews.py and scripts/gallery.py (the website, previews and gallery), never by the app, the command line or the MCP server: no user path reaches it. The compare and diff panels (Draw like\u2026) draw one chain like a reference",
+   "standard error (M2)": "what the whole figure's drawing writes to standard error is held and dropped when the figure is drawn again as one subunit (spec.held_stderr, the main thread only: the command line); the app and the MCP server never show it",
+   "one decision (I1, I2, M1)": "the data (datafile.spec_data), the interactive page (interactive.build_page) and the layout file (spec.layout_document) take the figure's subunit by the decision carried from it (spec.below_floor_of): the app passes its kept figure (data and page jobs) or the draw job's took_subunit (the layout file download, which draws nothing); the command line and the MCP server draw the figure to decide, only for an assembly of two"
   },
   "worse": [],
   "better": [
