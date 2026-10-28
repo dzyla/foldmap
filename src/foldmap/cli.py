@@ -1506,15 +1506,19 @@ def _focus_plan(focus: str, sym, bb, sses, nucleic=None, below_floor: bool = Fal
 
 def _one_of_each(chains: list[str], bb) -> set:
     """The smallest repeating unit inside a protomer: one chain of each distinct sequence, those nearest the
-    first (a homo-oligomer's protomer gives one chain; a heterodimer's, both partners)."""
+    first (a homo-oligomer's protomer gives one chain; a heterodimer's, both partners). Two chains are one protein
+    when their whole modelled sequences are alike, or when model.homolog_chains calls them copies (the rule the
+    labels share by: residues at the same numbers alike), so a copy modelled in part is no protein of its own
+    (plan 29 Task 8b: 26EL's chains F, residues 1-291, and M, 292-682, drawn beside A as two more proteins)."""
     from difflib import SequenceMatcher
 
+    root = {c: first for c, (first, _) in homolog_chains(bb).items()}
     seq = {c: [l.name for l in bb.labels if l.chain == c] for c in chains}
     centre = {c: bb.ca[[k for k, l in enumerate(bb.labels) if l.chain == c]].mean(axis=0) for c in chains}
     groups: list[list[str]] = []
     for c in chains:
         for g in groups:
-            if SequenceMatcher(None, seq[g[0]], seq[c], autojunk=False).ratio() > 0.9:
+            if root[g[0]] == root[c] or SequenceMatcher(None, seq[g[0]], seq[c], autojunk=False).ratio() > 0.9:
                 g.append(c)
                 break
         else:

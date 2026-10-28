@@ -302,7 +302,7 @@ Of the 41 named-entry rows, 30 rest on the comment at the item and 11 on git (ev
 | `cli:_in_sequence:argument:-180@6d2655ae` | argument | -180 | turns = sorted(range(-180 + AZIMUTH_STEP, 181, AZIMUTH_STEP), key=lambda a: (abs(a), a < 0)) | unknown | - | membrane | - |
 | `cli:_in_sequence:argument:181@6d2655ae` | argument | 181 | turns = sorted(range(-180 + AZIMUTH_STEP, 181, AZIMUTH_STEP), key=lambda a: (abs(a), a < 0)) | unknown | - | membrane | - |
 | `cli:_face_medians.page_y:comparison:1e-9@0f0573ec` | comparison | 1e-9 | elif abs(slope) > 1e-9: | convention | a floating-point tolerance | - | - |
-| `cli:_one_of_each:comparison:0.9@92fb00cc` | comparison | 0.9 | if SequenceMatcher(None, seq[g[0]], seq[c], autojunk=False).ratio() > 0.9: | unknown | - | - | - |
+| `cli:_one_of_each:comparison:0.9@fdc2e633` | comparison | 0.9 | if root[g[0]] == root[c] or SequenceMatcher(None, seq[g[0]], seq[c], autojunk=False).ratio() > 0.9: | unknown | - | focus | - |
 | `cli:build_parser:argument:60@29d007de` | argument | 60 | sq.add_argument("--columns", type=int, default=60, help="residues (alignment columns) per row (default 60)") | unknown | - | cli, domain_confidence, elstyle, names +1 | - |
 | `cli:build_parser:argument:0.7@afd84f49` | argument | 0.7 | default=0.7, | unknown | - | cli, domain_confidence, elstyle, names +1 | - |
 
@@ -1032,8 +1032,8 @@ Of the 41 named-entry rows, 30 rest on the comment at the item and 11 on git (ev
 |---|---|---|---|---|---|---|---|
 | `model:AUTO_NT` | constant | 300 | AUTO_NT = 300 # na_extent auto: larger nucleic acids are cropped to the stems the protein touches | unknown | earliest in this file: 22ace5f 2026-10-10 na_extent (auto crops large RNA to touched stems), na_style; focus keeps the sub… | na_structure | - |
 | `model:_MERGE_GAP` | constant | 12 | _MERGE_GAP = 12 # crop by stems: kept stretches of one strand closer than this many nucleotides are joined | unknown | earliest in this file: 22ace5f 2026-10-10 na_extent (auto crops large RNA to touched stems), na_style; focus keeps the sub… | - | - |
-| `model:homolog_chains.alike:comparison:20@b282cc0a` | comparison | 20 | return len(common) >= 20 and same >= 0.9 * len(common) | unknown | - | diff, domains, heldout_copies, membrane +6 | - |
-| `model:homolog_chains.alike:comparison:0.9@b282cc0a` | comparison | 0.9 | return len(common) >= 20 and same >= 0.9 * len(common) | unknown | - | diff, domains, heldout_copies, membrane +6 | - |
+| `model:homolog_chains.alike:comparison:20@b282cc0a` | comparison | 20 | return len(common) >= 20 and same >= 0.9 * len(common) | unknown | - | diff, domains, focus, heldout_copies +7 | - |
+| `model:homolog_chains.alike:comparison:0.9@b282cc0a` | comparison | 0.9 | return len(common) >= 20 and same >= 0.9 * len(common) | unknown | - | diff, domains, focus, heldout_copies +7 | - |
 | `model:generic_label:comparison:26@0840011b` | comparison | 26 | return "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[n] if n < 26 else f"S{n + 1}" | unknown | - | - | - |
 | `model:crop_nucleic:default:flank` | default | 6 | def crop_nucleic(na: Nucleic, flank: int = 6, *, by: str = "contacts") -> Nucleic: | unknown | - | na_structure, nucleic | - |
 | `model:crop_nucleic:argument:3@f8579048` | argument | 3 | for _ in range(3): # partners of every kept nucleotide are kept too | unknown | - | na_structure, nucleic | - |
@@ -1789,7 +1789,7 @@ Of the 41 named-entry rows, 30 rest on the comment at the item and 11 on git (ev
 | `route:_pull_turns.pull:comparison:1e-9@607e22d0#3` | comparison | 1e-9 | if abs(x1 - x0) > 1e-9 or abs(y2 - y1) > 1e-9 or abs(x3 - x2) > 1e-9 or abs(y1 - y0) <= r + 1e-9: | convention | a floating-point tolerance | heldout_budgets, heldout_copies, layout, ligands +3 | - |
 | `route:_pull_turns.pull:comparison:1e-9@607e22d0#4` | comparison | 1e-9 | if abs(x1 - x0) > 1e-9 or abs(y2 - y1) > 1e-9 or abs(x3 - x2) > 1e-9 or abs(y1 - y0) <= r + 1e-9: | convention | a floating-point tolerance | heldout_budgets, heldout_copies, layout, ligands +3 | - |
 | `route:_pull_turns:comparison:6@949e987b` | comparison | 6 | if at_a and at_b and len(out) < 6: # both pulls move the same run: the clearance that keeps both ports clear | unknown | - | route | - |
-| `route:_pull_turns.keeps:comparison:1e-9@bf6d1401` | comparison | 1e-9 | return all((y - port[1]) * e[1] >= r - 1e-9 for port, e, r in ((pa, ea, reach[0]), (pb, eb, reach[1]))) | convention | a floating-point tolerance | app, browser, copies, datafile +22 | - |
+| `route:_pull_turns.keeps:comparison:1e-9@bf6d1401` | comparison | 1e-9 | return all((y - port[1]) * e[1] >= r - 1e-9 for port, e, r in ((pa, ea, reach[0]), (pb, eb, reach[1]))) | convention | a floating-point tolerance | app, browser, copies, datafile +23 | - |
 | `route:_Router._joined:argument:16@94b3a97e` | argument | 16 | key = blake2b(np.packbits(free).tobytes(), digest_size=16).digest() | unknown | - | route | - |
 | `route:_Router.second:fallback:route_second_search_refused` | fallback | route_second_search_refused | fallback.note("route_second_search_refused", int(self.wide_nodes > max_nodes)) | named-entry:7QUP | _MAX_NODES_PAGE: "once spent, a search that runs out of _MAX_NODES falls back as before (fix round 1: 7QUP's focus view took 158 s of its 180)" | floor | random-100 reports second_searches_refused (not gated); R1 (the readability floor: route_budget) |
 | `route:_Router.drawn:comparison:1e-9@e06060ef` | comparison | 1e-9 | into = lambda p, e: abs(e[0]) < 1e-9 and e[1] * wall.side * wall.up < 0 # noqa: E731 - into the wall | convention | a floating-point tolerance | 310, app, browser, cli +38 | - |

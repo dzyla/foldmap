@@ -424,3 +424,98 @@ def test_the_apps_downloads_are_the_figures(page_held_at_16_in, tmp_path):
     assert saved_as and {r.split(":")[1] for r in saved_as} <= figure.layout.focus_chains and figure.took_subunit
     back = draw_spec(figure_spec(PSII, layout_file=saved))
     assert back.layout.focus_chains == figure.layout.focus_chains
+
+
+def _captured(name: str):
+    """A captured input of cli._one_of_each (tests/data/app29/NAME.json.gz): each chain's residue numbers, names and CA
+    as io.load_backbone read them from the whole entry. The other backbone atoms are not kept (stood in by the CA):
+    _one_of_each, _focus_plan and _context read no other. Returns the backbone and the document."""
+    import gzip
+    import json
+
+    import numpy as np
+
+    from foldmap.model import Backbone, ResLabel
+
+    with gzip.open(DATA / "app29" / f"{name}.json.gz", "rt", encoding="utf-8") as fh:
+        doc = json.load(fh)
+    labels, ca = [], []
+    for c, d in doc["chains"].items():
+        icodes = d["icode"] or [""] * len(d["seq"])
+        labels += [ResLabel(c, s, i, n) for s, i, n in zip(d["seq"], icodes, d["name"].split())]
+        ca += d["ca"]
+    ca = np.asarray(ca, float).reshape(-1, 3)
+    prev = np.array([k > 0 and labels[k - 1].chain == l.chain for k, l in enumerate(labels)])
+    return Backbone(labels, np.repeat(ca[:, None, :], 4, axis=1), prev), doc
+
+
+def test_a_copy_modelled_in_part_is_no_protein_of_its_own():
+    """Plan 29 Task 8b (ruling P29-14; docs/validation/app29/diagnosis-t8.md): 26EL is twenty copies of one protein
+    (residues 1-682), C2. Its protomer holds F, modelled 1-291, and M, 292-682: against A's whole sequence their
+    ratios are 0.59 and 0.73, so _one_of_each took them as two more proteins and focus auto drew A, F and M, 132 to
+    301 Å apart, said as "1 of 7". model.homolog_chains, the rule the labels share by, calls them A's copies."""
+    from types import SimpleNamespace
+
+    from foldmap.cli import _context, _focus_plan
+
+    bb, doc = _captured("26EL-one-of-each")  # 76 kB; and the C2 symmetry detect_symmetry found: two protomers of ten
+    sym = SimpleNamespace(**doc["sym"])
+    focus, whole_of_two = _focus_plan("auto", sym, bb, [None] * doc["n_sses"])
+    assert focus == {"A"} and not whole_of_two
+    assert _context(sym, focus, bb, neighbours=False) == "1 of 20 subunits shown · C2 symmetry"
+
+
+def test_26el_is_drawn_as_one_chain():
+    """The same, end to end on the whole 26EL (the download; skipped where it is not)."""
+    from foldmap.spec import draw_spec, figure_spec
+    from helpers import r100_entry
+
+    d = draw_spec(figure_spec(r100_entry("26EL")))
+    assert d.layout.focus_chains == {"A"} and d.layout.context.startswith("1 of 20 subunits shown · C2 symmetry")
+
+
+def test_one_protein_by_its_numbers_is_today_one_protein_even_as_two_entities():
+    """The control the fix's risk asks for (ruling P29-14), pinned as it is: two chains that share their residue
+    numbers and are alike at them are one protein to model.homolog_chains, and so now to _one_of_each, even when the
+    file holds them as two entities. No near-identical paralogs sharing numbering exist among the 710 structures at
+    hand (tests/data, plan 29's tune half and the download cache less its check half): every pair of chains of two
+    entities alike at 70 % or more of 20 or more shared numbers is 97 % alike or more, and homolog_chains joins each.
+    Three of them it joins where the whole-sequence ratio did not: HIV-1 reverse transcriptase's p66 and p51 (8VBG and
+    1HYS; one gene, p51 its first 440 residues, folded otherwise) and 6V6S's unassigned poly-UNK chains of different
+    entities. None is symmetric, so focus auto never reaches _one_of_each on them, and no figure changes. The risk,
+    named: a symmetric assembly of p66/p51 heterodimers (or of poly-UNK models) would draw p66 alone as its subunit.
+    8VBG's p66 (A, 1-542) and p51 (B, 6-428), captured (app29/8VBG-p66-p51.json.gz, 8 kB)."""
+    from difflib import SequenceMatcher
+
+    from foldmap.cli import _one_of_each
+    from foldmap.model import homolog_chains
+
+    bb, _ = _captured("8VBG-p66-p51")
+    seq = {c: [l.name for l in bb.labels if l.chain == c] for c in "AB"}
+    assert SequenceMatcher(None, seq["A"], seq["B"], autojunk=False).ratio() < 0.9  # two proteins, by the ratio
+    assert homolog_chains(bb)["B"] == ("A", 0)  # one protein, by the numbers
+    assert _one_of_each(["A", "B"], bb) == {"A"}
+
+
+def test_near_identical_paralogs_below_the_copy_rule_stay_two_proteins():
+    """The rule's own edge, on a synthetic pair: two chains numbered alike, 1-100, differing at 15 of the 100 (85 %
+    alike: under homolog_chains' 90 % and under the ratio's 0.9) stay two proteins; at 5 they are one."""
+    import numpy as np
+
+    from foldmap.cli import _one_of_each
+    from foldmap.model import Backbone, ResLabel
+
+    names = ["ALA", "GLY", "LEU", "SER", "VAL", "THR", "ASP", "GLU", "LYS", "ARG"]
+
+    def pair(differ: int) -> Backbone:
+        a = [names[k % 10] for k in range(100)]
+        b = [("TRP" if k % 7 == 0 and k // 7 < differ else n) for k, n in enumerate(a)]
+        labels = [ResLabel("A", k + 1, "", n) for k, n in enumerate(a)] + [
+            ResLabel("B", k + 1, "", n) for k, n in enumerate(b)
+        ]
+        ca = np.array([(k * 3.8, 0.0, 0.0) for k in range(100)] + [(k * 3.8, 10.0, 0.0) for k in range(100)])
+        prev = np.array([k % 100 > 0 for k in range(200)])
+        return Backbone(labels, np.repeat(ca[:, None, :], 4, axis=1), prev)
+
+    assert _one_of_each(["A", "B"], pair(15)) == {"A", "B"}
+    assert _one_of_each(["A", "B"], pair(5)) == {"A"}

@@ -2,16 +2,17 @@
  "what": "foldmap's thresholds, special cases and fallbacks, scanned from src/foldmap (scripts/inventory.py)",
  "source_stamp": {
   "foldmap": "0.1.0",
-  "code_fingerprint": "b871e2b918355e71",
+  "code_fingerprint": "893407124ec081be",
   "package": "checkout",
-  "checkout_fingerprint": "b871e2b918355e71",
+  "checkout_fingerprint": "893407124ec081be",
   "installed_matches_checkout": true,
   "git": {
-   "commit": "6b83673b6f3cb1c9d339195005786eed79f11efe",
+   "commit": "cdd315f89fe0694ca3f2683d71a050f31d611c8e",
    "dirty": true,
    "dirty_paths": [
-    "src/foldmap/figcheck.py",
-    "src/foldmap/science.py"
+    "src/foldmap/cli.py",
+    "tests/data/app29/26EL-one-of-each.json.gz",
+    "tests/data/app29/8VBG-p66-p51.json.gz"
    ],
    "source": "git"
   },
@@ -1911,7 +1912,7 @@
    "kind": "constant",
    "module": "cli",
    "function": "<module>",
-   "line": 1585,
+   "line": 1589,
    "value": "6",
    "at": "_DOMAIN_PULL = 6 # CA-pair-equivalents of attraction between any two elements of one domain",
    "comment": "CA-pair-equivalents of attraction between any two elements of one domain",
@@ -2119,22 +2120,24 @@
    "tests": []
   },
   {
-   "id": "cli:_one_of_each:comparison:0.9@92fb00cc",
+   "id": "cli:_one_of_each:comparison:0.9@fdc2e633",
    "kind": "comparison",
    "module": "cli",
    "function": "_one_of_each",
-   "line": 1517,
+   "line": 1521,
    "value": "0.9",
-   "at": "if SequenceMatcher(None, seq[g[0]], seq[c], autojunk=False).ratio() > 0.9:",
+   "at": "if root[g[0]] == root[c] or SequenceMatcher(None, seq[g[0]], seq[c], autojunk=False).ratio() > 0.9:",
    "comment": "",
-   "tests": []
+   "tests": [
+    "test_focus"
+   ]
   },
   {
    "id": "cli:build_parser:argument:60@29d007de",
    "kind": "argument",
    "module": "cli",
    "function": "build_parser",
-   "line": 2007,
+   "line": 2011,
    "value": "60",
    "at": "sq.add_argument(\"--columns\", type=int, default=60, help=\"residues (alignment columns) per row (default 60)\")",
    "comment": "",
@@ -2154,7 +2157,7 @@
    "kind": "argument",
    "module": "cli",
    "function": "build_parser",
-   "line": 2018,
+   "line": 2022,
    "value": "0.7",
    "at": "default=0.7,",
    "comment": "",
@@ -10587,6 +10590,7 @@
    "tests": [
     "test_diff",
     "test_domains",
+    "test_focus",
     "test_heldout_copies",
     "test_membrane",
     "test_na_layout",
@@ -10609,6 +10613,7 @@
    "tests": [
     "test_diff",
     "test_domains",
+    "test_focus",
     "test_heldout_copies",
     "test_membrane",
     "test_na_layout",
@@ -20198,7 +20203,8 @@
     "test_random100",
     "test_render",
     "test_rosette",
-    "test_route"
+    "test_route",
+    "test_science"
    ]
   },
   {
