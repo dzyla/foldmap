@@ -455,3 +455,38 @@ def test_text_keeps_off_a_strand_drawn_twice_as_wide():
         assert got["A6"]["pass"] is None and got["A6"]["here"] == reason, got["A6"]
     else:
         assert got["A6"]["pass"], got["A6"]
+
+
+def _nearer_another_strand(lay) -> list[tuple[int, int]]:
+    """The base letters nearer another strand's drawn line than their own strand's (docs/validation/app29/
+    diagnosis-t8.md's measure): (strand, nucleotide) of each."""
+
+    def to_line(q, pts) -> float:
+        pts = np.asarray(pts, float).reshape(-1, 2)
+        a, ab = pts[:-1], np.diff(pts, axis=0)
+        t = np.clip(((q - a) * ab).sum(1) / (ab * ab).sum(1), 0.0, 1.0)
+        return float(np.hypot(*(a + t[:, None] * ab - q).T).min())
+
+    owner = {(p.strand, i): k for k, p in enumerate(lay.na_paths) for i in p.nts}
+    out = []
+    for key, xy in sorted(lay.na_letters.items()):
+        q, k = np.asarray(xy, float), owner[key]
+        mine = to_line(q, lay.na_paths[k].points)
+        if any(to_line(q, p.points) < mine for j, p in enumerate(lay.na_paths) if j != k and len(p.points) > 1):
+            out.append(key)
+    return out
+
+
+def test_22mz_unpaired_letters_sit_nearest_their_own_strand():
+    """Plan 29 Task 8b (ruling P29-14; diagnosis-t8.md, 22MZ part 2): _place_letters took a letter's first spot clear
+    of text and lines, whichever strand it was nearest. 22MZ's pseudoknot routes runs 2 and 6 side by side 0.65
+    NT_ROW apart, so U57's spot beside run 6 sat 0.35 from run 2's line, on run 2's far side: 7 of its 26 unpaired
+    letters were nearer another strand than their own. A spot beside or along the strand is now clear only where its
+    own strand is the nearest: 3 remain (0:50 G, 0:56 C, 0:67 G). For each no spot beside or along the strand is both
+    clear and nearest its own (0:50: 3 clear spots nearer another strand, 8 nearest its own but crowded or struck);
+    their letters are placed by the drawn outlines, a later pass the rule leaves as it was. The fixture is the whole
+    entry (76 nucleotides), gzipped."""
+    lay, sses, bb = make_layout(Path(__file__).parent / "data" / "app29" / "22MZ.cif.gz")
+    route_loops(lay, sses, bb)
+    assert len(lay.na_letters) == 26
+    assert _nearer_another_strand(lay) == [(0, 50), (0, 56), (0, 67)]

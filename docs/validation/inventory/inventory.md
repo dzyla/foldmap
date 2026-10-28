@@ -83,10 +83,10 @@ every correction of a rule are by hand.
 | default | 33 | 0 | 0 | 0 | 0 | 3 | 30 |
 | local | 1 | 0 | 0 | 0 | 0 | 0 | 1 |
 | comparison | 301 | 0 | 0 | 0 | 0 | 159 | 142 |
-| argument | 674 | 0 | 1 | 0 | 0 | 193 | 480 |
+| argument | 675 | 0 | 1 | 0 | 0 | 194 | 480 |
 | fallback | 24 | 0 | 0 | 0 | 4 | 1 | 19 |
 | fallback-marker | 29 | 0 | 0 | 0 | 3 | 0 | 26 |
-| all | 1650 | 62 | 26 | 28 | 41 | 458 | 1035 |
+| all | 1651 | 62 | 26 | 28 | 41 | 459 | 1035 |
 
 Of the 41 named-entry rows, 30 rest on the comment at the item and 11 on git (evidence starting `git:`: a commit whose message ties the value to the entries).
 
@@ -1144,6 +1144,7 @@ Of the 41 named-entry rows, 30 rest on the comment at the item and 11 on git (ev
 | `na_labels:_slide_from.where:argument:1e-12@e74e0fc5` | argument | 1e-12 | f = np.clip(((q - a) * d).sum(axis=1) / np.maximum((d * d).sum(axis=1), 1e-12), 0.0, 1.0) | convention | a floating-point tolerance | heldout_copies, na_layout, na_routing, na_text_keepoff +1 | - |
 | `na_labels:_outline:argument:0.45@1a594b62` | argument | 0.45 | head = min(HEAD_LEN, e.length * 0.45) | unknown | - | na_text_keepoff | - |
 | `na_labels:_boxes_of:argument:4@68aeb51c` | argument | 4 | return np.empty((0, 4)) | convention | an array's shape | na_metrics, na_text_keepoff | - |
+| `na_labels:_strand_lines:argument:4@8c9de879` | argument | 4 | return np.empty((0, 4)), np.empty(0, int) | convention | an array's shape | na_text_keepoff | - |
 | `na_labels:_place_letters:argument:4@6e8955a0` | argument | 4 | strand_segs = np.vstack([np.hstack([q[:-1], q[1:]]) for q in lines]) if lines else np.empty((0, 4)) | convention | an array's shape | na_layout, na_text_keepoff | - |
 | `na_labels:_place_letters.outline_room:argument:0.05@fd913a9d` | argument | 0.05 | box = ink.get(base, ink["N"]) + np.array([q[0] - 0.05, q[1] - 0.05, q[0] + 0.05, q[1] + 0.05]) | unknown | - | - | - |
 | `na_labels:_place_letters.outline_room:argument:0.05@fd913a9d#2` | argument | 0.05 | box = ink.get(base, ink["N"]) + np.array([q[0] - 0.05, q[1] - 0.05, q[0] + 0.05, q[1] + 0.05]) | unknown | - | - | - |
