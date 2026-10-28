@@ -1716,13 +1716,14 @@ def science_checks(drawn) -> dict[str, list[str] | None]:
     """The science checks (science.SCIENCE) of a drawn figure, apart from the page checks: findings per check, None
     for those not yet measured (S5). Sheet block k is named "sheet <k>" (Layout.sheets, from 0). Every strand and
     ghost stands in its drawn column with its drawn span (drawn_columns, _span); S6 reads the pairings the layout
-    could not draw (Layout.unshown)."""
+    could not draw (Layout.unshown). S3 counts a ghost lent to a barrel (layout._unwrap) as a ring strand only when it
+    pairs into the ring (science.barrel_finding)."""
     from .dssp import assign_dssp
     from .science import (
         NOT_YET,
         adjacent_pairs,
+        barrel_finding,
         bridge_counts,
-        count_finding,
         mark_findings,
         neighbour_findings,
         open_finding,
@@ -1745,11 +1746,9 @@ def science_checks(drawn) -> dict[str, list[str] | None]:
         s1, s2 = neighbour_findings(spots, count, own_ghosts)
         out["S1"] += [f"sheet {k}: {t}" for t in s1]
         out["S2"] += [f"sheet {k}: {t}" for t in s2]
-        lent = [i for i in ghosts if i not in ids]
-        if own_ghosts:  # a barrel: its ring is its strands (accessories aside) and the ghosts lent to it
-            ring = [i for i in ids if i not in lay.accessory] + lent
-            others = [i for i in ids if i in lay.accessory]
-            found = count_finding(f"sheet {k}", ring, others, count, adjacent_pairs(spots))
+        if own_ghosts:  # a barrel: its ring is its strands (accessories aside) and the lent ghosts that pair into it
+            lent = [i for i in ghosts if i not in ids]
+            found = barrel_finding(f"sheet {k}", ids, lay.accessory, lent, count, adjacent_pairs(spots))
         else:  # drawn open: no ring of _BARREL_MIN strands or more among its own strands
             found = open_finding(f"sheet {k}", ids, count)
         if found:

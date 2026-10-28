@@ -2,6 +2,7 @@
 the page checks (figcheck A1-A20). S1: sheet neighbours pair; S2: a barrel's closure pairs; S3: a barrel's strand
 count is its pairing cycle."""
 
+import json
 from pathlib import Path
 
 import numpy as np
@@ -10,9 +11,19 @@ import pytest
 from foldmap.dssp import assign_dssp
 from foldmap.io import load_backbone
 from foldmap.model import Sheet
-from foldmap.science import SCIENCE, neighbour_findings, pairing_cycle, science_lines, sheet_checks
+from foldmap.science import (
+    SCIENCE,
+    barrel_finding,
+    count_finding,
+    lent_ring,
+    neighbour_findings,
+    pairing_cycle,
+    science_lines,
+    sheet_checks,
+)
 from foldmap.sheets import build_sheets
 from foldmap.ss import build_sses
+from helpers import R100_CACHE
 
 DATA = Path(__file__).parent / "data"
 R100 = DATA / "r100"
@@ -65,6 +76,7 @@ def test_8utf_a_strand_beside_an_unpaired_ghost_fails_s1():
 
     found = science_checks(_drawn(DATA / "8UTF.cif"))
     assert found["S1"] == found["S2"] == [], found
+    assert found["S3"] == []  # plan 29 Task 7's control: the measles F sheets that hold lent ghosts are drawn open
 
 
 def test_the_pairing_cycle_leaves_a_pendant_strand_out():
@@ -583,3 +595,60 @@ def test_check_and_summary_reports_carry_the_kinds(capsys):
     assert got["kinds"]["S5"] == "external" and got["kinds"]["S1"] == "consistency"
     assert got["kinds"]["A5"] == "readability" and set(got["kinds"]) == {*SCIENCE, *criteria.CRITERIA}
     assert f"  {kind_line()}" in summarize(str(R100 / "1BXW-A.cif.gz")).splitlines()
+
+
+# ------------------------------------------------------------------------------- plan 29 Task 7: lent ghosts in S3
+def test_9x4l_a_ghost_lent_beside_an_accessory_is_no_barrel_strand():
+    """Plan 29 Task 7 (triage proposal 4, docs/validation/app29/fix-ghost). 9X4L's sheet 7, chain 3's 5-strand barrel
+    as foldmap check draws it, holds the ghost of 7:7-8, which layout._unwrap lent beside the accessory 3:208-213: it
+    pairs with that accessory alone (2 bridges). S3 counted every lent ghost as a ring strand: "6 barrel strands
+    drawn, the pairing cycle has 5". app29/9X4L-sheet7-s3.json is S3's input for that block on the whole entry's page
+    (figure_spec's defaults): its strands, accessories, lent ghosts, the pairs drawn side by side and every bridge
+    count among them; no crop under 200 kB keeps the page (Task 4's note on 9X4L)."""
+    doc = json.loads((DATA / "app29" / "9X4L-sheet7-s3.json").read_text(encoding="utf-8"))
+    count = counts({(a, b): n for a, b, n in doc["bridges"]})
+    closure = [tuple(p) for p in doc["closure"]]
+    own = [i for i in doc["strands"] if i not in doc["accessory"]]
+    assert doc["lent"] == ["7:7-8"] and len(own) == 5
+    before = count_finding(
+        "sheet 7", own + doc["lent"], doc["accessory"], count, closure
+    )  # every lent ghost a ring strand
+    assert before == doc["S3"][0] == "sheet 7: 6 barrel strands drawn, the pairing cycle has 5"
+    assert lent_ring(own, doc["lent"], count, closure) == []
+    assert barrel_finding("sheet 7", doc["strands"], set(doc["accessory"]), doc["lent"], count, closure) is None
+
+
+def _ring_counts(names, lent=()):
+    """A barrel whose strands pair round in order (6 bridges each), `lent` drawn as ghosts lent across the cut."""
+    pairs = {(names[k], names[(k + 1) % len(names)]): 6 for k in range(len(names))}
+    return counts(pairs), [n for n in names if n not in lent]
+
+
+def test_a_ring_strand_lent_across_the_cut_still_counts():
+    """Plan 29 Task 7's guard: a strand lent across an unrolled ring's cut that is a ring strand (a barrel shared by
+    copies, its ghost drawn between two strands of the ring) still counts, alone or in a run of lent strands joined
+    to the ring through each other; a ghost that pairs with an accessory alone does not."""
+    names = list("abcdef")
+    count, own = _ring_counts(names, lent=["f"])
+    assert lent_ring(own, ["f"], count) == ["f"]
+    assert barrel_finding("b", own, set(), ["f"], count, ()) is None
+    assert (
+        count_finding("b", own, ["f"], count, ()) == "b: 5 barrel strands drawn, the pairing cycle has 6"
+    )  # uncounted
+    names = list("abcdefg")
+    count, own = _ring_counts(names, lent=["e", "f", "g"])  # f pairs with e and g, lent too: joined through them
+    assert lent_ring(own, ["g", "f", "e"], count) == ["g", "f", "e"]
+    assert barrel_finding("b", own, set(), ["e", "f", "g"], count, ()) is None
+    pairs = {(a, b): 6 for a, b in zip("abcde", "bcdea")} | {("c", "x"): 4, ("x", "y"): 2}  # x an accessory of c
+    count = counts(pairs)
+    assert lent_ring(list("abcde"), ["y"], count) == []  # y lent beside the accessory x alone, as 9X4L's 7:7-8
+    assert barrel_finding("b", [*"abcde", "x"], {"x"}, ["y"], count, ()) is None
+    assert count_finding("b", [*"abcde", "y"], ["x"], count, ()) == "b: 6 barrel strands drawn, the pairing cycle has 5"
+
+
+@pytest.mark.skipif(not (R100_CACHE / "9X4L.cif").is_file(), reason="9X4L is not in the download cache")
+def test_9x4l_drawn_passes_s3():
+    """Plan 29 Task 7 end to end: 9X4L as foldmap check draws it (the whole entry, 8692 residues) has no S3 finding."""
+    from foldmap.figcheck import science_checks
+
+    assert science_checks(_drawn(R100_CACHE / "9X4L.cif"))["S3"] == []

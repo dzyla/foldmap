@@ -2,15 +2,16 @@
  "what": "foldmap's thresholds, special cases and fallbacks, scanned from src/foldmap (scripts/inventory.py)",
  "source_stamp": {
   "foldmap": "0.1.0",
-  "code_fingerprint": "79fd1bbcb0016900",
+  "code_fingerprint": "b871e2b918355e71",
   "package": "checkout",
-  "checkout_fingerprint": "79fd1bbcb0016900",
+  "checkout_fingerprint": "b871e2b918355e71",
   "installed_matches_checkout": true,
   "git": {
-   "commit": "3d6c798c1cf06e484016b396a690ac67edfced74",
+   "commit": "6b83673b6f3cb1c9d339195005786eed79f11efe",
    "dirty": true,
    "dirty_paths": [
-    "src/foldmap/symmetry.py"
+    "src/foldmap/figcheck.py",
+    "src/foldmap/science.py"
    ],
    "source": "git"
   },
@@ -4412,7 +4413,7 @@
    "kind": "comparison",
    "module": "figcheck",
    "function": "_angstrom",
-   "line": 1890,
+   "line": 1889,
    "value": "0.05",
    "at": "return \"<0.1\" if x < 0.05 else f\"{x:.1f}\"",
    "comment": "",
@@ -21256,7 +21257,7 @@
    "kind": "fallback",
    "module": "science",
    "function": "pairing_cycle",
-   "line": 185,
+   "line": 197,
    "value": "s3_cycles_capped",
    "at": "fallback.note(\"s3_cycles_capped\")",
    "comment": "",
@@ -21268,7 +21269,7 @@
    "kind": "argument",
    "module": "science",
    "function": "along",
-   "line": 333,
+   "line": 371,
    "value": "1e-12",
    "at": "t = float(np.clip(np.dot(q - a, ab) / max(np.dot(ab, ab), 1e-12), 0.0, 1.0))",
    "comment": "",

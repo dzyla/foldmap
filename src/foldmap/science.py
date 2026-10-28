@@ -163,20 +163,32 @@ def adjacent_pairs(spots: list[Spot]) -> list[tuple[str, str]]:
     return [(a, b) for a, ca, sa, _ in spots for b, cb, sb, _ in spots if cb == ca + 1 and _meet(sa, sb) and a != b]
 
 
+def _joined(count: Callable[[str, str], int], closure=()) -> Callable[[str, str], bool]:
+    """Two strands joined in the pairing graph (pairing_cycle): at least sheets._MIN_PAIRS bridges, or one when the
+    pair is in `closure` (drawn side by side)."""
+    from .sheets import _MIN_PAIRS
+
+    drawn = {frozenset(p) for p in closure}
+
+    def joined(a: str, b: str) -> bool:
+        n = count(a, b)
+        return n >= _MIN_PAIRS or bool(n and frozenset((a, b)) in drawn)
+
+    return joined
+
+
 def pairing_cycle(ids: Iterable[str], count: Callable[[str, str], int], closure=()) -> int | None:
     """The longest simple cycle among these strands in the pairing graph: strands joined by at least
     sheets._MIN_PAIRS bridges, and each pair in `closure` (drawn side by side: adjacent_pairs) by one, as a barrel's
     closing ladder may be (1TIM's beta7-beta8). 0 when there is no cycle; None when there are too many cycles to
     look at."""
-    from .sheets import _MIN_PAIRS
-
     ids = sorted(set(ids))
+    joined = _joined(count, closure)
     graph = nx.Graph()
     graph.add_nodes_from(ids)
     for i, a in enumerate(ids):
         for b in ids[i + 1 :]:
-            n = count(a, b)
-            if n >= _MIN_PAIRS or (n and frozenset((a, b)) in {frozenset(p) for p in closure}):
+            if joined(a, b):
                 graph.add_edge(a, b)
     core = nx.k_core(graph, 2)  # strands on no cycle cannot be in a barrel's ring
     best = 0
@@ -198,6 +210,32 @@ def open_finding(label: str, ids: Iterable[str], count) -> str | None:
     if cycle >= _BARREL_MIN:
         return f"{label}: drawn open, its pairing closes a ring of {cycle} strands"
     return None
+
+
+def lent_ring(ring: list[str], lent: Iterable[str], count, closure=()) -> list[str]:
+    """The ghosts lent to a barrel (layout._unwrap: a neighbouring copy's strand drawn across an unrolled ring's cut
+    leaves its ghost where it pairs) that stand for strands of its ring: those joined in the pairing graph (_joined)
+    to a strand of `ring`, directly or through another such ghost, in `lent`'s order. A ghost lent beside an
+    accessory strand alone (9X4L's 7:7-8, beside 3:208-213) is no ring strand (plan 29 Task 7)."""
+    joined = _joined(count, closure)
+    members, left = list(ring), list(lent)
+    grew = True
+    while grew:
+        took = [g for g in left if any(joined(g, r) for r in members)]
+        members += took
+        left = [g for g in left if g not in took]
+        grew = bool(took)
+    return [g for g in lent if g not in left]
+
+
+def barrel_finding(label: str, strands: list[str], accessory, lent: list[str], count, closure) -> str | None:
+    """S3 of a block drawn as a barrel (a ghost repeats one of its own strands): its ring is its strands less the
+    accessories (`accessory`: a container of strand ids) and the ghosts lent to it that stand for ring strands
+    (lent_ring); the other lent ghosts are counted as the accessories are, in the pairing graph but not in the ring."""
+    own = [i for i in strands if i not in accessory]
+    ring_lent = lent_ring(own, lent, count, closure)
+    others = [i for i in strands if i in accessory] + [g for g in lent if g not in ring_lent]
+    return count_finding(label, own + ring_lent, others, count, closure)
 
 
 def count_finding(label: str, ring: list[str], others: Iterable[str], count, closure) -> str | None:
