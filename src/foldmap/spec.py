@@ -6,6 +6,10 @@ point; values given explicitly win; defaults fill the rest."""
 
 from __future__ import annotations
 
+import contextlib
+import io
+import sys
+import threading
 import time
 from dataclasses import dataclass, field, fields, replace
 from pathlib import Path
@@ -580,6 +584,12 @@ class Drawn:
 
         return over_labels(self.loops)
 
+    @property
+    def took_subunit(self) -> bool:
+        """Whether the figure draws one subunit in full (Layout.focus_chains): the decision every other route that
+        lays the same spec out carries (below_floor_of), so its data, page and layout file are of this figure."""
+        return getattr(self.layout, "focus_chains", None) is not None
+
 
 def draw_spec(spec: FigureSpec, like_out: dict | None = None) -> Drawn:
     """Lay out, route and draw the figure. `like_out`: cli.make_layout's (a figure drawn like a reference: what the
@@ -589,18 +599,68 @@ def draw_spec(spec: FigureSpec, like_out: dict | None = None) -> Drawn:
     wording of any other subunit focus auto draws (Layout.context, scope.drawn_scope). Its seconds are both
     drawings'. A floor that cannot be judged keeps the whole figure, and so does an element reference the figure
     names (--rename, --domain, a mark, ...) on a chain of the other subunit, which one subunit cannot draw
-    (BadReference)."""
+    (BadReference). What the first drawing writes to standard error (unused data rows, a membrane not found) is
+    held (held_stderr) and written only when its figure is kept, so it is said once, of the figure drawn."""
     from .cli import BadReference
 
     start = time.perf_counter()
-    drawn = _draw_once(spec, like_out)
+    with held_stderr() as held:
+        drawn = _draw_once(spec, like_out)
+    kept = True
     if getattr(drawn.layout, "whole_of_two", False) and _below_floor(drawn):
         try:
-            drawn = _draw_once(spec, like_out, below_floor=True)
+            drawn, kept = _draw_once(spec, like_out, below_floor=True), False
         except BadReference:  # a reference to the other subunit, drawn whole: the whole figure is kept
             pass
+        except BaseException:  # the error is said after what the whole figure's drawing said
+            release(held)
+            raise
+    if kept:
+        release(held)
     drawn.seconds = time.perf_counter() - start
     return drawn
+
+
+@contextlib.contextmanager
+def held_stderr():
+    """Standard error written inside, held in a buffer (yielded) for the caller to write out (release) or drop; written
+    out at once when what runs inside raises. Only in the main thread (the command line): a redirect is process-wide,
+    so in a server's other threads (the app's sessions) nothing is held and None is yielded."""
+    if threading.current_thread() is not threading.main_thread():
+        yield None
+        return
+    buf = io.StringIO()
+    try:
+        with contextlib.redirect_stderr(buf):
+            yield buf
+    except BaseException:
+        sys.stderr.write(buf.getvalue())
+        raise
+
+
+def release(held) -> None:
+    """Write out what held_stderr held (nothing when it held nothing)."""
+    if held is not None and held.getvalue():
+        sys.stderr.write(held.getvalue())
+
+
+def below_floor_of(spec: FigureSpec, layout, drawn=None) -> bool:
+    """Whether focus auto takes one subunit of the assembly of two `layout` holds whole (Layout.whole_of_two): the
+    decision draw_spec made for the figure of `spec`, carried, never judged again here (plan 29 Task 5 fix round 1,
+    ruling P29-12). `drawn`: that figure (a Drawn), a callable giving it (the app's kept figure, app_jobs._drawn),
+    or the decision itself (a bool, the app's draw job's took_subunit); None: the figure is drawn now (draw_spec,
+    what it says on standard error dropped: the caller's own layout says it). False at no cost for every other
+    layout. The routes that lay a spec out without drawing it (datafile.spec_data, interactive.build_page,
+    layout_document) lay it out again with below_floor=True when this says so."""
+    if not getattr(layout, "whole_of_two", False):
+        return False
+    got = drawn() if callable(drawn) else drawn
+    if isinstance(got, bool):
+        return got
+    if got is None:
+        with held_stderr():
+            got = draw_spec(spec)
+    return got.took_subunit
 
 
 def _below_floor(drawn: Drawn) -> bool:
@@ -632,22 +692,25 @@ def _draw_once(spec: FigureSpec, like_out: dict | None, below_floor: bool = Fals
     return Drawn(fig, loops, layout, sses, bb, model, seconds=time.perf_counter() - start)
 
 
-def layout_document(spec: FigureSpec, structure_name: str | None = None, drawn: Drawn | None = None) -> dict:
+def layout_document(spec: FigureSpec, structure_name: str | None = None, drawn=None) -> dict:
     """The layout file document for the figure. Element references in the edits are resolved against the
     layout without the edits (the labels they were written for) and saved as residue ranges. With no edits that is
     the layout `drawn` (the figure of this spec, draw_spec) when given, which is not laid out again (random-100
-    C33: 7JU4's figure was laid out twice, 27 of its 183 s). Laid out again, it keeps the subunit `drawn` took of an
-    assembly of two below the readability floor (draw_spec); without `drawn` (the app's download) such an assembly is
-    laid out whole."""
+    C33: 7JU4's figure was laid out twice, 27 of its 183 s). Laid out again, it takes the figure's subunit of an
+    assembly of two below the readability floor (below_floor_of: `drawn` the Drawn, or the decision as a bool, the
+    app's download; else the figure is drawn to decide)."""
     from .cli import make_layout
 
-    if drawn is not None and not any(spec.edits().values()):
+    if isinstance(drawn, Drawn) and not any(spec.edits().values()):
         layout, sses = drawn.layout, drawn.sses
     else:
         kw = {**spec.layout_kwargs(edits=False), "data": None, "data_column": None, "crosslinks": None}  # read once
-        if drawn is not None and drawn.layout.focus_chains:  # the subunit drawn (no effect on any other focus)
-            kw["below_floor"] = True
-        layout, sses, _ = make_layout(spec.structure, spec.mode, spec.rotate, spec.flip_v, **kw)
+        with held_stderr() as held:
+            layout, sses, _ = make_layout(spec.structure, spec.mode, spec.rotate, spec.flip_v, **kw)
+        if below_floor_of(spec, layout, drawn):  # the figure's subunit (draw_spec's decision, carried)
+            layout, sses, _ = make_layout(spec.structure, spec.mode, spec.rotate, spec.flip_v, below_floor=True, **kw)
+        else:
+            release(held)
     return layoutfile.document(
         structure_name or str(spec.structure),
         spec.theme,

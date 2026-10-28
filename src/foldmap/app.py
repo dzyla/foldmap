@@ -503,12 +503,16 @@ def sequence_figure(path, settings: dict, view: dict):
     )
 
 
-def layout_document(path, settings: dict, uploads: dict[str, str] | None = None) -> dict:
+def layout_document(
+    path, settings: dict, uploads: dict[str, str] | None = None, took_subunit: bool | None = None
+) -> dict:
     """The app's settings as a layout file document (element references saved as residue ranges). Hosted, the files
     it names (names files, the alignment, the reference uploaded under Draw like…) can only be the server's copies of
     uploads: each is named as uploaded (`uploads`: kept path -> uploaded name; else its file name), never by its
-    server path. A reference that is a PDB entry is saved as its id (`foldmap plot --layout-file` fetches it)."""
-    doc = spec_document(spec_of(path, settings), structure_name=Path(path).name)
+    server path. A reference that is a PDB entry is saved as its id (`foldmap plot --layout-file` fetches it).
+    `took_subunit`: whether the figure drew one subunit (the draw job's; spec.below_floor_of), so an assembly of two
+    is laid out as the figure draws it, with nothing drawn here; None: drawn to decide when it matters."""
+    doc = spec_document(spec_of(path, settings), structure_name=Path(path).name, drawn=took_subunit)
 
     def own(p: str) -> str:
         return (uploads or {}).get(p) or Path(p).name

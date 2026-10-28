@@ -342,3 +342,85 @@ def test_31fd_is_drawn_as_one_subunit():
 
     d = draw_spec(figure_spec(r100_entry("31FD")))
     assert d.floor == [] and d.layout.subunits == (2, "C2") and len(d.layout.focus_chains) == 15
+
+
+def _page_chains(html: str) -> set[str]:
+    """The chains of the elements an interactive page holds (its topo-data JSON)."""
+    import json
+    import re
+
+    blob = re.search(r'<script type="application/json" id="topo-data">(.*?)</script>', html, re.S).group(1)
+    return {e["chain"] for e in json.loads(blob)["elements"]}
+
+
+def test_every_route_takes_the_figures_subunit(page_held_at_16_in, tmp_path):
+    """Plan 29 Task 5 fix round 1 (ruling P29-12): the data, the interactive page and the layout file are of the figure
+    draw_spec drew, one subunit of the 31FD crop below the floor, by the decision carried from the figure
+    (spec.below_floor_of): given (the figure, a callable, a bool) or drawn to decide when none is at hand."""
+    from foldmap import layoutfile
+    from foldmap.datafile import spec_data
+    from foldmap.interactive import build_page
+    from foldmap.spec import draw_spec, figure_spec, layout_document
+
+    spec = figure_spec(PSII)
+    d = draw_spec(spec)
+    assert d.took_subunit and d.layout.subunits == (2, "C2")
+    drawn_chains = {s.chain for s in d.sses}
+    for given in (None, d, lambda: d, True):
+        assert spec_data(spec, drawn=given)["structure"]["focus_chains"] == sorted(d.layout.focus_chains)
+    assert spec_data(spec, drawn=False)["structure"]["focus_chains"] is None  # the decision is taken as given
+    assert _page_chains(build_page(PSII)) == _page_chains(build_page(PSII, drawn=d)) == drawn_chains
+    label = next(p.label for p in d.layout.placed.values() if p.sse.chain in d.layout.focus_chains)
+    renamed = figure_spec(PSII, rename={label: "X"})  # a label both copies share, saved as the subunit's residues
+    figure = draw_spec(renamed)
+    for given in (True, None, figure):
+        out = layoutfile.save(tmp_path / "psii.yaml", layout_document(renamed, drawn=given))
+        back = draw_spec(figure_spec(PSII, layout_file=out))
+        assert back.layout.focus_chains == figure.layout.focus_chains and back.floor == []
+    whole = layoutfile.save(tmp_path / "whole.yaml", layout_document(renamed, drawn=False))
+    assert draw_spec(figure_spec(PSII, layout_file=whole)).layout.focus_chains is None  # both copies named: kept whole
+
+
+def test_a_figure_drawn_twice_says_its_warnings_once(page_held_at_16_in, tmp_path, capsys):
+    """M2 (fix round 1): what the whole figure's drawing writes to standard error (a data row not used, what was read)
+    is held and dropped when the figure is drawn again as one subunit: said once, of the figure drawn."""
+    from foldmap.spec import draw_spec, figure_spec
+
+    table = tmp_path / "values.csv"
+    table.write_text("chain,residue,value\nO,120,1.5\nO,9999,2.0\n", encoding="utf-8")
+    d = draw_spec(figure_spec(PSII, data=str(table)))
+    err = capsys.readouterr().err
+    assert d.took_subunit and err.count("9999") == 1 and err.count("foldmap: read ") <= 1, err
+
+
+def test_the_apps_downloads_are_the_figures(page_held_at_16_in, tmp_path):
+    """The app's Data JSON, its 3D view's page and its layout file (with a rename) are of the figure it shows,
+    one subunit of the 31FD crop: the data and page jobs take the decision from the kept figure, the layout file
+    from the draw job's took_subunit, drawing nothing."""
+    pytest.importorskip("streamlit")  # the app extra: absent in the sdist and minimum-deps jobs
+    import json
+
+    import yaml
+
+    from foldmap import app, app_jobs
+    from foldmap.app_views import layout_yaml
+    from foldmap.spec import draw_spec, figure_spec
+
+    settings = {**app.LAYOUT_DEFAULTS, "theme": "publication"}
+    blob = json.dumps(settings, sort_keys=True)
+    got = app_jobs.draw_job(str(PSII), blob)
+    d, _ = app_jobs.draw_settings(PSII, settings)
+    assert got["took_subunit"] and d.took_subunit
+    data = json.loads(app_jobs.data_job(str(PSII), blob, "json"))
+    assert data["structure"]["focus_chains"] == sorted(d.layout.focus_chains)
+    assert _page_chains(app_jobs.page_job(str(PSII), blob)) == {s.chain for s in d.sses}
+    label = next(p.label for p in d.layout.placed.values() if p.sse.chain in d.layout.focus_chains)
+    renamed = json.dumps({**settings, "rename": f"{label}=X"}, sort_keys=True)  # a label both copies share
+    figure = draw_spec(app.spec_of(PSII, json.loads(renamed)))
+    text = layout_yaml(str(PSII), renamed, None, app_jobs.draw_job(str(PSII), renamed)["took_subunit"])
+    saved = tmp_path / "psii.yaml"
+    saved.write_bytes(text)
+    saved_as = set(yaml.safe_load(text.decode())["edits"]["rename"])  # res:CHAIN:a-b, the subunit's chains only
+    assert saved_as and {r.split(":")[1] for r in saved_as} <= figure.layout.focus_chains and figure.took_subunit
+    back = draw_spec(figure_spec(PSII, layout_file=saved))
+    assert back.layout.focus_chains == figure.layout.focus_chains

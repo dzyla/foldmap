@@ -152,18 +152,27 @@ def write(data: dict, path) -> Path:
     return path
 
 
-def spec_data(spec, sections: tuple[str, ...] = DEFAULT, name: str | None = None) -> dict:
+def spec_data(spec, sections: tuple[str, ...] = DEFAULT, name: str | None = None, drawn=None) -> dict:
     """The data of the figure a spec.FigureSpec describes: its structure read (io.read_model, its assembly) and laid
     out as `plot` lays it out (cli.make_layout: no routing, no drawing), then structure_data. The one route the
     command line, the MCP server and the app take, so they give the same bytes. `name`: the structure's name in the
-    data (default its file's; the app names an uploaded structure as uploaded, not by the copy it keeps)."""
+    data (default its file's; the app names an uploaded structure as uploaded, not by the copy it keeps). An assembly
+    of two that the figure draws as one subunit (below the readability floor: spec.draw_spec) is laid out as that
+    subunit (spec.below_floor_of; `drawn`: the figure, a callable giving it, or None to draw it to decide)."""
     from .cli import make_layout
     from .io import read_model
+    from .spec import below_floor_of, held_stderr, release
 
     model = read_model(spec.structure, spec.assembly)
-    layout, sses, bb = make_layout(
-        spec.structure, spec.mode, spec.rotate, spec.flip_v, model=model, **spec.layout_kwargs()
-    )
+    kw = spec.layout_kwargs()
+    with held_stderr() as held:
+        layout, sses, bb = make_layout(spec.structure, spec.mode, spec.rotate, spec.flip_v, model=model, **kw)
+    if below_floor_of(spec, layout, drawn):  # the figure's subunit (draw_spec's decision, carried)
+        layout, sses, bb = make_layout(
+            spec.structure, spec.mode, spec.rotate, spec.flip_v, model=model, below_floor=True, **kw
+        )
+    else:
+        release(held)
     return structure_data(layout, sses, bb, model, sections, name=name or str(spec.structure))
 
 

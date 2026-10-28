@@ -142,6 +142,7 @@ def figure_view(ws: Workspace) -> None:
                 "files": tuple(sorted(result["files"].items())) or None,
                 "scope": result.get("scope"),
                 "png_dpi": result.get("png_dpi"),  # the download button's label
+                "took_subunit": result.get("took_subunit"),  # the layout file's subunit (layout_yaml)
             },
             elements=result["elements"],
             protein_chains=result["chains"],
@@ -461,14 +462,15 @@ def uploads_of(ss: MutableMapping) -> dict[str, str]:
     return dict(v for v in (ss.get(k) for k in kept) if v)
 
 
-def layout_yaml(path, blob: str, uploads: dict[str, str] | None = None) -> bytes:
+def layout_yaml(path, blob: str, uploads: dict[str, str] | None = None, took_subunit: bool | None = None) -> bytes:
     """The layout file of these settings (YAML). Hosted, uploads are named as uploaded (app.layout_document), and
-    a comment above asks for them."""
+    a comment above asks for them. `took_subunit`: the figure's (the draw job's), so the file is laid out as the
+    figure is, with nothing drawn here."""
     import yaml
 
     from foldmap.app import layout_document, local_files, uploaded_files
 
-    doc = layout_document(path, json.loads(blob), uploads)
+    doc = layout_document(path, json.loads(blob), uploads, took_subunit)
     text = yaml.safe_dump(doc, sort_keys=False, allow_unicode=True)
     files = [] if local_files() else uploaded_files(doc)
     from foldmap.app_edits import upload_name
@@ -495,10 +497,11 @@ def figure_downloads(
     eager: tuple | None = None,
     uploads: dict[str, str] | None = None,
     png_dpi: int | None = None,
+    took_subunit: bool | None = None,
 ) -> list[Download]:
     """The figure's files (eager: the render's files as sorted (ext, bytes) items) and its layout file (uploads:
-    uploads_of the session). png_dpi: what the figure's PNG is written at (render.png_dpi: 300, less on a page past
-    50 megapixels), which its button says."""
+    uploads_of the session; took_subunit: the figure's, layout_yaml). png_dpi: what the figure's PNG is written at
+    (render.png_dpi: 300, less on a page past 50 megapixels), which its button says."""
     out = [
         Download(
             f"dl_{ext}",
@@ -513,7 +516,7 @@ def figure_downloads(
         Download(
             "dl_layout",
             "Layout file",
-            partial(layout_yaml, path, blob, uploads),
+            partial(layout_yaml, path, blob, uploads, took_subunit),
             f"{stem}-layout.yaml",
             "application/x-yaml",
         )
@@ -613,8 +616,13 @@ def download_menu(ws: Workspace) -> None:
         blob, eager, note = offered
         if note:
             st.caption(note)
-        dpi = (ss.get("last_good") or {}).get("png_dpi")
-        buttons(figure_downloads(ws.path, blob, ws.name, ws.lim, eager, uploads_of(ss), png_dpi=dpi))
+        good = ss.get("last_good") or {}
+        took = good.get("took_subunit")
+        buttons(
+            figure_downloads(
+                ws.path, blob, ws.name, ws.lim, eager, uploads_of(ss), png_dpi=good.get("png_dpi"), took_subunit=took
+            )
+        )
     st.markdown("**Data**")
     if offered is None:
         st.caption("Nothing to download until the figure draws.")

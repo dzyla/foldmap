@@ -446,6 +446,9 @@ def draw_job(path, settings_json: str, eager_after: float | None = None) -> dict
         "splits_note": "" if app.pair_kind(settings) else splits_said(drawn)[1],
         "seconds": seconds,
         "files": files,
+        # one subunit drawn in full (spec.Drawn.took_subunit): the layout file download lays out with it, drawing
+        # nothing (app_views.layout_yaml; plan 29 Task 5 fix round 1)
+        "took_subunit": drawn.took_subunit,
     }
     _keep_drawn((str(path), settings_json), drawn)  # after every save: another thread may save it from here on
     return out
@@ -472,7 +475,7 @@ def data_job(path, settings_json: str, kind: str, name: str | None = None) -> by
         from .compare import json_text
 
         return json_text(app.pair_page(path, settings).data).encode("utf-8")
-    data = spec_data(app.spec_of(path, settings), DEFAULT, name=name)
+    data = spec_data(app.spec_of(path, settings), DEFAULT, name=name, drawn=lambda: _drawn(path, settings_json))
     return dumps(data).encode("utf-8") if kind == "json" else zip_bytes(data)
 
 
@@ -508,11 +511,13 @@ def sequence_job(path, settings_json: str, view_json: str, ext: str) -> bytes:
 
 
 def page_job(path, settings_json: str) -> str:
-    """The interactive page (figure beside the 3D structure) as HTML."""
+    """The interactive page (figure beside the 3D structure) as HTML: the figure's, its subunit taken as the figure
+    takes it (the kept figure decides: interactive.build_page's `drawn`)."""
     from . import app
     from . import interactive as interactive_mod
 
-    return interactive_mod.build_page(path, **app.spec_of(path, json.loads(settings_json)).page_kwargs())
+    kw = app.spec_of(path, json.loads(settings_json)).page_kwargs()
+    return interactive_mod.build_page(path, drawn=lambda: _drawn(path, settings_json), **kw)
 
 
 def contacts_job(path, settings_json: str) -> dict | None:

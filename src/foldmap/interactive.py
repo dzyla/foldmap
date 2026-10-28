@@ -905,19 +905,28 @@ def build_page(
     title: str | None = None,
     viewer: str = "molstar",
     provenance_out: list | None = None,
+    drawn=None,
     **layout_options,
 ) -> str:
     """The HTML page as a string. viewer: 'molstar' (Mol*, PDBe build) or '3dmol' for the 3D panel.
     provenance_out: a list the figure's provenance items (how it was made) are added to, for the caller to say.
-    layout_options go to cli.make_layout (symmetry, assembly, swap, ...)."""
+    layout_options go to cli.make_layout (symmetry, assembly, swap, ...). An assembly of two that the figure draws
+    as one subunit (below the readability floor: spec.draw_spec) is drawn here as that subunit (spec.below_floor_of;
+    `drawn`: the figure, a callable giving it, or None to draw it to decide)."""
     from .cli import make_layout
+    from .spec import below_floor_of, held_stderr, release
 
     if viewer not in VIEWERS:
         raise ValueError(f"unknown 3D viewer {viewer!r}; choose from {', '.join(VIEWERS)}")
 
     look = look or Style()
     model = read_model(path, layout_options.get("assembly", "auto"))  # once: layout, hover notes and 3D model
-    layout, sses, bb = make_layout(path, mode, look=look, model=model, **layout_options)
+    with held_stderr() as held:
+        layout, sses, bb = make_layout(path, mode, look=look, model=model, **layout_options)
+    if below_floor_of(_page_spec(path, mode, look, title, layout_options), layout, drawn):  # the figure's subunit
+        layout, sses, bb = make_layout(path, mode, look=look, model=model, below_floor=True, **layout_options)
+    else:
+        release(held)
     loops = route_loops(layout, sses, bb)
     fig = draw(layout, loops, sses, title, model=model, look=look)
     svg = _hit_targets(save_svg(fig))
@@ -989,6 +998,19 @@ same residues light up in all three views · click an element to keep it lit</p>
 <script id="topo-app">{_APP}</script>
 </body></html>
 """
+
+
+def _page_spec(path, mode: str, look: Style, title: str | None, layout_options: dict):
+    """The figure spec of a page's figure (build_page's arguments), for spec.below_floor_of to draw when no figure is
+    given."""
+    from dataclasses import fields
+
+    from .spec import FigureSpec
+
+    names = {f.name for f in fields(FigureSpec)}
+    return FigureSpec(
+        Path(path), look=look, mode=mode, title=title, **{k: v for k, v in layout_options.items() if k in names}
+    )
 
 
 def write_page(path, out, **kw) -> Path:

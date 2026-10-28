@@ -2586,9 +2586,11 @@ def _cmd_figure(args: argparse.Namespace) -> int:
     if args.command == "interactive":
         from .interactive import write_page
 
+        decided = functools.cache(lambda: draw_spec(spec))  # drawn once, if an assembly of two asks (below_floor_of)
         for n, out in enumerate(args.output):
             made: list[dict] = []
-            page = write_page(spec.structure, out, viewer=args.viewer, provenance_out=made, **spec.page_kwargs())
+            kw = {"viewer": args.viewer, "provenance_out": made, "drawn": decided, **spec.page_kwargs()}
+            page = write_page(spec.structure, out, **kw)
             if n == 0:  # the same figure for every output
                 print(provenance_block(made), file=sys.stderr, end="")
             print(f"wrote {page}")
