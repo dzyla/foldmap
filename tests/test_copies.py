@@ -439,10 +439,12 @@ def test_a_copys_sheet_is_drawn_by_its_own_pairing():
     """C2b-3 fix round 1, ruling R2 (science outranks A15): _regroup_copies split 6JLN b's one DSSP sheet as B's two
     to draw b like B, which put b:353-356 beside b:398-402 with no bridge (S1) and drew panels no sheet of the
     bridges (A11). A sheet is never dissolved, split, merged or reshaped: S1-S3, S6 and A11 hold, the copies' differing
-    sheets are left out of A15 and reported (figcheck.copies_sheets_differ), the rest drawn alike."""
+    sheets are left out of A15 and reported (figcheck.copies_sheets_differ), the rest drawn alike. Both copies are
+    drawn (focus none): drawn whole, 6JLN is below the readability floor, so focus auto draws one of its two subunits
+    (plan 29 Task 5)."""
     from helpers import r100_entry
 
-    d = drawn(r100_entry("6JLN"))
+    d = drawn(r100_entry("6JLN"), focus="none")
     assert {k: v for k, v in figcheck.science_checks(d).items() if v} == {}
     assert figcheck.order_checks(d) == []
     assert "b" in {c for c, _ in figcheck.copies_sheets_differ(d)}
