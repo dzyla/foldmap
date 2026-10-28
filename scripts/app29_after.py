@@ -21,6 +21,8 @@ file of scripts/app29_light.py: campaign, navalidate, science) is summarised, ev
 sheets draws, for every entry whose app.svg changed between the rerun and the after run (tune and check), for the
 leads (LEADS) and for the named crops (CROPS), the app's PNG before beside after at one scale (pixels per point of
 the page, the smaller of the two PNGs' and of what fits SHEET_PX), into --out, and writes --look: one row per pair
+(a lead the run's host could not draw within the hosted job limit is taken from --slow-before/--slow-after, a run on
+another host, and its row says so)
 with the sheet's sha256 and both SVGs', and an empty verdict column that the controller fills by hand after looking
 (plan 29 Task N+1 Step 3).
 """
@@ -310,12 +312,38 @@ def cmd_report(args) -> int:
     before, rerun, after = (app29.load_both(d) for d in (args.before, args.rerun, args.after))
     t = table(before, rerun, after)
     measures = [json.loads(Path(f).read_text(encoding="utf-8")) for f in args.measure or []]
+    slow = None
+    if args.slow_before:  # entries over the hosted job limit on the run's host, run alone on a faster one
+        sa, sb = (_rows(app29.load_both(d)) for d in (args.slow_before, args.slow_after))
+        slow = {
+            "host": args.slow_host,
+            "stamps": [
+                ((app29.load_both(d).get("source_stamp") or {}).get("git") or {}).get("commit")
+                for d in (args.slow_before, args.slow_after)
+            ],
+            "entries": [
+                {
+                    "id": i,
+                    "half": t_half(i, before, after),
+                    "outcome": [outcome(sa[i]), outcome(sb[i])],
+                    "seconds": [sa[i].get("seconds"), sb[i].get("seconds")],
+                    "committed_before": outcome(_rows(before)[i]) if i in _rows(before) else None,
+                    "moved": [
+                        f
+                        for f in ("app.svg", "app.png")
+                        if (sa[i].get("files") or {}).get(f) != (sb[i].get("files") or {}).get(f)
+                    ],
+                }
+                for i in sorted(sa.keys() & sb.keys())
+            ],
+        }
     doc = {
         "source_stamp": _stamp(),
         "records": {"before": args.before, "rerun": args.rerun, "after": args.after},
         "table": t,
         "measures": [{"kind": m["kind"], "summary": m["summary"]} for m in measures],
         "causes": CAUSES,
+        "slow": slow,
     }
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -323,6 +351,14 @@ def cmd_report(args) -> int:
     out.write_text(render(doc, measures), encoding="utf-8", newline="\n")
     print(f"wrote {out} and {out.with_suffix('.json')}")
     return 0
+
+
+def t_half(i: str, *recs: dict) -> str:
+    for rec in recs:
+        for r in rec["entries"]:
+            if r["id"] == i:
+                return r.get("half") or "-"
+    return "lead"
 
 
 def _stamp_line(st: dict) -> str:
@@ -386,6 +422,25 @@ def render(doc: dict, measures: list[dict]) -> str:
             )
     else:
         lines.append("Identical: every outcome, SVG and PNG.")
+    slow = doc.get("slow")
+    if slow:
+        st0, st1 = ((c or "?")[:7] for c in slow["stamps"])
+        lines += [
+            "",
+            f"## Over the hosted job limit on gpu-desktop: the same entries alone on {slow['host']}",
+            "",
+            f"The hosted draw job is killed at 90 s (refused: time). An entry near it on zyla-office passes it on "
+            f"gpu-desktop's slower cores, so each such entry (and each lead that timed out) was also run at both "
+            f"commits on {slow['host']}, a few at once (before git {st0}, after git {st1}). Not in the table above.",
+            "",
+            "| id | half | committed before | before | after | seconds | moved |",
+            "|---|---|---|---|---|---|---|",
+        ]
+        for e in slow["entries"]:
+            lines.append(
+                f"| {e['id']} | {e['half']} | {e['committed_before'] or '-'} | {e['outcome'][0]} | {e['outcome'][1]} "
+                f"| {e['seconds'][0]} -> {e['seconds'][1]} | {', '.join(e['moved']) or '-'} |"
+            )
     if any(t["missing"].values()):
         lines += ["", f"Entries missing from a run: {t['missing']}"]
     if measures:
@@ -521,6 +576,9 @@ def cmd_sheets(args) -> int:
             pairs.append((i, i, b[i].get("half"), f"lead: {why}", Path(a[i]["folder"]), Path(b[i]["folder"]), None))
         else:
             fa, fb = Path(args.leads_before) / i, Path(args.leads_after) / i
+            if args.slow_before and not ((fa / "app.png").is_file() and (fb / "app.png").is_file()):
+                fa, fb = Path(args.slow_before) / i, Path(args.slow_after) / i  # over the job limit on this host
+                why += f" ({args.slow_host}: over the hosted job limit on the run's host)"
             pairs.append((i, i, "lead", f"lead: {why}", fa, fb, None))
     for i, (pattern, why) in CROPS.items():
         if i in a and i in b:
@@ -588,6 +646,9 @@ def main(argv=None) -> int:
     r.add_argument("--rerun", required=True, help="the before commit rerun on the after run's host")
     r.add_argument("--after", required=True, help="the after record")
     r.add_argument("--measure", nargs="*", help="app29_light.py measures (campaign, navalidate, science)")
+    r.add_argument("--slow-before", help="an app29 run folder of the entries over the job limit, on another host")
+    r.add_argument("--slow-after", help="the same at the after commit")
+    r.add_argument("--slow-host", default="zyla-office")
     r.add_argument("--out", required=True, help="FILE.md (and FILE.json beside it)")
     s = sub.add_parser("sheets", help="the look test's before/after sheets and look.md")
     s.add_argument("--rerun", required=True)
@@ -596,6 +657,9 @@ def main(argv=None) -> int:
     s.add_argument("--after-out", required=True, help="the after run's folder (its figures)")
     s.add_argument("--leads-before", required=True, help="app29 run --ids of the leads outside the sample, before")
     s.add_argument("--leads-after", required=True, help="the same, after")
+    s.add_argument("--slow-before", help="a lead with no figure in --leads-*: its run on another host, before")
+    s.add_argument("--slow-after", help="the same, after")
+    s.add_argument("--slow-host", default="zyla-office", help="that host's name (said in the row)")
     s.add_argument("--out", required=True, help="the sheets' folder")
     s.add_argument("--look", required=True, help="look.md (and look.json beside it)")
     args = ap.parse_args(argv)
