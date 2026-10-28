@@ -5,7 +5,7 @@ measured on the tune half and the bench only, plus its own measure, written as r
 with the code that wrote them (foldmap.source_stamp).
 
     python scripts/app29_light.py helical --old FILE --out FILE [--jobs N] [--max-copies 64]
-    python scripts/app29_light.py science --old FILE --out FILE [--jobs N]
+    python scripts/app29_light.py science --old FILE --out FILE [--jobs N] [--cache]
     python scripts/app29_light.py campaign --before DIR --after DIR --label LABEL --out FILE [--na]
     python scripts/app29_light.py navalidate --before DIR --after DIR --out FILE
     python scripts/app29_light.py report --name NAME --before RUN --after RUN --bench FILE --measure FILE... --out DIR
@@ -20,7 +20,10 @@ skipped for time (the old search is n^4). Exit 1 when any return differs.
 science (Task 7) draws plan 29's tune half and every .cif/.cif.gz under tests/data as `foldmap check` does
 (spec.draw_spec(spec.figure_spec(path)): the default view) and judges each drawing with figcheck.science_checks as it
 was (--old: that figcheck.py) and as it is: S1-S6 before and after, per entry, and the entries whose findings
-changed, and whether any finding is new.
+changed, and whether any finding is new. Each barrel block holding ghosts lent by another copy is listed with the
+ghosts science.lent_ring takes into its ring (`lent`, summary `ring_lent`). --cache (Task N+1, once the check half is
+unsealed) adds every cached download (~/.cache/foldmap/*.cif, *.cif.gz): Task 7 review M1's search for a real barrel
+whose ring strand is lent across the cut.
 
 campaign (Task 8b) reads two scripts/random100.py run folders (--views default; report.json) of the same entries,
 before and after a fix that may move figures: each entry's campaign keys (sensitivity.keys_of: pass, the failing
@@ -363,7 +366,37 @@ def science_one(path: str, old_file: str) -> dict:
     except Exception as e:  # not drawn: said, not judged
         return {"name": name, "error": f"{type(e).__name__}: {e}"[:200]}
     before, after = old.science_checks(drawn), figcheck.science_checks(drawn)
-    return {"name": name, "before": before, "after": after, "changed": before != after}
+    out = {"name": name, "before": before, "after": after, "changed": before != after}
+    try:
+        out["lent"] = lent_blocks(drawn)
+    except Exception as e:  # the probe failed: said, the findings kept
+        out["lent_error"] = f"{type(e).__name__}: {e}"[:200]
+    return out
+
+
+def lent_blocks(drawn) -> list[dict]:
+    """Each barrel block of a drawn figure (one drawing a ghost of its own strand) holding ghosts lent by another copy
+    (layout._unwrap), as figcheck.science_checks reads it: its strands, the lent ghosts, and those science.lent_ring
+    takes into the ring (a ring strand lent across the cut: Task 7 review M1's control) (plan 29 Task N+1)."""
+    from foldmap.dssp import assign_dssp
+    from foldmap.figcheck import _span, block_ghosts, drawn_columns, local_layout
+    from foldmap.science import adjacent_pairs, bridge_counts, lent_ring
+
+    lay = local_layout(drawn.layout)
+    out, count = [], None
+    for k, ids in enumerate(lay.sheets):
+        ghosts = {g.sse.id: g for g in block_ghosts(lay, k)}
+        lent = [i for i in ghosts if i not in ids]
+        if not lent or not any(i in ids for i in ghosts):
+            continue
+        if count is None:
+            count = bridge_counts(drawn.sses, assign_dssp(drawn.bb).bridges)
+        columns = drawn_columns(lay, k)
+        spots = [(i, c, _span(ghosts[i] if g else lay.placed[i]), g) for c, col in enumerate(columns) for i, g in col]
+        own = [i for i in ids if i not in lay.accessory]
+        ring = lent_ring(own, lent, count, adjacent_pairs(spots))
+        out.append({"sheet": k, "strands": list(ids), "lent": lent, "ring_lent": ring})
+    return out
 
 
 def cmd_science(args) -> int:
@@ -374,6 +407,10 @@ def cmd_science(args) -> int:
     for p in sorted((ROOT / "tests" / "data").rglob("*")):
         if p.is_file() and p.name.endswith((".cif", ".cif.gz")):
             paths.setdefault(str(p), "tests/data")
+    if args.cache:  # Task N+1 (the check half unsealed, P29-5): every cached download, the check half's included
+        for p in sorted((Path.home() / ".cache" / "foldmap").glob("*.cif*")):
+            if p.is_file() and p.name.endswith((".cif", ".cif.gz")):
+                paths.setdefault(str(p), "cache")
     with ProcessPoolExecutor(max_workers=max(1, args.jobs)) as pool:
         futs = [(pool.submit(science_one, p, args.old), src) for p, src in paths.items()]
         rows = [{**f.result(), "source": src} for f, src in futs]
@@ -396,6 +433,15 @@ def cmd_science(args) -> int:
         },
         "S3_before": {r["name"]: r["before"]["S3"] for r in rows if r.get("before", {}).get("S3")},
         "S3_after": {r["name"]: r["after"]["S3"] for r in rows if r.get("after", {}).get("S3")},
+        "sources": {s: sum(1 for r in rows if r["source"] == s) for s in sorted({r["source"] for r in rows})},
+        "lent_blocks": sum(len(r.get("lent") or []) for r in rows),
+        "lent_entries": sorted({r["name"] for r in rows if r.get("lent")}),
+        "lent_errors": sorted(f"{r['name']}: {r['lent_error']}" for r in rows if "lent_error" in r),
+        "ring_lent": {
+            r["name"]: [f"sheet {b['sheet']}: {', '.join(b['ring_lent'])}" for b in r["lent"] if b["ring_lent"]]
+            for r in rows
+            if any(b["ring_lent"] for b in r.get("lent") or [])
+        },
     }
     doc = {"kind": "science", "source_stamp": _stamp(), "summary": summary, "rows": rows}
     Path(args.out).parent.mkdir(parents=True, exist_ok=True)
@@ -777,6 +823,7 @@ def main(argv=None) -> int:
     c.add_argument("--old", required=True, help="figcheck.py as it was")
     c.add_argument("--out", required=True)
     c.add_argument("--jobs", type=int, default=24)
+    c.add_argument("--cache", action="store_true", help="also every cached download, the check half's too (N+1 only)")
     g = sub.add_parser("campaign", help="two random100 runs' keys (and A17 measures) before and after")
     g.add_argument("--before", required=True)
     g.add_argument("--after", required=True)
