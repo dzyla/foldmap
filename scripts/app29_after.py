@@ -57,7 +57,48 @@ CROPS = {  # entry -> (the SVG ids cropped to, why): the look test's named rows
     ),
 }
 SHEET_PX = 1600  # a panel's largest side, px: the sheet's scale is the smaller of this and the PNGs' own
-CAUSES: dict[str, str] = {}  # entry -> the cause of its change in the third-sample and NA measures (after the run)
+_MARKS = (  # Task 4's moves, by the SVG groups that differ (ligand, ligand-tether, ligand-label ids)
+    "Task 4 (fix-ligand: render._place_mark keeps a mark clear of loop lines; the tether-reach step): only its ligand "
+    "marks, tethers and labels moved ({n} SVG groups, every one a ligand's)"
+)
+CAUSES: dict[str, str] = {  # entry -> the cause of its change (the sample's figures, the third sample, the NA set)
+    **{
+        i: _MARKS.format(n=n) + "; no key moved"
+        for i, n in (
+            ("1NID", 9),
+            ("3ABR", 6),
+            ("3G6E", 15),
+            ("3WAU", 6),
+            ("4GWY", 10),
+            ("5S4U", 6),
+            ("6PO4", 12),
+            ("6VBG", 12),
+            ("7F5S", 3),
+            ("7XBK", 21),
+            ("8EM7", 7),
+            ("4YBB", 28),
+            ("1KX5", 3),
+        )
+    },
+    "6IZP": "Task 4 (fix-ligand): the two B2R marks moved inward, so the page is 206.74 -> 203.96 pt wide and every "
+    "element shifts with it (10 ligand groups moved, the rest translated); no key moved",
+    "9FZL": "Task 5 (fix-floor: focus auto draws one subunit of a two-copy complex whose whole figure is below the "
+    "readability floor): one subunit, area 65458.72 -> 14561.27, the fallbacks counts_hidden 2 -> 1, "
+    "helix_name_moved 22 -> 0 and page_text_small 1 -> 0 (better)",
+    "7SPI": "Task 8b Fix A (fix-copies: copies modelled in part are one protein to focus auto): TraV's A1 drawn once, "
+    "B1 lent where it completes A1's sheet; area 426.01 -> 338.03; pass, criteria and fallbacks identical",
+    # the sample's figures (scripts/app29.py run, rerun -> after)
+    **{i: _MARKS.format(n=n) for i, n in (("29TB", 6), ("9SXF", 6), ("9WNE", 4), ("9YN3", 6))},
+    "9X4L": _MARKS.format(n=6) + "; its A20 (ligand tethers local) now passes",
+    "9SVL": "Task 4 (fix-ligand): 11 ligand groups moved and the page widened 361.14 -> 374.38 pt with them, so the "
+    "rest shifts",
+    "26EL": "Task 8b Fix A (fix-copies): focus auto draws A alone, not A, F and M on a diagonal; page 1091 x 1414 -> "
+    "525 x 668 pt",
+    "31FD": "Task 5 (fix-floor): the two-copy complex was below the floor whole, so one subunit is drawn; page 3456 x "
+    "619 -> 1477 x 883 pt; floor exit -> pass",
+    "9X4M": "Task 5 (fix-floor): the two-copy complex was below the floor whole, so one subunit is drawn; page 3456 x "
+    "1203 -> 1746 x 1466 pt; floor exit -> pass",
+}
 
 
 def _module(path: Path, name: str):
@@ -273,7 +314,7 @@ def measure_lines(m: dict) -> list[str]:
         if s["errors"]:
             lines.append(f"- not drawn: {'; '.join(s['errors'])}")
         return lines + [""]
-    st = [((x or {}).get("commit") or "committed")[:7] for x in s["stamps"]]
+    st = [((x or {}).get("commit") or "")[:7] or "(the committed report)" for x in s["stamps"]]
     lines = [f"### {s['label']}", "", f"- before git {st[0]}, after git {st[1]}; entries {s['entries'][0]} -> "]
     lines[-1] += f"{s['entries'][1]}; pass {s['passed'][0]} -> {s['passed'][1]}"
     if kind == "campaign":
@@ -405,11 +446,12 @@ def render(doc: dict, measures: list[dict]) -> str:
         "",
     ]
     if t["changed"]:
-        lines += ["| id | half | outcome | moved | seconds | page failed |", "|---|---|---|---|---|---|"]
+        lines += ["| id | half | outcome | moved | seconds | page failed | cause |", "|---|---|---|---|---|---|---|"]
         for c in t["changed"]:
             lines.append(
                 f"| {c['id']} | {c['half']} | {c['outcome'][0]} -> {c['outcome'][1]} | {', '.join(c['moved']) or '-'} "
-                f"| {c['seconds'][0]} -> {c['seconds'][1]} | {c['ui_failed'][0]} -> {c['ui_failed'][1]} |"
+                f"| {c['seconds'][0]} -> {c['seconds'][1]} | {c['ui_failed'][0]} -> {c['ui_failed'][1]} | "
+                f"{_cause(c['id'])} |"
             )
     else:
         lines.append("Nothing.")
