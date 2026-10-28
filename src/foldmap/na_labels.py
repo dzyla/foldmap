@@ -260,29 +260,6 @@ def _boxes_of(bodies) -> np.ndarray:
     return np.stack([b[:, 0] - hx, b[:, 1] - hy, b[:, 0] + hx, b[:, 1] + hy], axis=1)
 
 
-def _strand_lines(paths: list[NAPath]) -> tuple[np.ndarray, np.ndarray]:
-    """Every strand's drawn line as segments (x0, y0, x1, y1), and the index in `paths` of the strand each is of."""
-    lines = [(k, np.asarray(p.points, float).reshape(-1, 2)) for k, p in enumerate(paths) if len(p.points) > 1]
-    if not lines:
-        return np.empty((0, 4)), np.empty(0, int)
-    segs = np.vstack([np.hstack([q[:-1], q[1:]]) for _, q in lines])
-    return segs, np.concatenate([np.full(len(q) - 1, k) for k, q in lines])
-
-
-def _own_nearest(q, k: int, segs: np.ndarray, of: np.ndarray) -> bool:
-    """Is strand k's line (segments `segs` of strands `of`, _strand_lines) the nearest strand to the spot q, no other
-    strand's line nearer it (a tie is its own)? A letter nearer another strand reads as that strand's. A strand with
-    no line (one point) is nobody's nearest and takes no part: such a letter is judged as before."""
-    a, b = segs[:, :2], segs[:, 2:]
-    ab = b - a
-    along = ((np.asarray(q, float) - a) * ab).sum(axis=1)
-    length2 = (ab * ab).sum(axis=1)
-    t = np.clip(np.divide(along, length2, out=np.zeros_like(along), where=length2 > 0), 0.0, 1.0)
-    d = np.hypot(*(a + t[:, None] * ab - np.asarray(q, float)).T)
-    mine = d[of == k]
-    return mine.size == 0 or not bool((d[of != k] < mine.min()).any())
-
-
 def _place_letters(
     layout: Layout, paths: list[NAPath], loops=(), only=None
 ) -> dict[tuple[int, int], tuple[float, float]]:
@@ -295,9 +272,7 @@ def _place_letters(
     held-out 2FD8's three nucleotides across a jelly roll), the same spots judged by the elements' drawn outlines (a
     strand's shaft is narrower than its box: a letter fits between two shafts), then rings further out
     (_LETTER_RINGS), nearest first, each in sight of its nucleotide (_in_sight); when none of those is clear either,
-    the one furthest from the other letters. A spot beside or along the strand is clear only where no other strand
-    drawn is nearer it than its own (_own_nearest; plan 29 Task 8b: 22MZ's U57, beside run 6 but nearer run 2's line,
-    on run 2's far side, read as run 2's).
+    the one furthest from the other letters.
     `only` (a set of (strand, nucleotide)): place those letters again, every other letter staying where
     layout.na_letters has it, clear of the ties' and gaps' labels placed since too (_letters_off_loops)."""
     where = stem_points(layout)  # on its curve where a bent duplex is drawn as one (na_curve)
@@ -366,13 +341,8 @@ def _place_letters(
             return 0.0
         return taken.nearest(q, own)
 
-    own_segs, own_of = _strand_lines(paths)
-
-    def own(q, k: int) -> bool:  # no other strand's line nearer the spot than its own strand's (paths[k])
-        return _own_nearest(q, k, own_segs, own_of)
-
     at = {key: d for d in layout.stems for key in d.axial}
-    for k_path, p in enumerate(paths):
+    for p in paths:
         pts = np.asarray(p.points, float)
         stems = [at[key] for key in p.between]
         centre = np.mean([[d.cx, d.cy] for d in stems], axis=0) if stems else None
@@ -392,16 +362,13 @@ def _place_letters(
                 out[key] = stay[key]
                 continue
             spaces = [room(q, index[key]) for q in options]
-            free = [r >= _LETTER_GAP and not struck(q, key) and own(q, k_path) for q, r in zip(options, spaces)]
+            free = [r >= _LETTER_GAP and not struck(q, key) for q, r in zip(options, spaces)]
             if not any(free):  # crowded: further out, and further along the strand
                 more = [xy + side * NT_ROW * f for f in (3.1, -3.1)]
                 more += [xy + side * NT_ROW * f + ahead * t for f in (1.0, -1.0, 1.7, -1.7) for t in (0.8, -0.8)]
                 options += more
                 spaces += [room(q, index[key]) for q in more]
-                free += [
-                    r >= _LETTER_GAP and not struck(q, key) and own(q, k_path)
-                    for q, r in zip(more, spaces[-len(more) :])
-                ]
+                free += [r >= _LETTER_GAP and not struck(q, key) for q, r in zip(more, spaces[-len(more) :])]
             if not any(free) and p.kind != "hairpin":  # by the drawn outlines, then on rings further out
                 ok = [
                     outline_room(q, key, index[key]) >= _LETTER_GAP and not struck(q, key) and seen(q, xy)
