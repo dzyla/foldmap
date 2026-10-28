@@ -540,6 +540,68 @@ def build(args) -> dict:
     }
 
 
+# what a floor fix's record says beside its measures (plan 29 Task 5 fix round 1, ruling P29-12): name -> text
+FLOOR_NOTES: dict[str, str] = {
+    "time bound (M3)": "drawing twice costs a C2 complex under the floor its whole figure's time plus its subunit's, "
+    "about 1.3 times the whole (9FZL: whole 47.3 s, subunit 13.4 s). A C2 complex whose whole figure takes about 70 "
+    "to 85 s would pass the hosted 90 s (A2b) drawn twice, where drawn once it showed a figure with a floor warning. "
+    "No measured entry comes near: 9FZL, at 62.7 s for the app's job, is the worst measured case. A bound, not a "
+    "measured failure; the cost falls only on C2 complexes under the floor",
+    "make_figure (M4)": "cli.make_figure lays out once and keeps an assembly of two whole, as draw_spec does before "
+    "judging its floor. It is used only by scripts/build_site.py, scripts/make_previews.py and scripts/gallery.py "
+    "(the website, previews and gallery), never by the app, the command line or the MCP server: no user path "
+    "reaches it. The compare and diff panels (Draw like…) draw one chain like a reference",
+    "standard error (M2)": "what the whole figure's drawing writes to standard error is held and dropped when the "
+    "figure is drawn again as one subunit (spec.held_stderr, the main thread only: the command line); the app and "
+    "the MCP server never show it",
+    "one decision (I1, I2, M1)": "the data (datafile.spec_data), the interactive page (interactive.build_page) and "
+    "the layout file (spec.layout_document) take the figure's subunit by the decision carried from it "
+    "(spec.below_floor_of): the app passes its kept figure (data and page jobs) or the draw job's took_subunit (the "
+    "layout file download, which draws nothing); the command line and the MCP server draw the figure to decide, "
+    "only for an assembly of two",
+}
+# a tune entry's kept file that may change between two records of a floor fix, and why (floor_since): file -> cause
+SINCE_CAUSES: dict[str, str] = {
+    "ui-data.json": "the Data download describes the subunit the figure draws (I1: datafile.spec_data takes the "
+    "figure's decision)",
+    "ui-data.zip": "the same, as CSV tables (I1)",
+    "ui-layout.yaml": "the layout file is laid out as the figure's subunit (M1: the draw job's took_subunit)",
+}
+
+
+def floor_since(args, worse: list[str]) -> dict | None:
+    """What changed since the fix's last record (`--since-*`: its tune run, and its third-sample and NA runs): each
+    tune entry's kept files (app.svg, app.png and the page session's downloads, by sha256) and the third-sample and
+    NA figures (SVG), each with its cause (SINCE_CAUSES); a change with no cause is added to `worse`."""
+    if not args.since_record:
+        return None
+    prune = _script("prune")
+    prev = {e["id"]: e for e in json.loads(Path(args.since_record).read_text(encoding="utf-8"))["entries"]}
+    now = json.loads((Path(args.after) / "report.json").read_text(encoding="utf-8"))["entries"]
+    files = []
+    for e in now:
+        was = (prev.get(e["id"]) or {}).get("files") or {}
+        for name, digest in sorted((e.get("files") or {}).items()):
+            if was.get(name) != digest:
+                cause = SINCE_CAUSES.get(name, "unexplained")
+                files.append({"id": e["id"], "file": name, "cause": cause})
+                if cause == "unexplained":
+                    worse.append(f"{e['id']}: {name} changed since {args.since_label}, unexplained")
+    moved = {}
+    for m in ("r100", "na"):
+        a = prune._campaign_keys(Path(args.since_runs) / m, "baseline", m)
+        b = prune._campaign_keys(Path(args.runs_after) / m, "baseline", m)
+        moved[m] = prune.svg_moved(a["svg"], b["svg"])
+        keys = (
+            prune.campaign_verdict(a["entries"], b["entries"])
+            if m == "r100"
+            else prune.na_verdict({"entries": a["entries"]}, {"entries": b["entries"]})
+        )
+        moved[f"{m}_keys"] = keys["verdict"]
+        worse += [f"{m}: {i} figure moved since {args.since_label}, unexplained" for i in moved[m]]
+    return {"label": args.since_label, "files": files, **moved}
+
+
 def floor_part(args, tune: list[dict]) -> dict:
     """Plan 29 Task 5's own measures (a two-copy complex under the floor; ruling P29-7): the tune half's floor tally;
     its assemblies of two that focus auto draws whole (TUNE_FLAGS: each tune id laid out the app's way, no floor
@@ -594,6 +656,8 @@ def floor_part(args, tune: list[dict]) -> dict:
         "tune_whole_of_two": twos,
         "entries": entries,
         "prediction": {"drawings": len(drawings), "agree": sum(agree), "largest_gap_pt": gap},
+        "since": floor_since(args, worse),
+        "notes": dict(FLOOR_NOTES),
         "worse": worse,
         "better": better,
     }
@@ -655,6 +719,15 @@ def _floor_lines(f: dict) -> list[str]:
         "floor's other reason, is known only once the loops are routed. spec.draw_spec draws the whole, judges it and "
         "draws again instead.",
     ]
+    if f.get("since"):
+        x = f["since"]
+        lines += ["", f"## Changed since {x['label']} (the last record), and why", ""]
+        lines += [f"- `{c['id']}` {c['file']}: {c['cause']}" for c in x["files"]] or ["- tune kept files: none"]
+        for m in ("r100", "na"):
+            lines.append(f"- {m}: keys {x[m + '_keys']}; figures moved: {', '.join(x[m]) or 'none'}")
+    if f.get("notes"):
+        lines += ["", "## Notes", ""]
+        lines += [f"- {k}: {v}." for k, v in f["notes"].items()]
     return lines
 
 
