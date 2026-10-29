@@ -15,6 +15,9 @@ drawn after plan 15's fixes with none of this sample's or the first's ids.
 
     python scripts/random100.py run --views all --sample docs/validation/random100-heldout/sample.json --out DIR
 
-`report.md` and `report.json.gz` (gzipped: `random100.py run --failed-from` reads it as it is) are plan 15's full run
-(95 of 100), judged by the same criteria and limits as the other samples; `review.md` says which of the first run's
-twenty failures pass now, why the other five fail, and what else changed.
+`report.md`, `report.json.gz` (gzipped: `random100.py run --failed-from` reads it as it is) and `run.log` are the run at
+the paper's release, v0.2.0 (e1392f7, code fingerprint 7879eea05bd9301c), in a clean checkout of the tag on
+zyla-office, judged by the same criteria and limits as the other samples: 94 of 100 pass. Against plan 15's full run
+(95), one entry fails that passed: 13FZ, A3 in the domains view (strands B:1-13 and D:1-13 routed by the fallback),
+listed for the release after v0.2.0 and not fixed in it (the freeze rule). `review.md` is plan 15's review of plan
+15's run: which of the first run's twenty failures passed then, why the other five failed, and what else changed.

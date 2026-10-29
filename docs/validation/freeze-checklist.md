@@ -12,7 +12,7 @@ record. A record whose number the paper quotes is regenerated before the paper q
 
 | record | made at | why it is regenerated | how |
 |---|---|---|---|
-| `random100-fourth/` | not drawn | the paper's headline count | `fourth_sample.py draw --release TAG`, then one `random100.py run --views all`, in the release checkout (the protocol) |
+| `random100-fourth/` | drawn and run once at v0.2.0 (85 of 101) | the paper's headline count | `fourth_sample.py draw --release TAG`, then one `random100.py run --views all`, in the release checkout (the protocol) |
 | `sensitivity/` | runs at 5f09684's code | the NA fixes, the prune and the rest changed what it measures; the default baseline moved 80 to 82 (its "Code since this run" section, final review F1) | rerun stages B, V and X at the release commit (about 3.9 h on zl), then `sensitivity.py report` |
 | `readability-floor/` | e6fcf36 | its census and measures predate later code; its generator now says R1's route-budget reason fires on 7NZ2's domains view (F9) | `scripts/readability_floor.py` |
 | `prune/` | runs at 46f5ebf, record b730a05 | its next render adds one sentence: the record's stamp is b730a05 while the equivalence runs were at c64ea7a, and `git diff c64ea7a b730a05 -- src` is comments and docstrings only (parked T9.3) | `scripts/prune.py` report at the release |
@@ -20,7 +20,7 @@ record. A record whose number the paper quotes is regenerated before the paper q
 | `na-fixes/` | 6ca884c | stamped at a pre-release commit; `na_runs:_JOINT_NEAR` was pruned after it (the prune measured the NA set identical) | `scripts/na_fixes_record.py` |
 | `domain-uncertainty/` | 42e3fe8 | stamped at a pre-release commit | `scripts/domain_uncertainty.py` |
 | `homologues/topology-transfer/` | cdd29dd | H1-H5 not remeasured since; low risk (domain-name placement and NA joints only changed) | `scripts/topology_transfer.py`, with the other homologue campaigns |
-| `random100/`, `random100-heldout/` | 7696947 | "on this release" in the paper is false until they are rerun (claims R8, R9) | `random100.py run` at the tag, not for the headline |
+| `random100/`, `random100-heldout/` | 7696947; rerun at v0.2.0 (91 and 94 of 100) | "on this release" in the paper is false until they are rerun (claims R8, R9) | `random100.py run` at the tag, not for the headline |
 | `random100-third/` | 7696947 | kept as it is: a historical prospective evaluation at 7696947 | none |
 | `na/` (and the M2 NA rerun) | older code | the NA campaign the paper quotes | `M2_RERUN=1 scripts/paper/run_all.sh TAG HARNESS` |
 | `inventory/` and its freeze baseline | b730a05 | the table must match the release's code (`tests/test_inventory.py` fails otherwise) | `scripts/inventory.py`; `scripts/freeze_baseline.py` only shrinks |

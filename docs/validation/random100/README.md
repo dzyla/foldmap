@@ -37,6 +37,12 @@ those fixes with none of either sample's ids (`--exclude` given twice, seed 2026
 tuned on: `docs/validation/random100-third/`. In plan 15's full run (7696947) the three pass 93 (this sample), 95
 (the second) and 83 (the third) of 100.
 
+`report.md`, `report.json` and `run.log` are the run at the paper's release, v0.2.0 (e1392f7, code fingerprint
+7879eea05bd9301c), in a clean checkout of the tag on zyla-office: 91 of 100 pass. Against plan 15's run (93), 10UJ
+and 9YKJ pass now, and 8RRX and 5LDW fail A6: a label collides with the helix it names (8RRX G:4806-4819 in every
+view; 5LDW G:265-268, G:296-308 and G:389-401 in the deposited-names view). Both are listed for the release after
+v0.2.0, not fixed in it (the freeze rule). `review.md` is plan 15's review of plan 15's run.
+
 ## The run
 
     NA_RNAPOLIS_PYTHON=/path/to/venv-with-rnapolis/bin/python python scripts/random100.py run [--jobs 1]

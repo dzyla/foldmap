@@ -1,6 +1,10 @@
 # foldmap random-100 campaign
 
-95 of 100 pass.
+94 of 100 pass.
+
+Report written by: foldmap 0.2.0, git e1392f79daf7, code fingerprint 7879eea05bd9301c, scripts/random100.py sha256 b552d3c3d4b3; Python 3.13.13 on Linux-7.0.0-38-generic-x86_64-with-glibc2.43; gemmi 0.7.5, numpy 2.5.4, scipy 1.18.1, networkx 3.7, matplotlib 3.11.2, PyYAML 6.0.3
+
+Entries measured by 1 code version(s): 7879eea05bd9301c+b552d3c3d4b358ca (100)
 
 An entry passes when no criterion fails. A criterion with nothing to judge in an entry is not judged (or does not apply), never counted as a pass: see the outcomes per criterion below.
 
@@ -15,7 +19,7 @@ Sample: seed 20261017, release-date cutoff 2026-10-13.
 | S5 | 8 | 8 |
 | S6 | 8 | 8 |
 | S7 | 7 | 6 |
-| S8 | 7 | 4 |
+| S8 | 7 | 3 |
 | S9 | 3 | 3 |
 | S10 | 5 | 5 |
 | S11 | 10 | 10 |
@@ -46,7 +50,7 @@ Sample: seed 20261017, release-date cutoff 2026-10-13.
 | A15 copies drawn alike | 34 | 1 | 15 | 50 |
 | A16 domains: one chain, alike, not tiny, panels apart, names clear | 50 | 1 | 12 | 37 |
 | A17 nucleic-acid metrics and stem names by their letters | 14 | 3 | 0 | 83 |
-| A18 membrane: TM helices in the band, loops out of the slab | 8 | 0 | 0 | 92 |
+| A18 membrane: only the band set in the band (TM helices across it, slab helices at their depths, crossing strands), no element nearer than its residues or on the wrong side, no loop nearer than its residues but out of a band element's port to its face or, for a loop in the bilayer, beside its own port to its residues' depth; a loop joining the faces crosses the band only beside its own port or past the band's ends | 8 | 0 | 0 | 92 |
 | A19 two states: same names in the same order | 8 | 0 | 0 | 92 |
 | A20 ligand tethers local | 12 | 0 | 53 | 35 |
 
@@ -56,7 +60,7 @@ Sample: seed 20261017, release-date cutoff 2026-10-13.
 - **A11** (1): 9BVV (no protein element drawn)
 - **A15** (15): 5S5Z (copies drawn with no symmetry tie: default C~A, D~B); 6XER (copies drawn with no symmetry tie: default C~A, D~B); 3L4G (copies drawn with no symmetry tie: default D~B; focus D~B); 6ET5 (copies drawn with no symmetry tie: default F~z, K~z, P~z, S~z, V~z, Y~z, b~z, e~z, h~z, k~z, n~z, q~z, t~z, w~z, 3~z, 6~z, G~1, N~1, Q~1, T~1, W~1, Z~1, c~1, f~); 8BCU (copies drawn with no symmetry tie: default D~C, A~C, B~C, G~H, E~C, F~C, I~H); 6V6S (copies drawn with no symmetry tie: default C~A, D~B, E~A, F~B, G~A, H~B, K~I, M~A, O~N, Q~N, R~N, S~N, T~B, Y~V, b~a, c~a, d~a, e~a, f~a, g~a, h~a, i~a, j~a, k~); 7ZDP (copies drawn with no symmetry tie: default j~X); 8WMV (copies drawn with no symmetry tie: default f~m, j~m); 6ZKT (copies drawn with no symmetry tie: default j~X); 8WH0 (copies drawn with no symmetry tie: default B~A, C~A, D~A, E~A, F~A); 6L9Z (copies drawn with no symmetry tie: default E~A, F~B, G~C, H~D, K~A, L~B, M~C, N~D, O~A, P~B, Q~C, R~D; focus E~A, F~B, G~C, H~D, K~A, L~B, M~C, N~D, O~A, P~B, Q); 2VBO (copies drawn with no symmetry tie: default B~A); 7NZ2 (copies drawn with no symmetry tie: default A2~A1, A3~A1, A4~A1, B1~A1, B2~A1, B3~A1, B4~A1, C2~C1, D1~C1, D2~C1, E2~E1, E3~E1, E4~E1, F1~E1, F2~E1, F3~E1, F4~E1); 9YER (copies drawn with no symmetry tie: default C~A); 9QK1 (copies drawn with no symmetry tie: default C~B, D~B, E~B, H~G, I~G)
 - **A16** (12): 3KSI (the domains view drew no domain); 5YUH (the domains view drew no domain); 6B7J (the domains view drew no domain); 2O4P (the domains view drew no domain); 3B6N (the domains view drew no domain); 3KTK (the domains view drew no domain); 2YJA (the domains view drew no domain); 3JBE (the domains view drew no domain); 1TKW (the domains view drew no domain); 2VBO (the domains view drew no domain); 5K7Z (the domains view drew no domain); 9WB3 (the domains view drew no domain)
-- **A20** (53): 1PTY (no tether to another chain; reported: ligand-tether:PTR:A323:2 7.807 (home A)); 1HMY (no tether to another chain); 6EJ3 (no tether to another chain; reported: ligand-tether:B7T:A501:0 7.443 (home A); ligand-tether:B7T:A501:1 6.648 (home A)); 5RFU (no tether to another chain); 8F03 (no tether to another chain); 5YUH (no tether to another chain); 2W6W (no tether to another chain); 3LIL (no tether to another chain); 7P46 (no tether to another chain; reported: ligand-tether:HEM+CYN:B301:1 7.452 (home B); ligand-tether:HEM+CYN:A301:2 6.984 (home A); ligand-tether:KYN:D303:0 7.308 (); 8HRP (no tether to another chain; reported: ligand-tether:NAD:A401:2 7.085 (home A); ligand-tether:G3H:C402:1 8.142 (home C); ligand-tether:NAD:D401:2 8.264 (home D)); 6SNU (no tether to another chain; reported: ligand-tether:PLP:A502:1 7.162 (home A); ligand-tether:PLP:A502:3 6.731 (home A); ligand-tether:PLP:B504:1 7.148 (home B);); 3AMZ (no tether to another chain; reported: ligand-tether:FAD:A3005:2 10.299 (home A); ligand-tether:FES:A3001:2 19.25 (home A); ligand-tether:ZXF:A3009:2 7.767 (home); 8ZT9 (no tether to another chain); 7X8H (no tether to another chain); 2NAD (no tether to another chain); 2O4P (no tether to another chain; reported: ligand-tether:TPV:A300:0 7.055 (home A)); 3B6N (no tether to another chain); 5EUJ (no tether to another chain; reported: ligand-tether:TPP:A602:2 6.904 (home A); ligand-tether:TPP:A602:3 6.548 (home A)); 9SLB (no tether to another chain); 6HW8 (no tether to another chain; reported: ligand-tether:MG:G301:2 9.455 (home G); ligand-tether:GT8:H301:0 7.81 (home H); ligand-tether:GT8:V301:0 6.703 (home V); l); 6XER (no tether to another chain; reported: ligand-tether:GTP:A501:1 9.82 (home A); ligand-tether:GTP:A501:2 6.856 (home A); ligand-tether:GDP:B501:3 7.63 (home B); l); 3ULQ (no tether to another chain); 2UZU (no tether to another chain); 6N9A (no tether to another chain; reported: ligand-tether:ZN:D1402:2 8.962 (home D1); ligand-tether:KG4:D1401:3 8.415 (home D1); ligand-tether:ZN:D2402:2 8.983 (home ); 2YJA (no tether to another chain; reported: ligand-tether:EST:B11550:0 7.343 (home B1); ligand-tether:EST:B11550:3 9.438 (home B1); ligand-tether:EST:B21550:0 7.343 (); 4N9F (no tether to another chain); 3L4G (no tether to another chain); 8D3D (no tether to another chain; reported: ligand-tether:CA:A2001:4 8.03 (home A)); 6V6S (no tether to another chain; reported: ligand-tether:ADP:U800:0 15.067 (home U); ligand-tether:ADP:U800:1 25.094 (home U); ligand-tether:ADP:U800:2 12.144 (home ); 12BM (no tether to another chain; reported: ligand-tether:ADP:A501:2 9.217 (home A); ligand-tether:ADP:A501:3 7.765 (home A); ligand-tether:AGS:C501:1 18.867 (home C)); 7BKC (no tether to another chain; reported: ligand-tether:FAD:A702:3 13.647 (home A); ligand-tether:FAD:a702:0 7.359 (home a); ligand-tether:FAD:a702:3 11.157 (home a); 9Y05 (no tether to another chain; reported: ligand-tether:JDP:A901:2 6.657 (home A)); 1TKW (no tether to another chain); 6MJ2 (no tether to another chain; reported: ligand-tether:CA:A1601:2 6.912 (home A)); 6QFA (no tether to another chain); 8JWF (no tether to another chain; reported: ligand-tether:YMZ:A1500:1 6.779 (home A); ligand-tether:YMZ:A1500:2 8.191 (home A)); 8WH0 (no tether to another chain; reported: ligand-tether:ANP:A802:3 8.21 (home A); ligand-tether:ANP:C802:1 7.546 (home C); ligand-tether:ANP:F802:1 6.752 (home F); ); 4NLG (no tether to another chain); 2FD8 (no tether to another chain); 13FZ (no tether to another chain; reported: ligand-tether:AGS:A2000:1 6.788 (home A); ligand-tether:AGS:A2000:2 13.886 (home A); ligand-tether:AGS:A2000:3 8.4 (home A); 4E8Q (no tether to another chain); 9IWF (no tether to another chain); 9YER (no tether to another chain); 9QK1 (no tether to another chain); 3IB0 (no tether to another chain; reported: ligand-tether:CO3:A687:3 6.71 (home A)); 6A4Y (no tether to another chain; reported: ligand-tether:HEM:A601:0 8.952 (home A)); 8JXD (no tether to another chain); 1C6A (no tether to another chain); 244L (no tether to another chain); 8U9T (no tether to another chain; reported: ligand-tether:W1L:A1401:3 7.845 (home A1); ligand-tether:W1L:A2401:3 7.884 (home A2)); 3U3H (no tether to another chain; reported: ligand-tether:03W+FMT:A1400:1 10.047 (home A1); ligand-tether:MRD:A12000:2 7.095 (home A1); ligand-tether:MRD:A32000:2 7.0); 6QND (no tether to another chain; reported: ligand-tether:MG:A402:0 8.701 (home A); ligand-tether:MG:A402:2 10.774 (home A); ligand-tether:MG:A402:3 7.584 (home A); l); 2BBH (no tether to another chain; reported: ligand-tether:DMU:A402:2 6.502 (home A); ligand-tether:DMU:A402:3 9.734 (home A))
+- **A20** (53): 1PTY (no tether to another chain; reported: ligand-tether:PTR:A323:2 7.807 (home A)); 1HMY (no tether to another chain); 6EJ3 (no tether to another chain; reported: ligand-tether:B7T:A501:0 7.443 (home A); ligand-tether:B7T:A501:1 6.648 (home A)); 5RFU (no tether to another chain; reported: ligand-tether:T8D:A1405:1 7.634 (home A1); ligand-tether:T8D:A2405:1 7.634 (home A2)); 8F03 (no tether to another chain); 5YUH (no tether to another chain; reported: ligand-tether:ZN:A1202:3 6.623 (home A1); ligand-tether:ZN:A2202:3 6.623 (home A2)); 2W6W (no tether to another chain); 3LIL (no tether to another chain); 7P46 (no tether to another chain; reported: ligand-tether:HEM+CYN:B301:1 7.452 (home B); ligand-tether:HEM+CYN:A301:2 6.984 (home A); ligand-tether:KYN:D303:0 7.308 (); 8HRP (no tether to another chain; reported: ligand-tether:NAD:A401:0 8.202 (home A); ligand-tether:NAD:A401:1 6.596 (home A); ligand-tether:NAD:A401:2 7.509 (home A);); 6SNU (no tether to another chain; reported: ligand-tether:PLP:A502:1 9.15 (home A); ligand-tether:PLP:A502:2 7.053 (home A); ligand-tether:PLP:A502:3 9.678 (home A); ); 3AMZ (no tether to another chain; reported: ligand-tether:FAD:A3005:2 10.736 (home A); ligand-tether:FES:A3001:2 10.645 (home A); ligand-tether:ZXF:A3009:1 9.74 (home); 8ZT9 (no tether to another chain; reported: ligand-tether:A1D87:B401:3 9.485 (home B); ligand-tether:A1D87:A401:2 9.484 (home A)); 7X8H (no tether to another chain); 2NAD (no tether to another chain); 2O4P (no tether to another chain; reported: ligand-tether:TPV:A300:0 6.969 (home A)); 3B6N (no tether to another chain); 5EUJ (no tether to another chain; reported: ligand-tether:TPP:A602:2 6.904 (home A); ligand-tether:TPP:A602:3 6.548 (home A)); 9SLB (no tether to another chain); 6HW8 (no tether to another chain; reported: ligand-tether:MG:G301:2 9.455 (home G); ligand-tether:GT8:H301:0 7.81 (home H); ligand-tether:GT8:V301:0 6.703 (home V); l); 6XER (no tether to another chain; reported: ligand-tether:GTP:A501:1 10.041 (home A); ligand-tether:GTP:A501:2 7.061 (home A); ligand-tether:GDP:B501:3 7.63 (home B);); 3ULQ (no tether to another chain); 2UZU (no tether to another chain); 6N9A (no tether to another chain; reported: ligand-tether:ZN:D1402:2 8.962 (home D1); ligand-tether:KG4:D1401:3 8.415 (home D1); ligand-tether:ZN:D2402:2 8.983 (home ); 2YJA (no tether to another chain; reported: ligand-tether:EST:B11550:0 7.343 (home B1); ligand-tether:EST:B11550:3 9.438 (home B1); ligand-tether:EST:B21550:0 7.343 (); 4N9F (no tether to another chain); 3L4G (no tether to another chain); 8D3D (no tether to another chain; reported: ligand-tether:CA:A2001:4 8.03 (home A)); 6V6S (no tether to another chain; reported: ligand-tether:ADP:U800:0 15.067 (home U); ligand-tether:ADP:U800:1 25.094 (home U); ligand-tether:ADP:U800:2 12.144 (home ); 12BM (no tether to another chain; reported: ligand-tether:ADP:A501:2 9.217 (home A); ligand-tether:ADP:A501:3 7.765 (home A); ligand-tether:AGS:C501:1 18.867 (home C)); 7BKC (no tether to another chain; reported: ligand-tether:FAD:A702:0 7.004 (home A); ligand-tether:FAD:A702:3 14.728 (home A); ligand-tether:FAD:a702:0 7.359 (home a)); 9Y05 (no tether to another chain; reported: ligand-tether:JDP:A901:2 6.657 (home A)); 1TKW (no tether to another chain); 6MJ2 (no tether to another chain; reported: ligand-tether:CA:A1601:2 6.912 (home A)); 6QFA (no tether to another chain); 8JWF (no tether to another chain; reported: ligand-tether:YMZ:A1500:1 6.779 (home A); ligand-tether:YMZ:A1500:2 8.191 (home A)); 8WH0 (no tether to another chain; reported: ligand-tether:ANP:A802:3 8.21 (home A); ligand-tether:ANP:C802:1 7.546 (home C); ligand-tether:ANP:F802:1 6.752 (home F); ); 4NLG (no tether to another chain); 2FD8 (no tether to another chain); 13FZ (no tether to another chain; reported: ligand-tether:AGS:A2000:1 6.788 (home A); ligand-tether:AGS:A2000:2 13.886 (home A); ligand-tether:AGS:A2000:3 8.4 (home A); 4E8Q (no tether to another chain); 9IWF (no tether to another chain); 9YER (no tether to another chain); 9QK1 (no tether to another chain); 3IB0 (no tether to another chain; reported: ligand-tether:CO3:A687:3 9.542 (home A)); 6A4Y (no tether to another chain; reported: ligand-tether:HEM:A601:0 8.952 (home A)); 8JXD (no tether to another chain); 1C6A (no tether to another chain); 244L (no tether to another chain); 8U9T (no tether to another chain; reported: ligand-tether:W1L:A1401:3 8.752 (home A1); ligand-tether:W1L:A2401:3 8.053 (home A2)); 3U3H (no tether to another chain; reported: ligand-tether:03W+FMT:A1400:1 10.047 (home A1); ligand-tether:MRD:A12000:2 7.095 (home A1); ligand-tether:MRD:A32000:2 7.0); 6QND (no tether to another chain; reported: ligand-tether:MG:A402:0 8.701 (home A); ligand-tether:MG:A402:2 10.774 (home A); ligand-tether:MG:A402:3 7.584 (home A); l); 2BBH (no tether to another chain; reported: ligand-tether:DMU:A402:2 6.502 (home A); ligand-tether:DMU:A402:3 9.734 (home A))
 
 ## Entries
 
@@ -64,106 +68,106 @@ process s: the default view's whole process (drawing, measuring and, for nucleic
 
 | id | stratum | bin | chains | process s | drawing s | A1 | A1c | A2 | A2b | A3 | A4 | A5 | A6 | A7 | A8 | A9 | A10 | A11 | A12 | A13 | A14 | A15 | A16 | A17 | A18 | A19 | A20 | failed |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 1PTY | S1 | M | 1 | 0.9 | 0.28 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | ○ |  |
-| 6TX2 | S1 | M | 1 | 0.85 | 0.28 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | - |  |
-| 7N71 | S1 | M | 1 | 1.25 | 0.63 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - |  |
-| 1HMY | S1 | M | 1 | 0.9 | 0.3 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | ○ |  |
-| 6EJ3 | S1 | M | 1 | 1.25 | 0.69 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | ○ |  |
-| 5RFU | S1 | M | 1 | 1.05 | 0.41 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | ○ |  |
-| 2FR2 | S1 | S | 1 | 0.7 | 0.17 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | - |  |
-| 8F03 | S1 | S | 1 | 1.1 | 0.48 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | ○ |  |
-| 3KSI | S1 | S | 1 | 0.95 | 0.4 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ○ | - | - | - | - |  |
-| 5YUH | S1 | S | 1 | 0.85 | 0.23 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ○ | - | - | - | ○ |  |
-| 2W6W | S1 | S | 1 | 0.75 | 0.17 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | ○ |  |
-| 3LIL | S1 | S | 1 | 0.8 | 0.18 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | ○ |  |
-| 7P46 | S2 | L | 8 | 1.7 | 0.9 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | ○ |  |
-| 8HRP | S2 | L | 8 | 2.05 | 1.17 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | ○ |  |
-| 6SNU | S2 | L | 4 | 1.7 | 0.96 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | ○ |  |
-| 3AMZ | S2 | L | 2 | 3.46 | 2.36 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | ○ |  |
-| 8ZT9 | S2 | M | 2 | 1.35 | 0.71 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | ○ |  |
-| 7X8H | S2 | M | 1 | 1.5 | 0.79 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | ○ |  |
-| 2NAD | S2 | M | 2 | 1.31 | 0.6 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | ○ |  |
-| 6B7J | S2 | M | 2 | 0.85 | 0.26 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ○ | - | - | - | - |  |
-| 2O4P | S2 | S | 2 | 0.8 | 0.26 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ○ | - | - | - | ○ |  |
-| 3B6N | S2 | S | 1 | 0.9 | 0.31 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ○ | - | - | - | ○ |  |
-| 5EUJ | S2 | XL | 24 | 1.65 | 0.79 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | ○ |  |
-| 9SLB | S2 | XL | 10 | 2.1 | 1.08 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | ○ |  |
-| 3KTK | S3 | L | 28 | 1.2 | 0.35 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ○ | - | - | - | - |  |
-| 5S5Z | S3 | L | 6 | 3.21 | 2.14 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ○ | ✓ | - | - | - | ✓ |  |
-| 6HW8 | S3 | L | 28 | 7.11 | 5.21 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | ○ |  |
-| 6XER | S3 | L | 5 | 2.61 | 1.59 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ○ | ✓ | - | - | - | ○ |  |
-| 3ULQ | S3 | M | 2 | 1.15 | 0.4 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✓ | - | - | - | ○ |  |
-| 2UZU | S3 | M | 2 | 0.9 | 0.31 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✓ | - | - | - | ○ |  |
-| 6N9A | S3 | M | 3 | 1.9 | 1.04 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | ○ |  |
-| 2YJA | S3 | S | 2 | 1.05 | 0.41 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ○ | - | - | - | ○ |  |
-| 4N9F | S3 | XL | 60 | 1.6 | 0.76 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✓ | - | - | - | ○ |  |
-| 3L4G | S3 | XL | 16 | 2.4 | 1.45 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ○ | ✓ | - | - | - | ○ |  |
-| 8FLU | S4 | L | 6 | 2.2 | 1.54 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✓ | - | - | - | - |  |
-| 6ET5 | S4 | L | 54 | 5.56 | 3.35 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ○ | ✓ | - | - | - | ✓ |  |
-| 7KH0 | S4 | L | 7 | 3.21 | 2.52 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✓ | - | - | - | - |  |
-| 8BCU | S4 | L | 9 | 3.51 | 2.56 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ○ | ✓ | - | - | - | - |  |
-| 7ZZ1 | S4 | L | 2 | 1.1 | 0.43 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✓ | - | - | - | ✓ |  |
-| 3JBE | S4 | M | 5 | 1.65 | 0.96 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ○ | - | - | - | - |  |
-| 6WUT | S4 | M | 3 | 1.3 | 0.64 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✓ | - | - | - | - |  |
-| 8D3D | S4 | XL | 16 | 17.28 | 15.48 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | ○ |  |
-| 6V6S | S4 | XL | 38 | 24.84 | 21.0 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ○ | ✓ | - | - | - | ○ |  |
-| 12BM | S4 | XL | 19 | 11.57 | 9.7 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✓ | - | - | - | ○ |  |
-| 9GTP | S4 | XL | 60 | 4.16 | 2.64 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | - | - | - | - | A15: focus 41.39338891387734 |
-| 7BKC | S4 | XL | 26 | 13.02 | 9.25 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | ○ |  |
-| 7SPB | S4 | XL | 78 | 1.6 | 0.75 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - |  |
-| 7ZDP | S4 | XL | 45 | 12.52 | 9.87 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ○ | ✓ | - | - | - | ✓ |  |
-| 9Y05 | S4 | XL | 12 | 1.7 | 0.85 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | ○ |  |
-| 1TKW | S5 | M | 2 | 1.0 | 0.37 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ○ | - | - | - | ○ |  |
-| 2MRJ | S5 | S | 1 | 0.7 | 0.14 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | - |  |
-| 5GIW | S5 | S | 1 | 0.6 | 0.07 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | - |  |
-| 2LZJ | S5 | S | 1 | 0.7 | 0.14 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | - |  |
-| 2N5J | S5 | S | 1 | 0.65 | 0.1 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | - |  |
-| 8SKX | S5 | S | 1 | 0.6 | 0.11 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | - |  |
-| 1RCH | S5 | S | 1 | 0.7 | 0.15 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | - |  |
-| 9BVV | S5 | S | 1 | 0.55 | 0.03 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ○ | ✓ | ✓ | ○ | ✓ | ✓ | ✓ | - | - | - | - | - | - |  |
-| 9CZH | S6 | L | 8 | 2.91 | 1.92 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✓ | - | ✓ |  |
-| 6MJ2 | S6 | L | 4 | 1.95 | 1.05 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✓ | - | ○ |  |
-| 6QFA | S6 | L | 10 | 1.65 | 0.93 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✓ | - | ○ |  |
-| 8WMV | S6 | L | 28 | 22.24 | 15.49 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ○ | ✓ | - | ✓ | - | ✓ |  |
-| 8JWF | S6 | M | 1 | 1.65 | 0.9 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | ✓ | - | ○ |  |
-| 7JI3 | S6 | M | 3 | 1.2 | 0.58 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✓ | - | - |  |
-| 7VVK | S6 | M | 6 | 2.25 | 1.57 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✓ | - | ✓ | - | - |  |
-| 6ZKT | S6 | XL | 45 | 16.38 | 13.32 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ○ | ✓ | - | ✓ | - | ✓ |  |
-| 8WH0 | S7 | L | 7 | 5.66 | 2.34 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ○ | ✓ | ✓ | - | - | ○ |  |
-| 6L9Z | S7 | L | 19 | 6.81 | 3.39 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ○ | ✓ | ✓ | - | - | ✓ |  |
-| 4NLG | S7 | M | 3 | 2.3 | 0.58 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | ✓ | - | - | ○ |  |
-| 2VBO | S7 | M | 4 | 2.15 | 0.37 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ○ | ○ | ✓ | - | - | ✓ |  |
-| 5K7Z | S7 | M | 6 | 3.06 | 0.84 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ○ | ✓ | - | - | ✓ |  |
-| 2FD8 | S7 | S | 2 | 1.85 | 0.25 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | ✓ | - | - | ○ |  |
-| 7NZ2 | S7 | XL | 44 | 57.55 | 43.7 | ✓ | - | ✓ | ✓ | ✗ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ○ | ✗ | ✗ | - | - | ✓ | A3: domains: B3:211-221>B3:227-408, B3:1051-1123>B3:1136-1140, F3:182-186>F3:197-205; A6: domains 3 (domain-label:D7 · A1 × loop:B3:211-221>B3:227-408; domain-label:D1 · A3 × loop:F3:182-186>F3:197-205; domain-label:D7 · B3 × loop:B3:211-221>B3:227-408); A16: domains 3 (domain-label:D7 · A1 × loop:B3:211-221>B3:227-408; domain-label:D1 · A3 × loop:F3:182-186>F3:197-205; domain-label:D7 · B3 × loop:B3:211-221>B3:227-408); A17: spearman 0.446 (limit 0.6) |
-| 9K4F | S8 | L | 4 | 3.46 | 1.21 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | ✗ | - | - | - | A17: stems_nearer_frac 0.875 (limit 1.0) |
-| 13FZ | S8 | L | 4 | 8.06 | 5.55 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | ○ |  |
-| 9WB3 | S8 | M | 4 | 2.4 | 0.61 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ○ | ✓ | - | - | - |  |
-| 7F3J | S8 | M | 8 | 1.7 | 0.16 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | ✓ | - | - | - |  |
-| 2XLJ | S8 | S | 2 | 1.85 | 0.22 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | ✓ | - | - | - |  |
-| 6S13 | S8 | XL | 52 | 47.43 | 32.1 | ✓ | - | ✓ | ✓ | ✗ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✓ | ✗ | - | - | - | A3: domains: strand A:2729-2729, strand A:2732-2733, strand A:2737-2738; A6: domains 3 (na:stem:80:first × na:run:239; na:stem:129:first × na:run:239; na:stem:129:first × na:run:240); A17: pair_f1 0.944 (limit 0.95) |
-| 8ZTU | S8 | XL | 56 | 60.74 | 43.48 | ✓ | - | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✓ | ✓ | - | - | ✓ | A3: domains: strand a:2701-2702, strand a:2705-2705, strand a:2710-2711 |
-| 4E8Q | S9 | M | 1 | 3.81 | 1.14 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | ✓ | ✓ | ✓ | - | - | ✓ | - | - | ○ |  |
-| 9IWF | S9 | S | 2 | 2.0 | 0.35 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | ✓ | ✓ | ✓ | - | - | ✓ | - | - | ○ |  |
-| 1Z43 | S9 | S | 1 | 1.9 | 0.37 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | ✓ | ✓ | ✓ | - | - | ✓ | - | - | - |  |
-| 9YER | S10 | L | 5 | 5.06 | 4.14 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ○ | ✓ | - | - | - | ○ |  |
-| 9QK1 | S10 | L | 9 | 7.96 | 7.12 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ○ | ✓ | - | - | - | ○ |  |
-| 3IB0 | S10 | M | 1 | 2.86 | 2.21 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | ○ |  |
-| 6A4Y | S10 | M | 1 | 2.1 | 1.45 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | ○ |  |
-| 8JXD | S10 | XL | 2 | 4.16 | 3.27 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | ○ |  |
-| 4P39 | S11 | M | 4 | 0.65 | 0.14 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | ✓ | - |  |
-| 3HQB | S11 | S | 2 | 0.8 | 0.23 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | ✓ | - |  |
-| 1C6A | S11 | S | 1 | 0.75 | 0.2 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | ✓ | ○ |  |
-| 244L | S11 | S | 1 | 0.7 | 0.19 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | ✓ | ○ |  |
-| 8U9T | S11 | M | 1 | 1.1 | 0.49 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | ○ |  |
-| 7IT6 | S11 | S | 1 | 0.75 | 0.14 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | - |  |
-| 3U3H | S11 | M | 1 | 2.05 | 1.18 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | ✓ | ○ |  |
-| 6QND | S11 | M | 1 | 0.95 | 0.33 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | ✓ | ○ |  |
-| 2BBJ | S11 | L | 5 | 2.2 | 1.42 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | ✓ | - |  |
-| 2BBH | S11 | S | 1 | 0.85 | 0.25 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | ✓ | ○ |  |
-| AF_AFQ387E4F1 | S12 | M | 1 | 0.8 | 0.25 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | - |  |
-| AF_AFQ8W0Z7F1 | S12 | M | 1 | 1.05 | 0.42 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | - |  |
-| AF_AFC7J156F1 | S12 | S | 1 | 0.65 | 0.12 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | - |  |
+| 1PTY | S1 | M | 1 | 1.1 | 0.3 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | ○ |  |
+| 6TX2 | S1 | M | 1 | 1.1 | 0.32 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | - |  |
+| 7N71 | S1 | M | 1 | 2.16 | 1.09 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - |  |
+| 1HMY | S1 | M | 1 | 1.2 | 0.34 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | ○ |  |
+| 6EJ3 | S1 | M | 1 | 1.86 | 0.93 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | ○ |  |
+| 5RFU | S1 | M | 1 | 1.8 | 0.73 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | ○ |  |
+| 2FR2 | S1 | S | 1 | 0.9 | 0.21 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | - |  |
+| 8F03 | S1 | S | 1 | 1.55 | 0.65 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | ○ |  |
+| 3KSI | S1 | S | 1 | 1.55 | 0.7 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ○ | - | - | - | - |  |
+| 5YUH | S1 | S | 1 | 1.76 | 0.72 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ○ | - | - | - | ○ |  |
+| 2W6W | S1 | S | 1 | 0.95 | 0.2 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | ○ |  |
+| 3LIL | S1 | S | 1 | 1.05 | 0.22 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | ○ |  |
+| 7P46 | S2 | L | 8 | 2.41 | 1.18 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | ○ |  |
+| 8HRP | S2 | L | 8 | 2.96 | 1.67 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | ○ |  |
+| 6SNU | S2 | L | 4 | 2.36 | 1.22 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | ○ |  |
+| 3AMZ | S2 | L | 2 | 4.26 | 2.66 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | ○ |  |
+| 8ZT9 | S2 | M | 2 | 1.71 | 0.75 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | ○ |  |
+| 7X8H | S2 | M | 1 | 2.2 | 1.09 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | ○ |  |
+| 2NAD | S2 | M | 2 | 2.16 | 1.03 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | ○ |  |
+| 6B7J | S2 | M | 2 | 1.7 | 0.73 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ○ | - | - | - | - |  |
+| 2O4P | S2 | S | 2 | 1.55 | 0.66 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ○ | - | - | - | ○ |  |
+| 3B6N | S2 | S | 1 | 1.4 | 0.43 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ○ | - | - | - | ○ |  |
+| 5EUJ | S2 | XL | 24 | 2.11 | 0.99 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | ○ |  |
+| 9SLB | S2 | XL | 10 | 2.71 | 1.3 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | ○ |  |
+| 3KTK | S3 | L | 28 | 1.3 | 0.38 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ○ | - | - | - | - |  |
+| 5S5Z | S3 | L | 6 | 3.91 | 2.48 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ○ | ✓ | - | - | - | ✓ |  |
+| 6HW8 | S3 | L | 28 | 8.52 | 6.02 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | ○ |  |
+| 6XER | S3 | L | 5 | 3.21 | 2.09 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ○ | ✓ | - | - | - | ○ |  |
+| 3ULQ | S3 | M | 2 | 1.45 | 0.47 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✓ | - | - | - | ○ |  |
+| 2UZU | S3 | M | 2 | 1.5 | 0.49 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✓ | - | - | - | ○ |  |
+| 6N9A | S3 | M | 3 | 2.46 | 1.36 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | ○ |  |
+| 2YJA | S3 | S | 2 | 1.65 | 0.63 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ○ | - | - | - | ○ |  |
+| 4N9F | S3 | XL | 60 | 1.9 | 0.85 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✓ | - | - | - | ○ |  |
+| 3L4G | S3 | XL | 16 | 3.21 | 1.85 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ○ | ✓ | - | - | - | ○ |  |
+| 8FLU | S4 | L | 6 | 2.86 | 1.77 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✓ | - | - | - | - |  |
+| 6ET5 | S4 | L | 54 | 6.22 | 3.39 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ○ | ✓ | - | - | - | ✓ |  |
+| 7KH0 | S4 | L | 7 | 4.36 | 3.35 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✓ | - | - | - | - |  |
+| 8BCU | S4 | L | 9 | 4.66 | 3.43 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ○ | ✓ | - | - | - | - |  |
+| 7ZZ1 | S4 | L | 2 | 1.46 | 0.5 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✓ | - | - | - | ✓ |  |
+| 3JBE | S4 | M | 5 | 2.06 | 1.15 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ○ | - | - | - | - |  |
+| 6WUT | S4 | M | 3 | 1.85 | 0.76 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✓ | - | - | - | - |  |
+| 8D3D | S4 | XL | 16 | 21.09 | 18.36 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | ○ |  |
+| 6V6S | S4 | XL | 38 | 31.03 | 25.7 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ○ | ✓ | - | - | - | ○ |  |
+| 12BM | S4 | XL | 19 | 14.89 | 12.65 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✓ | - | - | - | ○ |  |
+| 9GTP | S4 | XL | 60 | 4.76 | 2.63 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | - | - | - | - | A15: focus 41.39338891387734 |
+| 7BKC | S4 | XL | 26 | 17.35 | 11.45 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | ○ |  |
+| 7SPB | S4 | XL | 78 | 2.16 | 0.89 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - |  |
+| 7ZDP | S4 | XL | 45 | 15.19 | 11.71 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ○ | ✓ | - | - | - | ✓ |  |
+| 9Y05 | S4 | XL | 12 | 2.51 | 1.19 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | ○ |  |
+| 1TKW | S5 | M | 2 | 1.4 | 0.41 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ○ | - | - | - | ○ |  |
+| 2MRJ | S5 | S | 1 | 1.15 | 0.19 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | - |  |
+| 5GIW | S5 | S | 1 | 0.8 | 0.08 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | - |  |
+| 2LZJ | S5 | S | 1 | 0.95 | 0.16 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | - |  |
+| 2N5J | S5 | S | 1 | 1.0 | 0.14 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | - |  |
+| 8SKX | S5 | S | 1 | 1.16 | 0.19 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | - |  |
+| 1RCH | S5 | S | 1 | 1.15 | 0.25 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | - |  |
+| 9BVV | S5 | S | 1 | 0.85 | 0.06 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ○ | ✓ | ✓ | ○ | ✓ | ✓ | ✓ | - | - | - | - | - | - |  |
+| 9CZH | S6 | L | 8 | 3.46 | 2.26 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✓ | - | ✓ |  |
+| 6MJ2 | S6 | L | 4 | 2.81 | 1.39 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✓ | - | ○ |  |
+| 6QFA | S6 | L | 10 | 2.21 | 1.18 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✓ | - | ○ |  |
+| 8WMV | S6 | L | 28 | 32.22 | 21.13 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ○ | ✓ | - | ✓ | - | ✓ |  |
+| 8JWF | S6 | M | 1 | 2.21 | 1.23 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | ✓ | - | ○ |  |
+| 7JI3 | S6 | M | 3 | 1.7 | 0.69 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✓ | - | - |  |
+| 7VVK | S6 | M | 6 | 2.81 | 1.77 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✓ | - | ✓ | - | - |  |
+| 6ZKT | S6 | XL | 45 | 20.34 | 16.86 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ○ | ✓ | - | ✓ | - | ✓ |  |
+| 8WH0 | S7 | L | 7 | 7.07 | 3.26 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ○ | ✓ | ✓ | - | - | ○ |  |
+| 6L9Z | S7 | L | 19 | 8.17 | 3.75 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ○ | ✓ | ✓ | - | - | ✓ |  |
+| 4NLG | S7 | M | 3 | 3.21 | 0.67 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | ✓ | - | - | ○ |  |
+| 2VBO | S7 | M | 4 | 3.36 | 0.66 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ○ | ○ | ✓ | - | - | ✓ |  |
+| 5K7Z | S7 | M | 6 | 3.76 | 0.9 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ○ | ✓ | - | - | ✓ |  |
+| 2FD8 | S7 | S | 2 | 2.71 | 0.34 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | ✓ | - | - | ○ |  |
+| 7NZ2 | S7 | XL | 44 | 74.96 | 56.28 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ○ | ✓ | ✗ | - | - | ✓ | A17: spearman 0.446 (limit 0.6) |
+| 9K4F | S8 | L | 4 | 5.06 | 1.94 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | ✗ | - | - | - | A17: stems_nearer_frac 0.875 (limit 1.0) |
+| 13FZ | S8 | L | 4 | 17.14 | 13.6 | ✓ | - | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | ○ | A3: domains: strand B:1-13, strand D:1-13 |
+| 9WB3 | S8 | M | 4 | 3.51 | 0.98 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ○ | ✓ | - | - | - |  |
+| 7F3J | S8 | M | 8 | 2.91 | 0.27 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | ✓ | - | - | - |  |
+| 2XLJ | S8 | S | 2 | 2.71 | 0.37 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | ✓ | - | - | - |  |
+| 6S13 | S8 | XL | 52 | 57.32 | 36.5 | ✓ | - | ✓ | ✓ | ✗ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✓ | ✗ | - | - | - | A3: domains: strand A:2729-2729, strand A:2732-2733, strand A:2737-2738; A6: domains 4 (na:stem:80:first × na:run:239; na:stem:129:first × na:run:239; na:stem:129:first × na:run:240); A17: pair_f1 0.944 (limit 0.95) |
+| 8ZTU | S8 | XL | 56 | 80.82 | 58.74 | ✓ | - | ✓ | ✓ | ✗ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | ✗ | ✓ | - | - | ✓ | A3: domains: strand a:2701-2702, strand a:2705-2705, strand a:2710-2711; A6: default 1 (na:gap:499 × stub:N:c); deposited 1 (na:gap:499 × stub:N:c); beta 1 (na:gap:499 × stub:N:c); focus 1 (na:gap:499 × stub:N:c); domains 1 (domain-label:D2 · H × na:run:485); A16: domains 1 (domain-label:D2 · H × na:run:485) |
+| 4E8Q | S9 | M | 1 | 5.56 | 1.87 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | ✓ | ✓ | ✓ | - | - | ✓ | - | - | ○ |  |
+| 9IWF | S9 | S | 2 | 3.31 | 0.39 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | ✓ | ✓ | ✓ | - | - | ✓ | - | - | ○ |  |
+| 1Z43 | S9 | S | 1 | 2.96 | 0.43 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | ✓ | ✓ | ✓ | - | - | ✓ | - | - | - |  |
+| 9YER | S10 | L | 5 | 6.06 | 4.74 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ○ | ✓ | - | - | - | ○ |  |
+| 9QK1 | S10 | L | 9 | 10.02 | 8.45 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ○ | ✓ | - | - | - | ○ |  |
+| 3IB0 | S10 | M | 1 | 4.26 | 3.13 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | ○ |  |
+| 6A4Y | S10 | M | 1 | 2.96 | 1.79 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | ○ |  |
+| 8JXD | S10 | XL | 2 | 6.42 | 4.91 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | ○ |  |
+| 4P39 | S11 | M | 4 | 0.95 | 0.18 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | ✓ | - |  |
+| 3HQB | S11 | S | 2 | 1.0 | 0.25 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | ✓ | - |  |
+| 1C6A | S11 | S | 1 | 1.15 | 0.23 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | ✓ | ○ |  |
+| 244L | S11 | S | 1 | 1.3 | 0.31 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | ✓ | ○ |  |
+| 8U9T | S11 | M | 1 | 1.75 | 0.81 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | ○ |  |
+| 7IT6 | S11 | S | 1 | 0.95 | 0.16 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | - |  |
+| 3U3H | S11 | M | 1 | 3.56 | 2.05 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | ✓ | ○ |  |
+| 6QND | S11 | M | 1 | 1.66 | 0.54 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | ✓ | ○ |  |
+| 2BBJ | S11 | L | 5 | 3.11 | 1.97 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | ✓ | - |  |
+| 2BBH | S11 | S | 1 | 1.55 | 0.42 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | ✓ | ○ |  |
+| AF_AFQ387E4F1 | S12 | M | 1 | 1.45 | 0.43 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | - |  |
+| AF_AFQ8W0Z7F1 | S12 | M | 1 | 1.76 | 0.69 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | - |  |
+| AF_AFC7J156F1 | S12 | S | 1 | 1.0 | 0.14 | ✓ | - | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | - |  |
 
 ## Two-state pairs (S11)
 
@@ -179,121 +183,165 @@ process s: the default view's whole process (drawing, measuring and, for nucleic
 
 | id | honest_crossings | loop_crossings | na_run_crossings | fallback_curves | fallback_curves_crossing_an_element | kink_links_rejected | tighter_than_inflate | rejected_as_crossing | names_moved | area | max_rss_mb |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 1PTY | 6 | 6 | None | 0 | 0 | 0 | 0 | 0 | 0 | 282.83 | 162.1 |
-| 6TX2 | 8 | 8 | None | 0 | 0 | 0 | 0 | 0 | 0 | 358.13 | 160.6 |
-| 7N71 | 29 | 29 | None | 0 | 0 | 0 | 0 | 0 | 0 | 952.48 | 193.8 |
-| 1HMY | 14 | 14 | None | 0 | 0 | 0 | 0 | 0 | 0 | 333.48 | 162.8 |
-| 6EJ3 | 26 | 26 | None | 0 | 0 | 0 | 0 | 0 | 0 | 660.62 | 164.6 |
-| 5RFU | 16 | 16 | None | 0 | 0 | 0 | 0 | 0 | 0 | 654.74 | 175.0 |
-| 2FR2 | 8 | 8 | None | 0 | 0 | 0 | 0 | 0 | 0 | 158.5 | 159.7 |
-| 8F03 | 11 | 11 | None | 0 | 0 | 0 | 0 | 0 | 0 | 194.5 | 161.5 |
-| 3KSI | 6 | 6 | None | 0 | 0 | 0 | 0 | 0 | 0 | 322.04 | 162.6 |
-| 5YUH | 2 | 2 | None | 0 | 0 | 0 | 0 | 0 | 0 | 152.61 | 161.4 |
-| 2W6W | 1 | 1 | None | 0 | 0 | 0 | 0 | 0 | 0 | 178.43 | 160.3 |
-| 3LIL | 4 | 4 | None | 0 | 0 | 0 | 0 | 0 | 0 | 106.9 | 160.7 |
-| 7P46 | 19 | 19 | None | 0 | 0 | 0 | 0 | 0 | 0 | 1187.83 | 209.6 |
-| 8HRP | 143 | 143 | None | 0 | 0 | 0 | 2 | 0 | 0 | 2037.26 | 231.2 |
-| 6SNU | 100 | 100 | None | 0 | 0 | 0 | 0 | 0 | 0 | 1551.74 | 320.5 |
-| 3AMZ | 257 | 257 | None | 0 | 0 | 0 | 1 | 0 | 0 | 3464.26 | 344.4 |
-| 8ZT9 | 19 | 19 | None | 0 | 0 | 0 | 0 | 0 | 0 | 725.24 | 175.7 |
-| 7X8H | 52 | 52 | None | 0 | 0 | 0 | 2 | 0 | 0 | 875.38 | 194.8 |
-| 2NAD | 51 | 51 | None | 0 | 0 | 0 | 0 | 0 | 0 | 832.99 | 181.1 |
-| 6B7J | 4 | 4 | None | 0 | 0 | 0 | 0 | 0 | 0 | 524.75 | 161.7 |
-| 2O4P | 6 | 6 | None | 0 | 0 | 0 | 0 | 0 | 0 | 381.13 | 161.5 |
-| 3B6N | 12 | 12 | None | 0 | 0 | 0 | 1 | 0 | 0 | 616.9 | 163.8 |
-| 5EUJ | 20 | 20 | None | 0 | 0 | 0 | 1 | 0 | 0 | 729.18 | 336.6 |
-| 9SLB | 31 | 31 | None | 0 | 0 | 0 | 0 | 0 | 0 | 1270.52 | 411.7 |
-| 3KTK | 10 | 10 | None | 0 | 0 | 0 | 0 | 0 | 0 | 285.14 | 227.4 |
-| 5S5Z | 159 | 159 | None | 0 | 0 | 0 | 0 | 0 | 0 | 4315.14 | 359.2 |
-| 6HW8 | 358 | 358 | None | 0 | 0 | 0 | 2 | 0 | 0 | 8425.19 | 475.2 |
-| 6XER | 128 | 128 | None | 0 | 0 | 0 | 1 | 0 | 0 | 3598.61 | 346.2 |
-| 3ULQ | 6 | 6 | None | 0 | 0 | 0 | 0 | 0 | 0 | 646.25 | 164.5 |
-| 2UZU | 8 | 8 | None | 0 | 0 | 0 | 0 | 0 | 0 | 346.75 | 162.2 |
-| 6N9A | 58 | 58 | None | 0 | 0 | 0 | 0 | 0 | 0 | 1652.02 | 222.6 |
-| 2YJA | 8 | 8 | None | 0 | 0 | 0 | 0 | 0 | 0 | 664.18 | 165.5 |
-| 4N9F | 15 | 15 | None | 0 | 0 | 0 | 0 | 0 | 0 | 1238.42 | 308.6 |
-| 3L4G | 144 | 144 | None | 0 | 0 | 0 | 0 | 0 | 0 | 2497.48 | 311.6 |
-| 8FLU | 31 | 31 | None | 0 | 0 | 0 | 0 | 0 | 0 | 1666.39 | 218.4 |
-| 6ET5 | 37 | 37 | None | 0 | 0 | 0 | 1 | 0 | 1 | 25390.44 | 331.2 |
-| 7KH0 | 48 | 48 | None | 0 | 0 | 0 | 0 | 0 | 0 | 1786.7 | 227.8 |
-| 8BCU | 307 | 307 | None | 0 | 0 | 0 | 0 | 0 | 0 | 3672.39 | 391.1 |
-| 7ZZ1 | 9 | 9 | None | 0 | 0 | 0 | 0 | 0 | 0 | 685.99 | 170.7 |
-| 3JBE | 64 | 64 | None | 0 | 0 | 0 | 0 | 0 | 0 | 1076.66 | 173.4 |
-| 6WUT | 31 | 31 | None | 0 | 0 | 0 | 0 | 0 | 0 | 1058.6 | 212.5 |
-| 8D3D | 45 | 45 | None | 0 | 0 | 0 | 1 | 0 | 0 | 1628.23 | 554.1 |
-| 6V6S | 1237 | 1237 | None | 0 | 0 | 0 | 5 | 0 | 0 | 21320.9 | 619.7 |
-| 12BM | 405 | 405 | None | 0 | 0 | 0 | 2 | 0 | 0 | 10598.39 | 573.3 |
-| 9GTP | 138 | 138 | None | 0 | 0 | 0 | 2 | 0 | 0 | 4545.1 | 481.9 |
-| 7BKC | 620 | 620 | None | 0 | 0 | 0 | 7 | 0 | 0 | 13871.11 | 1456.9 |
-| 7SPB | 11 | 11 | None | 0 | 0 | 0 | 0 | 0 | 0 | 420.27 | 321.1 |
-| 7ZDP | 293 | 293 | None | 0 | 0 | 0 | 3 | 0 | 0 | 15620.27 | 514.5 |
-| 9Y05 | 26 | 26 | None | 0 | 0 | 0 | 1 | 0 | 0 | 947.57 | 358.5 |
-| 1TKW | 21 | 21 | None | 0 | 0 | 0 | 0 | 0 | 0 | 336.08 | 248.7 |
-| 2MRJ | 2 | 2 | None | 0 | 0 | 0 | 0 | 0 | 0 | 67.93 | 189.8 |
-| 5GIW | 0 | 0 | None | 0 | 0 | 0 | 0 | 0 | 0 | 8.58 | 159.2 |
-| 2LZJ | 2 | 2 | None | 0 | 0 | 0 | 0 | 0 | 0 | 65.53 | 194.1 |
-| 2N5J | 0 | 0 | None | 0 | 0 | 0 | 0 | 0 | 0 | 45.29 | 161.4 |
-| 8SKX | 1 | 1 | None | 0 | 0 | 0 | 0 | 0 | 0 | 54.42 | 165.8 |
-| 1RCH | 6 | 6 | None | 0 | 0 | 0 | 0 | 0 | 0 | 136.41 | 166.6 |
-| 9BVV | 0 | 0 | None | 0 | 0 | 0 | 0 | 0 | 0 | 0.0 | 157.4 |
-| 9CZH | 42 | 42 | None | 0 | 0 | 0 | 0 | 0 | 0 | 1787.96 | 304.4 |
-| 6MJ2 | 60 | 60 | None | 0 | 0 | 0 | 0 | 0 | 0 | 1561.16 | 267.0 |
-| 6QFA | 18 | 18 | None | 0 | 0 | 0 | 0 | 0 | 0 | 643.24 | 223.6 |
-| 8WMV | 228 | 228 | None | 0 | 0 | 0 | 0 | 0 | 0 | 11009.35 | 444.4 |
-| 8JWF | 58 | 58 | None | 0 | 0 | 0 | 3 | 0 | 0 | 1625.4 | 184.5 |
-| 7JI3 | 61 | 61 | None | 0 | 0 | 0 | 0 | 0 | 0 | 1219.04 | 192.0 |
-| 7VVK | 32 | 32 | None | 0 | 0 | 0 | 0 | 0 | 0 | 1729.5 | 222.8 |
-| 6ZKT | 279 | 279 | None | 0 | 0 | 0 | 1 | 0 | 0 | 16192.6 | 433.0 |
-| 8WH0 | 249 | 249 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 3254.26 | 372.8 |
-| 6L9Z | 138 | 138 | 16 | 0 | 0 | 0 | 0 | 0 | 0 | 9369.61 | 373.7 |
-| 4NLG | 24 | 24 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 709.03 | 173.3 |
-| 2VBO | 2 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 672.1 | 176.8 |
-| 5K7Z | 11 | 11 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1226.5 | 197.9 |
-| 2FD8 | 9 | 9 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 180.42 | 166.6 |
-| 7NZ2 | 2240 | 2240 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 38235.07 | 1004.3 |
-| 9K4F | 44 | 44 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 2245.59 | 199.2 |
-| 13FZ | 235 | 235 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2425.15 | 345.5 |
-| 9WB3 | 25 | 25 | 4 | 0 | 0 | 0 | 1 | 0 | 0 | 997.81 | 176.9 |
-| 7F3J | 2 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 152.4 | 169.1 |
-| 2XLJ | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 272.1 | 166.8 |
-| 6S13 | 111 | 111 | 326 | 0 | 0 | 0 | 0 | 0 | 0 | 23431.42 | 736.3 |
-| 8ZTU | 293 | 293 | 714 | 0 | 0 | 0 | 2 | 0 | 0 | 35176.31 | 632.8 |
-| 4E8Q | 0 | 0 | 10 | 0 | 0 | 0 | 0 | 0 | 0 | 2288.24 | 199.0 |
-| 9IWF | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 232.25 | 170.6 |
-| 1Z43 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 341.76 | 167.7 |
-| 9YER | 99 | 99 | None | 0 | 0 | 0 | 0 | 0 | 0 | 2856.02 | 341.3 |
-| 9QK1 | 92 | 92 | None | 0 | 0 | 0 | 0 | 0 | 0 | 3730.69 | 311.4 |
-| 3IB0 | 27 | 27 | None | 0 | 0 | 0 | 0 | 0 | 0 | 429.17 | 163.8 |
-| 6A4Y | 41 | 41 | None | 0 | 0 | 0 | 1 | 0 | 0 | 558.23 | 165.9 |
-| 8JXD | 59 | 59 | None | 0 | 0 | 0 | 0 | 0 | 0 | 1079.91 | 214.5 |
-| 4P39 | 0 | 0 | None | 0 | 0 | 0 | 0 | 0 | 0 | 63.27 | 158.9 |
-| 3HQB | 0 | 0 | None | 0 | 0 | 0 | 0 | 0 | 0 | 66.99 | 158.1 |
-| 1C6A | 6 | 6 | None | 0 | 0 | 0 | 0 | 0 | 0 | 190.57 | 160.3 |
-| 244L | 6 | 6 | None | 0 | 0 | 0 | 0 | 0 | 0 | 190.57 | 159.9 |
-| 8U9T | 20 | 20 | None | 0 | 0 | 0 | 0 | 0 | 0 | 652.69 | 170.1 |
-| 7IT6 | 10 | 10 | None | 0 | 0 | 0 | 1 | 0 | 0 | 101.47 | 159.7 |
-| 3U3H | 71 | 71 | None | 0 | 0 | 0 | 0 | 0 | 0 | 2235.22 | 255.6 |
-| 6QND | 12 | 12 | None | 0 | 0 | 0 | 0 | 0 | 0 | 627.23 | 164.0 |
-| 2BBJ | 32 | 32 | None | 0 | 0 | 0 | 0 | 0 | 0 | 2577.72 | 269.4 |
-| 2BBH | 2 | 2 | None | 0 | 0 | 0 | 0 | 0 | 0 | 331.67 | 161.6 |
-| AF_AFQ387E4F1 | 6 | 6 | None | 0 | 0 | 0 | 0 | 0 | 0 | 373.18 | 162.7 |
-| AF_AFQ8W0Z7F1 | 32 | 32 | None | 0 | 0 | 0 | 0 | 0 | 0 | 719.99 | 164.2 |
-| AF_AFC7J156F1 | 0 | 0 | None | 0 | 0 | 0 | 0 | 0 | 0 | 113.42 | 158.9 |
+| 1PTY | 6 | 6 | None | 0 | 0 | 0 | 0 | 0 | 0 | 282.83 | 168.0 |
+| 6TX2 | 8 | 8 | None | 0 | 0 | 0 | 0 | 0 | 0 | 358.13 | 168.1 |
+| 7N71 | 64 | 64 | None | 0 | 0 | 0 | 0 | 0 | 0 | 916.37 | 218.1 |
+| 1HMY | 14 | 14 | None | 0 | 0 | 0 | 0 | 0 | 0 | 333.48 | 168.8 |
+| 6EJ3 | 26 | 26 | None | 0 | 0 | 0 | 0 | 0 | 0 | 660.62 | 170.2 |
+| 5RFU | 37 | 37 | None | 0 | 0 | 0 | 0 | 0 | 0 | 694.77 | 198.2 |
+| 2FR2 | 8 | 8 | None | 0 | 0 | 0 | 0 | 0 | 0 | 158.5 | 166.5 |
+| 8F03 | 11 | 11 | None | 0 | 0 | 0 | 0 | 0 | 0 | 194.5 | 168.5 |
+| 3KSI | 9 | 9 | None | 0 | 0 | 0 | 0 | 0 | 0 | 421.36 | 182.1 |
+| 5YUH | 6 | 6 | None | 0 | 0 | 0 | 0 | 0 | 0 | 165.16 | 176.5 |
+| 2W6W | 1 | 1 | None | 0 | 0 | 0 | 0 | 0 | 0 | 178.43 | 167.4 |
+| 3LIL | 4 | 4 | None | 0 | 0 | 0 | 0 | 0 | 0 | 106.9 | 167.6 |
+| 7P46 | 19 | 19 | None | 0 | 0 | 0 | 0 | 0 | 0 | 1187.83 | 214.3 |
+| 8HRP | 143 | 143 | None | 0 | 0 | 0 | 2 | 0 | 0 | 2037.26 | 236.3 |
+| 6SNU | 123 | 123 | None | 0 | 0 | 0 | 0 | 0 | 0 | 1384.46 | 255.7 |
+| 3AMZ | 188 | 188 | None | 0 | 0 | 0 | 0 | 0 | 0 | 2829.24 | 354.3 |
+| 8ZT9 | 26 | 26 | None | 0 | 0 | 0 | 0 | 0 | 0 | 744.04 | 205.9 |
+| 7X8H | 29 | 29 | None | 0 | 0 | 0 | 0 | 0 | 0 | 1124.19 | 230.5 |
+| 2NAD | 51 | 51 | None | 0 | 0 | 0 | 0 | 0 | 0 | 832.99 | 217.0 |
+| 6B7J | 5 | 5 | None | 0 | 0 | 0 | 0 | 0 | 0 | 333.38 | 181.7 |
+| 2O4P | 5 | 5 | None | 0 | 0 | 0 | 0 | 0 | 0 | 285.5 | 182.1 |
+| 3B6N | 12 | 12 | None | 0 | 0 | 0 | 1 | 0 | 0 | 616.9 | 170.5 |
+| 5EUJ | 20 | 20 | None | 0 | 0 | 0 | 1 | 0 | 0 | 729.18 | 342.8 |
+| 9SLB | 31 | 31 | None | 0 | 0 | 0 | 0 | 0 | 0 | 1270.52 | 418.5 |
+| 3KTK | 10 | 10 | None | 0 | 0 | 0 | 0 | 0 | 0 | 285.14 | 232.7 |
+| 5S5Z | 159 | 159 | None | 0 | 0 | 0 | 0 | 0 | 0 | 4315.14 | 364.1 |
+| 6HW8 | 358 | 358 | None | 0 | 0 | 0 | 2 | 0 | 0 | 8425.19 | 483.6 |
+| 6XER | 128 | 128 | None | 0 | 0 | 0 | 1 | 0 | 0 | 3598.61 | 350.5 |
+| 3ULQ | 6 | 6 | None | 0 | 0 | 0 | 0 | 0 | 0 | 646.25 | 170.4 |
+| 2UZU | 8 | 8 | None | 0 | 0 | 0 | 0 | 0 | 0 | 346.75 | 169.4 |
+| 6N9A | 58 | 58 | None | 0 | 0 | 0 | 0 | 0 | 0 | 1652.02 | 229.2 |
+| 2YJA | 8 | 8 | None | 0 | 0 | 0 | 0 | 0 | 0 | 664.18 | 177.6 |
+| 4N9F | 15 | 15 | None | 0 | 0 | 0 | 0 | 0 | 0 | 1238.42 | 313.0 |
+| 3L4G | 144 | 144 | None | 0 | 0 | 0 | 0 | 0 | 0 | 2497.48 | 320.9 |
+| 8FLU | 31 | 31 | None | 0 | 0 | 0 | 0 | 0 | 0 | 1666.39 | 223.3 |
+| 6ET5 | 37 | 37 | None | 0 | 0 | 0 | 1 | 0 | 1 | 25390.44 | 334.5 |
+| 7KH0 | 48 | 48 | None | 0 | 0 | 0 | 0 | 0 | 0 | 1786.7 | 233.9 |
+| 8BCU | 307 | 307 | None | 0 | 0 | 0 | 0 | 0 | 0 | 3672.39 | 396.8 |
+| 7ZZ1 | 9 | 9 | None | 0 | 0 | 0 | 0 | 0 | 0 | 685.99 | 176.5 |
+| 3JBE | 64 | 64 | None | 0 | 0 | 0 | 0 | 0 | 0 | 1076.66 | 180.1 |
+| 6WUT | 31 | 31 | None | 0 | 0 | 0 | 0 | 0 | 0 | 1058.6 | 218.0 |
+| 8D3D | 45 | 45 | None | 0 | 0 | 0 | 1 | 0 | 0 | 1628.23 | 560.4 |
+| 6V6S | 1237 | 1237 | None | 0 | 0 | 0 | 5 | 0 | 0 | 21320.9 | 584.4 |
+| 12BM | 405 | 405 | None | 0 | 0 | 0 | 2 | 0 | 0 | 10598.39 | 559.0 |
+| 9GTP | 80 | 80 | None | 0 | 0 | 0 | 0 | 0 | 0 | 3172.52 | 486.7 |
+| 7BKC | 620 | 620 | None | 0 | 0 | 0 | 7 | 0 | 0 | 13871.11 | 1455.4 |
+| 7SPB | 10 | 10 | None | 0 | 0 | 0 | 0 | 0 | 0 | 367.15 | 325.1 |
+| 7ZDP | 293 | 293 | None | 0 | 0 | 0 | 3 | 0 | 0 | 15620.27 | 551.9 |
+| 9Y05 | 26 | 26 | None | 0 | 0 | 0 | 1 | 0 | 0 | 947.57 | 348.7 |
+| 1TKW | 21 | 21 | None | 0 | 0 | 0 | 0 | 0 | 0 | 336.08 | 254.1 |
+| 2MRJ | 2 | 2 | None | 0 | 0 | 0 | 0 | 0 | 0 | 67.93 | 195.4 |
+| 5GIW | 0 | 0 | None | 0 | 0 | 0 | 0 | 0 | 0 | 8.58 | 166.1 |
+| 2LZJ | 2 | 2 | None | 0 | 0 | 0 | 0 | 0 | 0 | 65.53 | 199.0 |
+| 2N5J | 0 | 0 | None | 0 | 0 | 0 | 0 | 0 | 0 | 45.29 | 167.6 |
+| 8SKX | 1 | 1 | None | 0 | 0 | 0 | 0 | 0 | 0 | 54.42 | 170.8 |
+| 1RCH | 6 | 6 | None | 0 | 0 | 0 | 0 | 0 | 0 | 136.41 | 171.3 |
+| 9BVV | 0 | 0 | None | 0 | 0 | 0 | 0 | 0 | 0 | 0.0 | 163.4 |
+| 9CZH | 42 | 42 | None | 0 | 0 | 0 | 0 | 0 | 0 | 1787.96 | 310.7 |
+| 6MJ2 | 60 | 60 | None | 0 | 0 | 0 | 0 | 0 | 0 | 1561.16 | 272.8 |
+| 6QFA | 18 | 18 | None | 0 | 0 | 0 | 0 | 0 | 0 | 643.24 | 228.7 |
+| 8WMV | 228 | 228 | None | 0 | 0 | 0 | 0 | 0 | 0 | 11009.35 | 496.4 |
+| 8JWF | 58 | 58 | None | 0 | 0 | 0 | 3 | 0 | 0 | 1625.4 | 198.0 |
+| 7JI3 | 61 | 61 | None | 0 | 0 | 0 | 0 | 0 | 0 | 1219.04 | 198.2 |
+| 7VVK | 32 | 32 | None | 0 | 0 | 0 | 0 | 0 | 0 | 1729.5 | 229.6 |
+| 6ZKT | 279 | 279 | None | 0 | 0 | 0 | 1 | 0 | 0 | 16192.6 | 474.4 |
+| 8WH0 | 249 | 249 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 3254.26 | 377.8 |
+| 6L9Z | 138 | 138 | 16 | 0 | 0 | 0 | 0 | 0 | 0 | 9369.61 | 378.9 |
+| 4NLG | 24 | 24 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 709.03 | 179.9 |
+| 2VBO | 2 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 672.1 | 183.7 |
+| 5K7Z | 11 | 11 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1226.5 | 205.4 |
+| 2FD8 | 9 | 9 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 180.42 | 173.9 |
+| 7NZ2 | 2240 | 2240 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 38235.07 | 1085.3 |
+| 9K4F | 44 | 44 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 2245.59 | 204.5 |
+| 13FZ | 235 | 235 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2425.15 | 333.6 |
+| 9WB3 | 25 | 25 | 4 | 0 | 0 | 0 | 1 | 0 | 0 | 997.81 | 183.4 |
+| 7F3J | 2 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 152.4 | 175.7 |
+| 2XLJ | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 272.1 | 173.8 |
+| 6S13 | 111 | 111 | 328 | 0 | 0 | 0 | 0 | 0 | 0 | 23431.42 | 742.6 |
+| 8ZTU | 293 | 293 | 702 | 0 | 0 | 0 | 2 | 0 | 0 | 35176.31 | 638.1 |
+| 4E8Q | 0 | 0 | 10 | 0 | 0 | 0 | 0 | 0 | 0 | 2288.24 | 204.0 |
+| 9IWF | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 232.25 | 177.2 |
+| 1Z43 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 341.76 | 174.8 |
+| 9YER | 99 | 99 | None | 0 | 0 | 0 | 0 | 0 | 0 | 2856.02 | 346.7 |
+| 9QK1 | 92 | 92 | None | 0 | 0 | 0 | 0 | 0 | 0 | 3730.69 | 316.2 |
+| 3IB0 | 27 | 27 | None | 0 | 0 | 0 | 0 | 0 | 0 | 429.17 | 170.3 |
+| 6A4Y | 41 | 41 | None | 0 | 0 | 0 | 1 | 0 | 0 | 558.23 | 172.0 |
+| 8JXD | 59 | 59 | None | 0 | 0 | 0 | 0 | 0 | 0 | 1079.91 | 220.5 |
+| 4P39 | 0 | 0 | None | 0 | 0 | 0 | 0 | 0 | 0 | 63.27 | 165.8 |
+| 3HQB | 0 | 0 | None | 0 | 0 | 0 | 0 | 0 | 0 | 66.99 | 164.9 |
+| 1C6A | 6 | 6 | None | 0 | 0 | 0 | 0 | 0 | 0 | 190.57 | 167.0 |
+| 244L | 6 | 6 | None | 0 | 0 | 0 | 0 | 0 | 0 | 190.57 | 167.4 |
+| 8U9T | 22 | 22 | None | 0 | 0 | 0 | 0 | 0 | 0 | 700.21 | 199.8 |
+| 7IT6 | 10 | 10 | None | 0 | 0 | 0 | 1 | 0 | 0 | 101.47 | 166.1 |
+| 3U3H | 71 | 71 | None | 0 | 0 | 0 | 0 | 0 | 0 | 2235.22 | 260.6 |
+| 6QND | 12 | 12 | None | 0 | 0 | 0 | 0 | 0 | 0 | 627.23 | 169.8 |
+| 2BBJ | 32 | 32 | None | 0 | 0 | 0 | 0 | 0 | 0 | 2577.72 | 261.7 |
+| 2BBH | 2 | 2 | None | 0 | 0 | 0 | 0 | 0 | 0 | 331.67 | 167.1 |
+| AF_AFQ387E4F1 | 6 | 6 | None | 0 | 0 | 0 | 0 | 0 | 0 | 373.18 | 168.3 |
+| AF_AFQ8W0Z7F1 | 32 | 32 | None | 0 | 0 | 0 | 0 | 0 | 0 | 719.99 | 171.3 |
+| AF_AFC7J156F1 | 0 | 0 | None | 0 | 0 | 0 | 0 | 0 | 0 | 113.42 | 165.3 |
+
+## Fallbacks taken
+
+Each named fallback (foldmap.fallback.FALLBACKS, docs/validation/inventory/inventory.md) counted as the figures were made: reported, not gated.
+
+| fallback | entries (default view) | times (default view) | times (every view) |
+|---|---|---|---|
+| loop_curve | 0 | 0 | 0 |
+| loop_over_text | 0 | 0 | 0 |
+| loop_wall_detour | 0 | 0 | 0 |
+| loop_wall_unkept | 0 | 0 | 0 |
+| route_unsnapped | 0 | 0 | 0 |
+| route_second_search_refused | 0 | 0 | 6 |
+| helix_name_moved | 1 | 1 | 8 |
+| na_tail_straight | 0 | 0 | 0 |
+| na_gap_unclear | 0 | 0 | 0 |
+| na_hairpin_unclear | 0 | 0 | 0 |
+| na_run_unclear | 0 | 0 | 6 |
+| na_trace_unclear | 0 | 0 | 2 |
+| stem_name_least_bad | 0 | 0 | 0 |
+| domain_name_least_bad | 0 | 0 | 0 |
+| glyph_width_guessed | 3 | 188 | 1316 |
+| mark_least_bad_spot | 0 | 0 | 0 |
+| counts_hidden | 6 | 7 | 47 |
+| interactions_dropped | 0 | 0 | 0 |
+| interactions_hidden | 0 | 0 | 0 |
+| crosslinks_unplaced | 0 | 0 | 0 |
+| page_text_small | 4 | 4 | 30 |
+| s3_cycles_capped | 0 | 0 | 0 |
+
+| id | default view |
+|---|---|
+| 3L4G | counts_hidden 1 |
+| 6ET5 | helix_name_moved 1; page_text_small 1 |
+| 6V6S | counts_hidden 1 |
+| 7ZDP | counts_hidden 1 |
+| 8WMV | page_text_small 1 |
+| 6ZKT | counts_hidden 1 |
+| 7NZ2 | page_text_small 1 |
+| 9WB3 | glyph_width_guessed 4 |
+| 6S13 | counts_hidden 2; glyph_width_guessed 108 |
+| 8ZTU | counts_hidden 1; glyph_width_guessed 76; page_text_small 1 |
 
 ## Science checks (S1-S6), apart from A1-A20
 
 Judged in every drawn view (default, deposited, beta, focus, domains, membrane, app); S5 once per entry.
 
+Check kinds: S1, S2, S3, S4, S6 structural consistency (the figure against its own structure, internal); S5 external validation (against CATH); A1-A20 readability (the page).
+
 A check passes only where it had something to judge; an entry with protein and nothing to judge (no sheet drawn, no barrel, no residue mark, no accessory strand, no CATH chopping) is not judged, one with no protein does not apply.
 
-| check | pass | fail | not judged | does not apply |
-|---|---|---|---|---|
-| S1 sheet neighbours pair | 86 | 0 | 11 | 3 |
-| S2 barrel closure pairs | 10 | 0 | 87 | 3 |
-| S3 barrel strand count is its pairing cycle | 86 | 0 | 11 | 3 |
-| S4 residue marks at their residue | 0 | 0 | 97 | 3 |
-| S5 automatic domains agree with a reference | 19 | 18 | 60 | 3 |
-| S6 accessory drawn at its partner | 28 | 0 | 69 | 3 |
+| check | pass | fail | not judged | does not apply | kind |
+|---|---|---|---|---|---|
+| S1 sheet neighbours pair | 86 | 0 | 11 | 3 | consistency |
+| S2 barrel closure pairs | 10 | 0 | 87 | 3 | consistency |
+| S3 barrel strand count is its pairing cycle | 86 | 0 | 11 | 3 | consistency |
+| S4 residue marks at their residue | 0 | 0 | 97 | 3 | consistency |
+| S5 automatic domains agree with a reference | 19 | 18 | 60 | 3 | external |
+| S6 accessory drawn at its partner | 28 | 0 | 69 | 3 | consistency |
 
 ### Science by view
 
@@ -598,16 +646,16 @@ Protein entries with no chain scored (S5 not judged), by reason:
 | id | named of accessory strands, per view |
 |---|---|
 | 6EJ3 | default 2 of 7; deposited 2 of 7; beta 2 of 7; seed1 2 of 7; roundtrip 2 of 7 |
-| 5RFU | default 0 of 2; deposited 0 of 2; beta 0 of 2; domains 0 of 2; seed1 0 of 2; roundtrip 0 of 2 |
+| 5RFU | default 0 of 2; deposited 0 of 2; beta 0 of 2; domains 0 of 2; seed1 0 of 2; roundtrip 0 of 2; interactive 0 of 2 |
 | 2FR2 | default 0 of 1; deposited 0 of 1; beta 0 of 1; seed1 0 of 1; roundtrip 0 of 1 |
 | 8F03 | default 1 of 1; deposited 1 of 1; beta 1 of 1; seed1 1 of 1; roundtrip 1 of 1 |
 | 8HRP | default 0 of 4; deposited 0 of 4; beta 0 of 4; focus 0 of 4; domains 0 of 4; seed1 0 of 4; roundtrip 0 of 4 |
-| 8ZT9 | default 0 of 2; deposited 0 of 2; beta 0 of 2; focus 0 of 1; domains 0 of 2; seed1 0 of 2; roundtrip 0 of 2 |
-| 2O4P | default 0 of 2; deposited 0 of 2; beta 0 of 2; focus 0 of 1; domains 0 of 2; seed1 0 of 2; roundtrip 0 of 2 |
+| 8ZT9 | default 0 of 2; deposited 0 of 2; beta 0 of 2; focus 0 of 1; domains 0 of 2; seed1 0 of 2; roundtrip 0 of 2; interactive 0 of 2 |
+| 2O4P | default 0 of 2; deposited 0 of 2; beta 0 of 2; focus 0 of 1; domains 0 of 2; seed1 0 of 2; roundtrip 0 of 2; interactive 0 of 2 |
 | 9SLB | default 0 of 1; deposited 0 of 1; beta 0 of 1; focus 5 of 10; seed1 0 of 1; roundtrip 0 of 1 |
 | 3KTK | default 0 of 1; deposited 0 of 1; beta 0 of 1; focus 0 of 14; domains 0 of 1; seed1 0 of 1; roundtrip 0 of 1 |
 | 5S5Z | default 0 of 1; deposited 0 of 1; beta 0 of 1; focus 0 of 0; domains 0 of 1; seed1 0 of 1; roundtrip 0 of 1 |
-| 6HW8 | default 0 of 2; deposited 0 of 2; beta 0 of 2; focus 0 of 1; domains 0 of 2; seed1 0 of 2; roundtrip 0 of 2 |
+| 6HW8 | default 0 of 2; deposited 0 of 2; beta 0 of 2; focus 0 of 1; domains 0 of 2; seed1 0 of 2; roundtrip 0 of 2; interactive 0 of 2 |
 | 4N9F | default 1 of 1; deposited 1 of 1; beta 1 of 1; focus 1 of 1; domains 1 of 1; seed1 1 of 1; roundtrip 1 of 1 |
 | 6ET5 | default 1 of 1; deposited 1 of 1; beta 1 of 1; focus 1 of 1; domains 1 of 1; seed1 1 of 1; roundtrip 1 of 1 |
 | 8BCU | default 3 of 18; deposited 3 of 18; beta 3 of 18; focus 0 of 3; domains 3 of 18; seed1 3 of 18; roundtrip 3 of 18 |
@@ -622,7 +670,7 @@ Protein entries with no chain scored (S5 not judged), by reason:
 | 8ZTU | default 0 of 2; deposited 0 of 2; beta 0 of 2; focus 0 of 2; domains 0 of 2; seed1 0 of 2; roundtrip 0 of 2 |
 | 9QK1 | default 0 of 10; deposited 0 of 10; beta 0 of 10; focus 0 of 2; domains 0 of 10; seed1 0 of 10; roundtrip 0 of 10 |
 | 3IB0 | default 1 of 1; deposited 1 of 1; beta 1 of 1; seed1 1 of 1; roundtrip 1 of 1 |
-| 8U9T | default 0 of 2; deposited 0 of 2; beta 0 of 2; domains 0 of 2; seed1 0 of 2; roundtrip 0 of 2 |
+| 8U9T | default 0 of 2; deposited 0 of 2; beta 0 of 2; domains 0 of 2; seed1 0 of 2; roundtrip 0 of 2; interactive 0 of 2 |
 | 7IT6 | default 1 of 1; deposited 1 of 1; beta 1 of 1; seed1 1 of 1; roundtrip 1 of 1 |
 | AF_AFQ8W0Z7F1 | default 1 of 1; deposited 1 of 1; beta 1 of 1; seed1 1 of 1; roundtrip 1 of 1 |
 
@@ -676,7 +724,7 @@ Protein entries with no chain scored (S5 not judged), by reason:
 - **A15** copies drawn alike
 - **A16** domains: one chain, alike, not tiny, panels apart, names clear
 - **A17** nucleic-acid metrics and stem names by their letters
-- **A18** membrane: TM helices in the band, loops out of the slab
+- **A18** membrane: only the band set in the band (TM helices across it, slab helices at their depths, crossing strands), no element nearer than its residues or on the wrong side, no loop nearer than its residues but out of a band element's port to its face or, for a loop in the bilayer, beside its own port to its residues' depth; a loop joining the faces crosses the band only beside its own port or past the band's ends
 - **A19** two states: same names in the same order
 - **A20** ligand tethers local
 
@@ -694,4 +742,7 @@ Protein entries with no chain scored (S5 not judged), by reason:
 - domain_overlap: 0.02
 - stem_name_gap: figcheck.stem_gap_tolerance(layout._INK_MARGIN em)
 - tether_length: 6.5
+- like_place_median: 1.0
+- like_place_p90: 2.5
+- like_relations: 0.95
 - documented warnings: none
