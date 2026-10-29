@@ -22,7 +22,7 @@ record. A record whose number the paper quotes is regenerated before the paper q
 | `homologues/topology-transfer/` | cdd29dd | H1-H5 not remeasured since; low risk (domain-name placement and NA joints only changed) | `scripts/topology_transfer.py`, with the other homologue campaigns |
 | `random100/`, `random100-heldout/` | 7696947; rerun at v0.2.0 (91 and 94 of 100) | "on this release" in the paper is false until they are rerun (claims R8, R9) | `random100.py run` at the tag, not for the headline |
 | `random100-third/` | 7696947 | kept as it is: a historical prospective evaluation at 7696947 | none |
-| `na/` (and the M2 NA rerun) | older code | the NA campaign the paper quotes | `M2_RERUN=1 scripts/paper/run_all.sh TAG HARNESS` |
+| `na/` (and the M2 NA rerun) | older code; rerun at v0.2.0 (34 of 39, as before) | the NA campaign the paper quotes | `M2_RERUN=1 scripts/paper/run_all.sh TAG HARNESS` |
 | `inventory/` and its freeze baseline | b730a05 | the table must match the release's code (`tests/test_inventory.py` fails otherwise) | `scripts/inventory.py`; `scripts/freeze_baseline.py` only shrinks |
 | the paper's numbers, tables and figures | 838c579 and later | everything quoted | `scripts/paper/run_all.sh TAG HARNESS` (HARNESS: the commit adding the fourth sample), `figures.sh`; inputs outside git rebuilt first (`scripts/paper/README.md`) |
 
