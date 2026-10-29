@@ -1,19 +1,15 @@
 {
  "what": "foldmap's thresholds, special cases and fallbacks, scanned from src/foldmap (scripts/inventory.py)",
  "source_stamp": {
-  "foldmap": "0.1.0",
-  "code_fingerprint": "893407124ec081be",
+  "foldmap": "0.2.0",
+  "code_fingerprint": "7879eea05bd9301c",
   "package": "checkout",
-  "checkout_fingerprint": "893407124ec081be",
+  "checkout_fingerprint": "7879eea05bd9301c",
   "installed_matches_checkout": true,
   "git": {
-   "commit": "cdd315f89fe0694ca3f2683d71a050f31d611c8e",
-   "dirty": true,
-   "dirty_paths": [
-    "src/foldmap/cli.py",
-    "tests/data/app29/26EL-one-of-each.json.gz",
-    "tests/data/app29/8VBG-p66-p51.json.gz"
-   ],
+   "commit": "df9726fcca2d7592d201d783031ceb6f6d691625",
+   "dirty": false,
+   "dirty_paths": [],
    "source": "git"
   },
   "script": {

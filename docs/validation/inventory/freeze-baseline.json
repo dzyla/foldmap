@@ -1,20 +1,20 @@
 {
  "what": "the inventory rows whose origin is named-entry, measured or unknown when the freeze began (plan 28 Task 9.5, rulings Q53 and Q54), as id less its line anchor (scripts/inventory.py _key) with the number of rows sharing it; 'all' is the same count over every row. tests/test_freeze.py fails on a row past these counts unless its evidence names a docs/validation record (CONTRIBUTING.md)",
  "source_stamp": {
-  "foldmap": "0.1.0",
-  "code_fingerprint": "1a96dacb9a78f068",
+  "foldmap": "0.2.0",
+  "code_fingerprint": "7879eea05bd9301c",
   "package": "checkout",
-  "checkout_fingerprint": "1a96dacb9a78f068",
+  "checkout_fingerprint": "7879eea05bd9301c",
   "installed_matches_checkout": true,
   "git": {
-   "commit": "a86a81c9933cb2a10d6a6fd144291249c5cd01d7",
+   "commit": "df9726fcca2d7592d201d783031ceb6f6d691625",
    "dirty": false,
    "dirty_paths": [],
    "source": "git"
   },
   "script": {
-   "name": "scripts/inventory.py",
-   "sha256": "152103d643104f9f6e343067a2073c7d46d76fc02c7e128a5b62fa630d8a2c88"
+   "name": "scripts/freeze_baseline.py",
+   "sha256": "2cca20d19499ecb760efd7057f5760c1ba2e5557bdb6591ea41bb19ec100ef7f"
   },
   "python": {
    "version": "3.12.9",
@@ -26,9 +26,9 @@
   },
   "packages": {
    "gemmi": "0.7.5",
-   "numpy": "2.4.6",
-   "scipy": "1.17.1",
-   "networkx": "3.6",
+   "numpy": "2.5.3",
+   "scipy": "1.18.1",
+   "networkx": "3.7",
    "matplotlib": "3.11.2",
    "PyYAML": "6.0.3"
   }
