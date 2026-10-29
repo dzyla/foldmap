@@ -63,7 +63,8 @@
 - Every domain constant is sensitive (`features.DOMAIN_NCUT`, `features.DOMAIN_CONTACT`,
   `features.DOMAIN_SEPARATION`, `features.DOMAIN_MIN_RESIDUES`, `features.DOMAIN_MIN_SEGMENT`;
   `docs/validation/sensitivity/report.md`). `features.DOMAIN_NCUT` at x1.25 takes the third sample's `S5` failures from
-  12 to 19 entries.
+  12 to 19 entries. `panels.CLOSE` (the gaps a domain's panel fills, set on 2LZM) is fragile: at x0.75 6QIK's
+  domains view fails `A16`, which no entry of the domains stage failed unperturbed (run at v0.2.0).
 - Domain names on loops in the domains view: 9FZL (`A16`, `A6`, third sample); 7NZ2 (second sample). `layout:_NAME_OPEN`,
   set for 7NZ2, was pruned with every key equal (`docs/validation/prune/report.md`).
 
@@ -81,7 +82,7 @@
 
 - [domain-uncertainty/report.md](../validation/domain-uncertainty/report.md): the failure classes, the mechanisms per
   chain, the confidence against CATH, and the undivided-threshold sweep.
-- [sensitivity/report.md](../validation/sensitivity/report.md): the domain constants, all sensitive.
+- [sensitivity/report.md](../validation/sensitivity/report.md): the domain constants, all sensitive; `panels:CLOSE` fragile.
 - [prune/report.md](../validation/prune/report.md): `layout:_NAME_OPEN` pruned; `layout:_PART_BLOWUP` and
   `panels:CLOSE` kept.
 - [random100-third/review.md](../validation/random100-third/review.md): `S5` and `A16` on the third sample.

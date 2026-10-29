@@ -75,11 +75,11 @@
 - A sheet seen nearly edge-on has its left-right order decided by a fraction of an ångström between its end strands
   (`layout._sheet_order`). Under `--like` the reference's order is carried (3WZ0-2AV5). On a default figure, how often
   a sheet sits on that margin is not measured.
-- Constants: `layout._SIDE_CLEAR` (a nucleic-acid stem's side, see [nucleic-acids.md](nucleic-acids.md)) is the one
-  fragile constant; at x1.25 the third sample's pass count falls by 5. Sensitive: `layout._STACK_PAD`,
-  `layout._HELIX_LOOP`, `layout._STEM_ROOM`, `layout._SS_RESTART_PAIRS`, `layout._SEP_MIRROR_ROOM`,
-  `layout._SEP_TIE_ROOM`, `layout._STACK_SHUT`, `layout._END_ROOM`, `layout._PART_BLOWUP`
-  (`docs/validation/sensitivity/report.md`). One factor at a time, two values each; interactions are not measured.
+- Constants: `layout._SIDE_CLEAR` (a nucleic-acid stem's side, see [nucleic-acids.md](nucleic-acids.md)) is one of
+  the two fragile constants (the other is `panels.CLOSE`, see [domains.md](domains.md)); at x1.25 the third sample's
+  pass count falls by 5. Sensitive: `layout._STACK_PAD`, `layout._HELIX_LOOP`, `layout._STEM_ROOM`,
+  `layout._SS_RESTART_PAIRS`, `layout._SEP_MIRROR_ROOM`, `layout._STACK_SHUT`, `layout._END_ROOM`,
+  `layout._PART_BLOWUP` (`docs/validation/sensitivity/report.md`, run at v0.2.0). One factor at a time, two values each; interactions are not measured.
 - Pruned on evidence: `layout:_NAME_OPEN` (7NZ2). Its removal left every key equal but moved three domains-view
   drawings (5NF8, 7F5S, 9FZL) that no key orders (`docs/validation/prune/report.md`).
 

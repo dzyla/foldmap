@@ -13,7 +13,7 @@ record. A record whose number the paper quotes is regenerated before the paper q
 | record | made at | why it is regenerated | how |
 |---|---|---|---|
 | `random100-fourth/` | drawn and run once at v0.2.0 (85 of 101) | the paper's headline count | `fourth_sample.py draw --release TAG`, then one `random100.py run --views all`, in the release checkout (the protocol) |
-| `sensitivity/` | runs at 5f09684's code | the NA fixes, the prune and the rest changed what it measures; the default baseline moved 80 to 82 (its "Code since this run" section, final review F1) | rerun stages B, V and X at the release commit (about 3.9 h on zl), then `sensitivity.py report` |
+| `sensitivity/` | runs at 5f09684's code; every stage (A, B, X, V) rerun at v0.2.0 on zyla-office, rendered without the "code since" section (no code since; ruling F-4) | the NA fixes, the prune and the rest changed what it measures; the default baseline moved 80 to 82 (its "Code since this run" section, final review F1) | rerun stages B, V and X at the release commit (about 3.9 h on zl), then `sensitivity.py report` |
 | `readability-floor/` | e6fcf36 | its census and measures predate later code; its generator now says R1's route-budget reason fires on 7NZ2's domains view (F9) | `scripts/readability_floor.py` |
 | `prune/` | runs at 46f5ebf, record b730a05 | its next render adds one sentence: the record's stamp is b730a05 while the equivalence runs were at c64ea7a, and `git diff c64ea7a b730a05 -- src` is comments and docstrings only (parked T9.3) | `scripts/prune.py` report at the release |
 | `metamorphic/` | this round's re-render | stamped at a pre-release commit | `scripts/metamorphic_record.py` |

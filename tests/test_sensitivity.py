@@ -418,12 +418,13 @@ def test_sensitivity_never_writes_into_the_third_sample():
 
 @needs_report
 def test_the_plan_of_the_record_is_the_plan_it_was_measured_with(sens):
-    """F1: the record re-renders from its kept runs with its own plan, the pruned constants included."""
+    """F1: the record re-renders from its kept runs with its own plan. The record is the run at v0.2.0 (after the
+    prune), so the pruned constants are in neither its plan nor its rows."""
     doc = json.loads((VALIDATION / "sensitivity" / "report.json").read_text(encoding="utf-8"))
     got = sens.plan_of_record(doc)
     assert len(got["perturbations"]) == sum(len(r["runs"]) for r in doc["constants"])
     assert {p["id"] for p in got["perturbations"]} == {r["id"] for r in doc["constants"]}
-    assert {"layout:_NAME_OPEN", "na_runs:_JOINT_NEAR"} <= {p["id"] for p in got["perturbations"]}
+    assert not {"layout:_NAME_OPEN", "na_runs:_JOINT_NEAR"} & {p["id"] for p in got["perturbations"]}
     assert all(p["label"] == sens.label(p["id"], p["factor"]) for p in got["perturbations"])
     assert [(s["id"], s["factor"]) for s in got["skipped"]] == [(s["id"], s["factor"]) for s in doc["skipped"]]
     assert all(s["origin"] for s in [*got["skipped"], *got["not_perturbable"]])
@@ -442,11 +443,12 @@ def test_the_committed_report_is_stamped_and_its_classes_add_up():
     assert doc["limitations"] == [c["id"] for c in doc["constants"] if c["class"] == "fragile"]
     assert doc["counts"]["incomplete"] == 0
     assert doc["named_in_sample"].get("route:_MAX_NODES_WINDOWS") == ["9FZL"]  # review I1: computed, not asserted
-    since = doc["code_since"]  # final review F1: the code since its runs, said in the record
-    assert since["measured_at"] == "5f09684" and set(since["pruned"]) == {"layout:_NAME_OPEN", "na_runs:_JOINT_NEAR"}
-    assert (since["baseline"], since["prune_baseline"]) == (doc["stage_b"]["baseline_passed"], 82)
+    # every stage rerun at v0.2.0 (freeze ruling F-4): no code since its runs, so the record says none (final review
+    # F1's section is for a record re-rendered over later code)
+    assert "code_since" not in doc and doc["source_stamp"]["code_fingerprint"] == "7879eea05bd9301c"
+    assert doc["stage_b"]["baseline_passed"] == 82  # the prune record's baseline on the same sample and view
     md = (VALIDATION / "sensitivity" / "report.md").read_text(encoding="utf-8")
-    assert "## Code since this run" in md and "not among the samples and entries named" not in md  # N5
+    assert "## Code since this run" not in md and "not among the samples and entries named" not in md  # N5
 
 
 def _stage_folder(sens, where: Path, runs: dict, reads: dict, unreached=(), foreign=()) -> Path:

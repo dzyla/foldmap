@@ -57,8 +57,9 @@
   has no bound). On the `D3` runs RNApolis has 24 of the 25 H-bond-window pairs those entries hold; 1AOI I:28/J:265
   is foldmap's only. Whether the rest are real pairs is not measured.
 - `nucleic.HBOND_STRETCH` is sensitive, and without it 7F5S fails `A17` and `A6` (`docs/validation/prune/report.md`).
-- `layout._SIDE_CLEAR` is the one fragile constant: at x1.25 the third sample's pass count falls by 5 and `A17`
-  failures go 7 to 13 (`docs/validation/sensitivity/report.md`). It was set on test structures (4YBB P5 at 2.81 Å is
+- `layout._SIDE_CLEAR` is one of the two fragile constants (the other, `panels.CLOSE`, is the domains view's): at
+  x1.25 the third sample's pass count falls by 5 and `A17` failures go 5 to 11 (`docs/validation/sensitivity/report.md`,
+  run at v0.2.0). It was set on test structures (4YBB P5 at 2.81 Å is
   the closest stem that does not fit turned round).
 - Tie labels on other ties, a collision the first two samples do not show: 3G6E, 6QIK, 7F5S (`A6`, third sample).
 - Other `A17` failures on the third sample at 7696947: 6VTX (stems_nearer_frac, now not applicable after F7), 4AS1
@@ -86,7 +87,7 @@
 - [na-fixes/report.md](../validation/na-fixes/report.md): F2-F7 measured, F3 and F5 reverted, F1 deferred, the
   limitations.
 - [metamorphic/report.md](../validation/metamorphic/report.md): findings MF2-MF4 and the `D3` runs.
-- [sensitivity/report.md](../validation/sensitivity/report.md): `layout:_SIDE_CLEAR` fragile;
+- [sensitivity/report.md](../validation/sensitivity/report.md): `layout:_SIDE_CLEAR` fragile (with `panels:CLOSE`);
   `nucleic:HBOND_STRETCH`, `na_runs:_DETOUR_STEPS` and `na_runs:_BESIDE_DETOUR` sensitive.
 - [prune/report.md](../validation/prune/report.md): `na_runs:_JOINT_NEAR` pruned; the others kept.
 - [na/report.md](../validation/na/report.md): the earlier nucleic-acid campaign, older code.
