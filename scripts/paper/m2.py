@@ -374,6 +374,15 @@ def build_membrane(nb) -> None:
     # extras: refusals, found-only recall, OPM's own ceiling, offsets, by class, attribution
     segs_found = [x for x in segs if any(e["id"] == x[0] for e in found)]
     ceiling = [x for x in segs if x[1]["crosses_opm"]]
+    nb.put(
+        "membrane_tm_recall_opm",
+        len(ceiling) / len(segs),
+        tex_frac(len(ceiling) / len(segs), 2),
+        src,
+        f"OPM's own planes under membrane_tm_recall's rule (claim Mem4): {len(ceiling)} of {len(segs)} of OPM's "
+        "transmembrane segments with >= 3 CA atoms reach membrane._MIN_CROSSING beyond OPM's mid-plane on both sides; "
+        "the ceiling of membrane_tm_recall (also extra.membrane_detail.opm_own_ceiling)",
+    )
     off = [e["estimate"]["midplane_offset"] for e in found]
     by_class = {}
     for cls in sorted({e["classtype"] for e in rows}):

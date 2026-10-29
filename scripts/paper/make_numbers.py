@@ -80,6 +80,7 @@ PENDING = {
     "membrane_thickness_mad": ("M2", "membrane vs OPM"),
     "membrane_tilt_median": ("M2", "membrane vs OPM"),
     "membrane_tm_recall": ("M2", "membrane vs OPM"),
+    "membrane_tm_recall_opm": ("M2", "membrane vs OPM: OPM's own planes under the same rule"),
     "membrane_side_correct": ("M2", "membrane vs OPM"),
     "membrane_side_called": ("M2", "membrane vs OPM"),
     "determinism_n": (
