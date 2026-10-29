@@ -317,10 +317,10 @@ def test_the_committed_comparison_matches_its_summary(hom):
 
 
 def test_the_new_seeds_lower_no_pair(hom):
-    """aligner-seeds/usalign.json (plan 24: TM-align's other seeds and gap-free rounds), measured post hoc beside the
-    committed usalign.json (plan 23, before): the same pairs and US-align runs; no pair's structure-route TM-score
+    """aligner-seeds/usalign.json (plan 24: TM-align's other seeds and gap-free rounds), measured post hoc beside
+    usalign-plan23.json (plan 23, before): the same pairs and US-align runs; no pair's structure-route TM-score
     lower, and fewer pairs where foldmap's search stops short of US-align's alignment."""
-    before_path, after_path = SET.parent / "usalign.json", SET.parent / "aligner-seeds" / "usalign.json"
+    before_path, after_path = SET.parent / "usalign-plan23.json", SET.parent / "aligner-seeds" / "usalign.json"
     if not before_path.exists() or not after_path.exists():
         pytest.skip("docs/validation/homologues is not part of the sdist")
     before = json.loads(before_path.read_text(encoding="utf-8"))["sets"]

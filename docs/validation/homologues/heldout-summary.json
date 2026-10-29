@@ -160,67 +160,67 @@
   }
  },
  "usalign": {
-  "about": "scripts/homologues.py align --usalign at c22ba5f: foldmap's structure route (align_chains, match 'structure') against US-align 20241108 (`USalign A.pdb B.pdb -mol prot -mm 0 -ter 2`) on the same residues (each chain's C\u03b1 as foldmap reads it, --assembly asu). TM-scores normalised by A's chain (US-align: by Structure_1, A; d0 of A's length, as foldmap's). US-align's pairs: every column of its alignment holding a residue of both. Limits where US-align's TM >= 0.5: foldmap's TM within 0.05, and >= 85% of US-align's pairs reproduced within \u00b11 residue (13a-3). Added after the held-out run (plan 23 Task 3): the H1-H5 numbers of this file stand as measured at its top-level measured_at; this entry's measured_at is the comparison's. Details: usalign-report.md, usalign.json.",
+  "about": "scripts/homologues.py align --usalign at 55e1a78: foldmap's structure route (align_chains, match 'structure') against US-align 20241108 (`USalign A.pdb B.pdb -mol prot -mm 0 -ter 2`) on the same residues (each chain's C\u03b1 as foldmap reads it, --assembly asu). TM-scores normalised by A's chain (US-align: by Structure_1, A; d0 of A's length, as foldmap's). US-align's pairs: every column of its alignment holding a residue of both. Limits where US-align's TM >= 0.5: foldmap's TM within 0.05, and >= 85% of US-align's pairs reproduced within \u00b11 residue (13a-3). Added after the held-out run (plan 23 Task 3): the H1-H5 numbers of this file stand as measured at its top-level measured_at; this entry's measured_at is the comparison's. Details: usalign-report.md, usalign.json.",
   "all": {
-   "both": 32,
-   "foldmap_lower": 43,
+   "both": 33,
+   "foldmap_lower": 14,
    "judged": 34,
    "pairs": 55,
-   "pairs_agree": 32,
+   "pairs_agree": 33,
    "same_side_of_h1": 55,
    "scoring_difference_max_abs": 0.0015,
-   "search_short": 28,
-   "tm_difference_max_abs": 0.0805,
-   "tm_difference_median": -0.0052,
+   "search_short": 5,
+   "tm_difference_max_abs": 0.0313,
+   "tm_difference_median": 0.0,
    "tm_within": 34,
-   "within_1_median": 0.9885,
+   "within_1_median": 1.0,
    "within_1_min": 0.0
   },
   "h1_refused": [
    {
-    "foldmap_tm": 0.2461,
+    "foldmap_tm": 0.2713,
     "pair": "1JBI_A-3U7Z_A",
     "stratum": "remote",
     "usalign_one_fold": false,
     "usalign_tm": 0.243
    },
    {
-    "foldmap_tm": 0.2233,
+    "foldmap_tm": 0.2643,
     "pair": "1XU6_A-1PS2_A",
     "stratum": "remote",
     "usalign_one_fold": false,
     "usalign_tm": 0.2406
    },
    {
-    "foldmap_tm": 0.3523,
+    "foldmap_tm": 0.3826,
     "pair": "2D46_A-3F42_B",
     "stratum": "remote",
     "usalign_one_fold": false,
     "usalign_tm": 0.3801
    },
    {
-    "foldmap_tm": 0.3693,
+    "foldmap_tm": 0.3952,
     "pair": "2JCA_A-3LQ9_A",
     "stratum": "remote",
     "usalign_one_fold": false,
     "usalign_tm": 0.3939
    },
    {
-    "foldmap_tm": 0.4839,
+    "foldmap_tm": 0.4918,
     "pair": "2MJ7_A-2EHB_D",
     "stratum": "remote",
     "usalign_one_fold": false,
     "usalign_tm": 0.4917
    },
    {
-    "foldmap_tm": 0.3917,
+    "foldmap_tm": 0.3967,
     "pair": "2Q82_A-2JTR_A",
     "stratum": "remote",
     "usalign_one_fold": false,
     "usalign_tm": 0.3921
    },
    {
-    "foldmap_tm": 0.4308,
+    "foldmap_tm": 0.4463,
     "pair": "5GL3_A-1WPN_A",
     "stratum": "remote",
     "usalign_one_fold": false,
@@ -229,18 +229,18 @@
   ],
   "heldout": {
    "both": 23,
-   "foldmap_lower": 32,
+   "foldmap_lower": 11,
    "judged": 23,
    "pairs": 40,
    "pairs_agree": 23,
    "same_side_of_h1": 40,
    "scoring_difference_max_abs": 0.0015,
-   "search_short": 21,
-   "tm_difference_max_abs": 0.0805,
-   "tm_difference_median": -0.0057,
+   "search_short": 4,
+   "tm_difference_max_abs": 0.0282,
+   "tm_difference_median": 0.0,
    "tm_within": 23,
-   "within_1_median": 0.9897,
-   "within_1_min": 0.8667
+   "within_1_median": 1.0,
+   "within_1_min": 0.9684
   },
   "limits": {
    "pair_agreement": 0.85,
@@ -248,20 +248,52 @@
    "tm_tolerance": 0.05,
    "usalign_tm": 0.5
   },
-  "measured_at": "c22ba5f",
+  "measured_at": "55e1a78",
+  "source_stamp": {
+   "checkout_fingerprint": "7879eea05bd9301c",
+   "code_fingerprint": "7879eea05bd9301c",
+   "foldmap": "0.2.0",
+   "git": {
+    "commit": "55e1a78e9d594601040decb04af43f321622d3d9",
+    "dirty": false,
+    "source": "asserted by runner"
+   },
+   "installed_matches_checkout": true,
+   "package": "checkout",
+   "packages": {
+    "PyYAML": "6.0.3",
+    "gemmi": "0.7.5",
+    "matplotlib": "3.11.2",
+    "networkx": "3.7",
+    "numpy": "2.5.4",
+    "scipy": "1.18.1"
+   },
+   "platform": {
+    "machine": "x86_64",
+    "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43"
+   },
+   "python": {
+    "implementation": "CPython",
+    "version": "3.13.13"
+   },
+   "script": {
+    "name": "scripts/homologues.py",
+    "sha256": "61e02d7fc4adfff81058b1975974aa1f447a37029f358bb9e66a9c6c2ca7555f"
+   }
+  },
   "tuning": {
-   "both": 9,
-   "foldmap_lower": 11,
+   "both": 10,
+   "foldmap_lower": 3,
    "judged": 11,
    "pairs": 15,
-   "pairs_agree": 9,
+   "pairs_agree": 10,
    "same_side_of_h1": 15,
    "scoring_difference_max_abs": 0.001,
-   "search_short": 7,
-   "tm_difference_max_abs": 0.0242,
-   "tm_difference_median": -0.0037,
+   "search_short": 1,
+   "tm_difference_max_abs": 0.0313,
+   "tm_difference_median": 0.0,
    "tm_within": 11,
-   "within_1_median": 0.9779,
+   "within_1_median": 1.0,
    "within_1_min": 0.0
   },
   "version": "20241108"

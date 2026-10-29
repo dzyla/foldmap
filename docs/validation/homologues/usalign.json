@@ -1,6 +1,10 @@
 {
- "about": "scripts/homologues.py align --usalign at c22ba5f: foldmap's structure route (align_chains, match 'structure') against US-align 20241108 (`USalign A.pdb B.pdb -mol prot -mm 0 -ter 2`) on the same residues (each chain's C\u03b1 as foldmap reads it, --assembly asu). TM-scores normalised by A's chain (US-align: by Structure_1, A; d0 of A's length, as foldmap's). US-align's pairs: every column of its alignment holding a residue of both. Limits where US-align's TM >= 0.5: foldmap's TM within 0.05, and >= 85% of US-align's pairs reproduced within \u00b11 residue (13a-3).",
- "measured_at": "c22ba5f",
+ "about": "scripts/homologues.py align --usalign at 55e1a78: foldmap's structure route (align_chains, match 'structure') against US-align 20241108 (`USalign A.pdb B.pdb -mol prot -mm 0 -ter 2`) on the same residues (each chain's C\u03b1 as foldmap reads it, --assembly asu). TM-scores normalised by A's chain (US-align: by Structure_1, A; d0 of A's length, as foldmap's). US-align's pairs: every column of its alignment holding a residue of both. Limits where US-align's TM >= 0.5: foldmap's TM within 0.05, and >= 85% of US-align's pairs reproduced within \u00b11 residue (13a-3).",
+ "entry_code": {
+  "7879eea05bd9301c+61e02d7fc4adfff8": 55
+ },
+ "measured_at": "55e1a78",
+ "mixed_code": false,
  "sets": {
   "heldout": [
    {
@@ -17,24 +21,53 @@
     "pieces": 0,
     "rmsd": 2.1914,
     "same_fold": true,
+    "source_stamp": {
+     "checkout_fingerprint": "7879eea05bd9301c",
+     "code_fingerprint": "7879eea05bd9301c",
+     "foldmap": "0.2.0",
+     "git": {
+      "commit": "55e1a78e9d594601040decb04af43f321622d3d9",
+      "dirty": false,
+      "source": "asserted by runner"
+     },
+     "installed_matches_checkout": true,
+     "package": "checkout",
+     "packages": {
+      "PyYAML": "6.0.3",
+      "gemmi": "0.7.5",
+      "matplotlib": "3.11.2",
+      "networkx": "3.7",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1"
+     },
+     "platform": {
+      "machine": "x86_64",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43"
+     },
+     "python": {
+      "implementation": "CPython",
+      "version": "3.13.13"
+     },
+     "script": {
+      "name": "scripts/homologues.py",
+      "sha256": "61e02d7fc4adfff81058b1975974aa1f447a37029f358bb9e66a9c6c2ca7555f"
+     }
+    },
     "stratum": "close",
     "tm_score": 0.8218,
     "usalign": {
      "agreement": {
-      "close_within_1": 0.99,
-      "exact": 0.9802,
-      "foldmap_pairs_in_usalign": 0.9802,
-      "within_1": 0.9802
+      "close_within_1": 1.0,
+      "exact": 1.0,
+      "foldmap_pairs_in_usalign": 1.0,
+      "within_1": 1.0
      },
      "auto": {
       "method": "sequence",
       "tm_score": 0.8218,
       "within_1": 0.8812
      },
-     "disagreements": [
-      "A 55-55 (1): B shifted -2",
-      "A 107-107 (1): not paired"
-     ],
+     "disagreements": [],
      "limits": {
       "applies": true,
       "pairs": true,
@@ -43,8 +76,8 @@
      },
      "rows": {
       "foldmap": [
-       "QDAASGEQVFKQCLVCHSIGPGAKNKVGPVLNGLFGRHSGTIEGFAYSDANKNSG---ITWTEEVFREYIRDPKAKIP--------------GTKMIFAGVKDEQKVSDLIAYIKQFNADGSKK",
-       "GDPAKGEAVFKKCMACHRVGPDAKNLVGPALTGVIDRQAGTAPGFNYSAINHAAGEAGLHWTPENIIAYLPDPNAFLRKFLADAGHAEQAKGSTKMVF-KLPDEQERKDVVAYLKQFSP-----"
+       "QDAASGEQVFKQCLVCHSIGPGAKNKVGPVLNGLFGRHSGTIEGFAYSDANKNS--G-ITWTEEVFREYIRDPKAKIP--------------GTKMIFAGVKDEQKVSDLIAYIKQFNADGSKK",
+       "GDPAKGEAVFKKCMACHRVGPDAKNLVGPALTGVIDRQAGTAPGFNYSAINHAAGEAGLHWTPENIIAYLPDPNAFLRKFLADAGHAEQAKGSTKMVF-KLPDEQERKDVVAYLKQFS-----P"
       ],
       "usalign": [
        "QDAASGEQVFKQCLVCHSIGPGAKNKVGPVLNGLFGRHSGTIEGFAYSDANKNS--G-ITWTEEVFREYIRDPKAKIP--------------GTKMIFAGVKDEQKVSDLIAYIKQFNADGSKK",
@@ -53,10 +86,10 @@
      },
      "structure": {
       "aligned": 101,
-      "rmsd": 1.2873,
-      "tm_score": 0.8818
+      "rmsd": 1.2382,
+      "tm_score": 0.883
      },
-     "tm_difference": -0.0013,
+     "tm_difference": -0.0001,
      "usalign": {
       "aligned": 101,
       "aligned_reported": 101,
@@ -70,9 +103,9 @@
     }
    },
    {
-    "aligned": 192,
+    "aligned": 188,
     "extras": 5,
-    "identity": 0.0833,
+    "identity": 0.0798,
     "kind": "positive",
     "length_a": 278,
     "length_b": 228,
@@ -81,34 +114,59 @@
     "only_a": 11,
     "pair": "1G9R_A-1JYL_A",
     "pieces": 2,
-    "rmsd": 4.539,
+    "rmsd": 4.1092,
     "same_fold": true,
+    "source_stamp": {
+     "checkout_fingerprint": "7879eea05bd9301c",
+     "code_fingerprint": "7879eea05bd9301c",
+     "foldmap": "0.2.0",
+     "git": {
+      "commit": "55e1a78e9d594601040decb04af43f321622d3d9",
+      "dirty": false,
+      "source": "asserted by runner"
+     },
+     "installed_matches_checkout": true,
+     "package": "checkout",
+     "packages": {
+      "PyYAML": "6.0.3",
+      "gemmi": "0.7.5",
+      "matplotlib": "3.11.2",
+      "networkx": "3.7",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1"
+     },
+     "platform": {
+      "machine": "x86_64",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43"
+     },
+     "python": {
+      "implementation": "CPython",
+      "version": "3.13.13"
+     },
+     "script": {
+      "name": "scripts/homologues.py",
+      "sha256": "61e02d7fc4adfff81058b1975974aa1f447a37029f358bb9e66a9c6c2ca7555f"
+     }
+    },
     "stratum": "remote",
-    "tm_score": 0.5017,
+    "tm_score": 0.5113,
     "usalign": {
      "agreement": {
-      "close_within_1": 0.9673,
-      "exact": 0.7407,
-      "foldmap_pairs_in_usalign": 0.9115,
-      "within_1": 0.9259
+      "close_within_1": 0.9869,
+      "exact": 0.9259,
+      "foldmap_pairs_in_usalign": 0.984,
+      "within_1": 0.9788
      },
      "auto": {
       "method": "structure",
-      "tm_score": 0.5017,
-      "within_1": 0.9259
+      "tm_score": 0.5113,
+      "within_1": 0.9788
      },
      "disagreements": [
-      "A 50-50 (1): not paired",
-      "A 69-70 (2): not paired",
       "A 72-72 (1): not paired",
-      "A 132-132 (1): B shifted -4",
-      "A 133-133 (1): not paired",
-      "A 134-135 (2): B shifted -4",
       "A 147-147 (1): not paired",
-      "A 181-181 (1): not paired",
       "A 237-237 (1): not paired",
-      "A 248-249 (2): not paired",
-      "A 266-266 (1): not paired"
+      "A 248-248 (1): not paired"
      ],
      "limits": {
       "applies": true,
@@ -118,8 +176,8 @@
      },
      "rows": {
       "foldmap": [
-       "--MDIVFAADDNY---------AAYLC------VAAKSVEAAHPDTEIRFHVLDAGISEANRAAVAANLRGGGGNIRFIDVNPEDFAGFPLNIRHISITTYARLKLGEYIADCDKVLYLDIDVLVRDSLTPLWDTDLGDNWLGASIDLFV-ERQEG--YKQKIGMAD------GEYY--------FNAGVLLINLKKWRR-HDIFKMSSEWVEQYKDVM-QYQDQDILNGLFKGGVCYANSRFNFMPTNYAFMASRHTDPLYRDRTNTVMPVAVSHYCGPAKPWHRDCTAWGAERFTELAGSLTTVPEEWRGKL",
-       "IRVKAIILAAGLGTRLRPLTENTPKALVQVNQKPLIEYQIEFLKEKGINDIIIIVGYLKEQFDYLK-----EKYGVRLVFNDKY-----------ADYNNFYSLYLVKEE--LANSYVIDADNYLFKNMFR-NDLTR---STYFSVYRE-DCTN--EWFLV------YGDDYKVQDIIVDSKAGRILSGVSFWDAPTAEKIVSFIDKAYVSGEF-----VDLYWDNMVKDNIKELDVYVEEL---------------------------EGNSIYEID------SVQDYRKLEEILK-----------------"
+       "--MDIVFAADDNY---------AAYLC------VAAKSVEAAHPDTEIR-FHVLDAGISEANRAAVAANLRGGGGNIRFIDVNPEDFAGFPLNIRHISITTYARLKLGEYIADCDKVLYLDIDVLVRDSLTPLWDTDLGDNWLGASID-L-----FVERQEGYKQKIGMAD------GEYY--------FNAGVLLINLKKWRR-HDIFKMSSEWVEQYKDVM-QYQDQDILNGLFKGGVCYANSRFNFMPTNYAFMASRHTDPLYRDRTNTVMPVAVSHYCGPAKPWHRDCTAWGAERFTELAGSLTTVPEEWRGKL",
+       "IRVKAIILAAGLGTRLRPLTENTPKALVQVNQKPLIEYQIEFLKEKGINDIIIIVGYLKE-QFDY-LK----EKYGVRLVFNDKY-AD---------YNNFYSLYLVKE-E--LANSYVIDADNYLFKNMFR-NDLTR----STYFSVYREDCTNEWFL----V-------YGDDYKVQDIIVDSKAGRILSGVSFWDAPTAEKIVSFIDKAYVSGE--F---VDLYWDNMVKDNIKELDVYVEEL---------------------------EGNSIYEI---DS--V-QDYRKLEEIL-K----------------"
       ],
       "usalign": [
        "--MDIVFAADDNY---------AAYLC------VAAKSVEAAHPDTEIR-FHVLDAGISEANRAAVAANLRGGGGNIRFIDVNPEDFAGFPLNIRHISITTYARLKLGEYIADCDKVLYLDIDVLVRDSLTPLWDTDLGDNWLGASID-L----FVERQEGY-KQKIGMA------DGEYY-------FNAGVLLINLKKWRR-HDIFKMSSEWVEQYKDVM-QYQDQDILNGLFKGGVCYANSRFNFMPTNYAFMASRHTDPLYRDRTNTVMPVAVSHYCGPAKPWHRDCTAWGAERFTELAGSLTTVPEEWRGKL",
@@ -127,11 +185,11 @@
       ]
      },
      "structure": {
-      "aligned": 192,
-      "rmsd": 4.539,
-      "tm_score": 0.5017
+      "aligned": 188,
+      "rmsd": 4.1092,
+      "tm_score": 0.5113
      },
-     "tm_difference": -0.0088,
+     "tm_difference": 0.0008,
      "usalign": {
       "aligned": 189,
       "aligned_reported": 189,
@@ -145,49 +203,83 @@
     }
    },
    {
-    "aligned": 48,
-    "extras": 9,
-    "identity": 0.0625,
+    "aligned": 55,
+    "extras": 5,
+    "identity": 0.0727,
     "kind": "positive",
     "length_a": 100,
     "length_b": 97,
-    "mates": 2,
+    "mates": 6,
     "method": "structure",
-    "only_a": 7,
+    "only_a": 3,
     "pair": "1JBI_A-3U7Z_A",
     "pieces": 0,
-    "rmsd": 4.4616,
+    "rmsd": 4.7754,
     "same_fold": false,
+    "source_stamp": {
+     "checkout_fingerprint": "7879eea05bd9301c",
+     "code_fingerprint": "7879eea05bd9301c",
+     "foldmap": "0.2.0",
+     "git": {
+      "commit": "55e1a78e9d594601040decb04af43f321622d3d9",
+      "dirty": false,
+      "source": "asserted by runner"
+     },
+     "installed_matches_checkout": true,
+     "package": "checkout",
+     "packages": {
+      "PyYAML": "6.0.3",
+      "gemmi": "0.7.5",
+      "matplotlib": "3.11.2",
+      "networkx": "3.7",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1"
+     },
+     "platform": {
+      "machine": "x86_64",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43"
+     },
+     "python": {
+      "implementation": "CPython",
+      "version": "3.13.13"
+     },
+     "script": {
+      "name": "scripts/homologues.py",
+      "sha256": "61e02d7fc4adfff81058b1975974aa1f447a37029f358bb9e66a9c6c2ca7555f"
+     }
+    },
     "stratum": "remote",
-    "tm_score": 0.2461,
+    "tm_score": 0.2713,
     "usalign": {
      "agreement": {
-      "close_within_1": 0.0938,
+      "close_within_1": 0.2812,
       "exact": 0.0577,
-      "foldmap_pairs_in_usalign": 0.0625,
-      "within_1": 0.0577
+      "foldmap_pairs_in_usalign": 0.3091,
+      "within_1": 0.3269
      },
      "auto": {
       "method": "structure",
-      "tm_score": 0.2461,
-      "within_1": 0.0577
+      "tm_score": 0.2713,
+      "within_1": 0.3269
      },
      "disagreements": [
-      "A 4-6 (3): B shifted +20",
-      "A 8-8 (1): B shifted +21",
-      "A 10-13 (4): B shifted +22",
-      "A 14-16 (3): B shifted +18",
-      "A 22-28 (7): not paired",
-      "A 29-30 (2): B shifted +13",
-      "A 31-32 (2): B shifted +12",
-      "A 33-34 (2): B shifted +11",
-      "A 35-36 (2): B shifted +2",
-      "A 37-37 (1): B shifted -11",
-      "A 38-38 (1): not paired",
-      "A 40-41 (2): not paired",
-      "A 51-58 (8): B shifted -9",
-      "A 61-63 (3): B shifted -3",
-      "A 67-74 (8): not paired"
+      "A 4-4 (1): not paired",
+      "A 8-8 (1): not paired",
+      "A 11-11 (1): not paired",
+      "A 13-14 (2): not paired",
+      "A 15-16 (2): B shifted -7",
+      "A 28-29 (2): B shifted -7",
+      "A 30-30 (1): B shifted -3",
+      "A 31-32 (2): B shifted -4",
+      "A 33-33 (1): B shifted -5",
+      "A 34-34 (1): B shifted -3",
+      "A 35-36 (2): B shifted -10",
+      "A 37-37 (1): B shifted -23",
+      "A 38-38 (1): B shifted -18",
+      "A 40-41 (2): B shifted -17",
+      "A 56-56 (1): not paired",
+      "A 61-70 (10): B shifted +2",
+      "A 71-74 (4): not paired"
      ],
      "limits": {
       "applies": false,
@@ -197,8 +289,8 @@
      },
      "rows": {
       "foldmap": [
-       "TAP--------------------IAITCFTRGLDIRKEKADVLCPGGC--------PLEEFSVYGNIVYASVSSIC-----------GAAVHRGVISNS----GGP---VRVYSLPGRENYS--SVDAN-GIQSQMLSRWSASFTVTLE",
-       "GEKHITVTVIHGDQTENVFEFDTDAKYLGEVLESEN------------LVDGESGEYGLFITTVD-----------EETADDSKQQWWCITKGGEQVNTSADQTPVSDGDAF----------ELTLKE-GY------------------"
+       "TAPI-----AITCFTRGLDIRK-EKADVLCPGGCP----LEEF--S--VYG-----NIVYASVSSICG------------A---------AVHRGVISNSGGPVRVYSLPGRENYSSVDANGIQSQMLSRWSASFTVTLE--",
+       "----GEKHITV---T-V--IHGDQTENVFEFDTDAKYLGEVLESENLVDGESGEYGLFITTVDE----ETADDSKQQWWCITKGGEQVNTSADQT-PVSDGDAFELTLKE------------------------------GY"
       ],
       "usalign": [
        "TAP---IAITCFTRGL----DIRKEKADVLCPGG------CPL-EE-FS---------VY-------------GNIVYASVSSICGA--------AVHRGVISNSGGPVRVYSLPGRENYSSVDANGIQSQMLSRWSASFTVTLE",
@@ -206,11 +298,11 @@
       ]
      },
      "structure": {
-      "aligned": 48,
-      "rmsd": 4.4616,
-      "tm_score": 0.2461
+      "aligned": 55,
+      "rmsd": 4.7754,
+      "tm_score": 0.2713
      },
-     "tm_difference": 0.0031,
+     "tm_difference": 0.0282,
      "usalign": {
       "aligned": 52,
       "aligned_reported": 52,
@@ -237,21 +329,55 @@
     "pieces": 1,
     "rmsd": 1.4428,
     "same_fold": true,
+    "source_stamp": {
+     "checkout_fingerprint": "7879eea05bd9301c",
+     "code_fingerprint": "7879eea05bd9301c",
+     "foldmap": "0.2.0",
+     "git": {
+      "commit": "55e1a78e9d594601040decb04af43f321622d3d9",
+      "dirty": false,
+      "source": "asserted by runner"
+     },
+     "installed_matches_checkout": true,
+     "package": "checkout",
+     "packages": {
+      "PyYAML": "6.0.3",
+      "gemmi": "0.7.5",
+      "matplotlib": "3.11.2",
+      "networkx": "3.7",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1"
+     },
+     "platform": {
+      "machine": "x86_64",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43"
+     },
+     "python": {
+      "implementation": "CPython",
+      "version": "3.13.13"
+     },
+     "script": {
+      "name": "scripts/homologues.py",
+      "sha256": "61e02d7fc4adfff81058b1975974aa1f447a37029f358bb9e66a9c6c2ca7555f"
+     }
+    },
     "stratum": "close",
     "tm_score": 0.8941,
     "usalign": {
      "agreement": {
-      "close_within_1": 1.0,
-      "exact": 1.0,
+      "close_within_1": 0.9872,
+      "exact": 0.962,
       "foldmap_pairs_in_usalign": 1.0,
-      "within_1": 1.0
+      "within_1": 0.9873
      },
      "auto": {
       "method": "sequence",
       "tm_score": 0.8941,
       "within_1": 1.0
      },
-     "disagreements": [],
+     "disagreements": [
+      "A 51-51 (1): not paired"
+     ],
      "limits": {
       "applies": true,
       "pairs": true,
@@ -260,8 +386,8 @@
      },
      "rows": {
       "foldmap": [
-       "LRQCLPCGPGGKGRCFGPSICCGDELGCFVGTAEALRCQEENYLPSPCQSGQKPCGSGGRCAAAGICCNDESCVTEPEC-",
-       "VRTCLPCGPGGKGRCFGPSICCGDELGCFVGTAEALRCQEENYLPSPCQSGQKPCGSGGRCAAAGICCSPDGCHEDPACD"
+       "LRQCLPCGPGGKGRCFGPSICCGDELGCFVGTAEALRCQEENYLPSP-CQSGQKPCGSGGRCAAAGICCNDESCVTEPEC-",
+       "VRTCLPCGPGGKGRCFGPSICCGDELGCFVGTAEALRCQEENYL-PSPCQSGQKPCGSGGRCAAAGICCSPDGCHEDPACD"
       ],
       "usalign": [
        "LRQCLPCGPGGKGRCFGPSICCGDELGCFVGTAEALRCQEENYLPSPCQSGQKPCGSGGRCAAAGICCNDESCVTEPEC-",
@@ -269,11 +395,11 @@
       ]
      },
      "structure": {
-      "aligned": 79,
-      "rmsd": 1.4428,
-      "tm_score": 0.8941
+      "aligned": 78,
+      "rmsd": 1.2089,
+      "tm_score": 0.8954
      },
-     "tm_difference": -0.0002,
+     "tm_difference": 0.001,
      "usalign": {
       "aligned": 79,
       "aligned_reported": 79,
@@ -287,38 +413,66 @@
     }
    },
    {
-    "aligned": 52,
-    "extras": 1,
-    "identity": 0.0769,
+    "aligned": 49,
+    "extras": 0,
+    "identity": 0.0816,
     "kind": "negative",
     "length_a": 174,
     "length_b": 60,
-    "mates": 3,
+    "mates": 4,
     "method": "structure",
-    "only_a": 10,
+    "only_a": 9,
     "pair": "1LSH_B-5MLC_3",
     "pieces": 0,
-    "rmsd": 4.4678,
+    "rmsd": 3.8612,
     "same_fold": false,
+    "source_stamp": {
+     "checkout_fingerprint": "7879eea05bd9301c",
+     "code_fingerprint": "7879eea05bd9301c",
+     "foldmap": "0.2.0",
+     "git": {
+      "commit": "55e1a78e9d594601040decb04af43f321622d3d9",
+      "dirty": false,
+      "source": "asserted by runner"
+     },
+     "installed_matches_checkout": true,
+     "package": "checkout",
+     "packages": {
+      "PyYAML": "6.0.3",
+      "gemmi": "0.7.5",
+      "matplotlib": "3.11.2",
+      "networkx": "3.7",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1"
+     },
+     "platform": {
+      "machine": "x86_64",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43"
+     },
+     "python": {
+      "implementation": "CPython",
+      "version": "3.13.13"
+     },
+     "script": {
+      "name": "scripts/homologues.py",
+      "sha256": "61e02d7fc4adfff81058b1975974aa1f447a37029f358bb9e66a9c6c2ca7555f"
+     }
+    },
     "stratum": "negative",
-    "tm_score": 0.1895,
+    "tm_score": 0.1929,
     "usalign": {
      "agreement": {
-      "close_within_1": 0.9189,
+      "close_within_1": 1.0,
       "exact": 0.625,
-      "foldmap_pairs_in_usalign": 0.8269,
-      "within_1": 0.8958
+      "foldmap_pairs_in_usalign": 0.9796,
+      "within_1": 1.0
      },
      "auto": {
       "method": "structure",
-      "tm_score": 0.1895,
-      "within_1": 0.8958
+      "tm_score": 0.1929,
+      "within_1": 1.0
      },
-     "disagreements": [
-      "A 1363-1363 (1): B shifted +4",
-      "A 1369-1369 (1): not paired",
-      "A 1389-1391 (3): B shifted +2"
-     ],
+     "disagreements": [],
      "limits": {
       "applies": false,
       "pairs": true,
@@ -327,8 +481,8 @@
      },
      "rows": {
       "foldmap": [
-       "--SKPKVVI----VLRAVRADGKQQGLQTTLYYGLTSNGLPKAKIVAVELSDLSVWKLCAKFRLSAHMKAKAAIGWGKNCQQYRAMLEASTGNLQSHPAARVDIKWGRLPSSLQRAKNALLENGAPVIASKLEMEIMPKANQKHQVSVILAAMTPRRMNIIVKLPKVTYFQQGILLPFTF--",
-       "DVRVKVILECTGCVRKSVN--KGSRGVSRYITQKNR-HNTPSRLELRKFCPYCYKHTIHGE-----------------------------------------------------------------------------------------------------------------------IK"
+       "-SKPKVVIV----LRAVRADGKQQGLQTTLYYGLTSNGLPK--AKIVA-VELSDLSVWKLCAKFRLSAHMKAKAAIGWGKNCQQYRAMLEASTGNLQSHPAARVDIKWGRLPSSLQRAKNALLENGAPVIASKLEMEIMPKANQKHQVSVILAAMTPRRMNIIVKLPKVTYFQQGILLPFTF---",
+       "DVRVKVILECTGCVRKSVNKGSRGVSRYITQKNR----HNTPSRLELRKFCPY-CYKHTIHG------------------------------------------------------------------------------------------------------------------------EIK"
       ],
       "usalign": [
        "--SKPKVVIV---LRAVRADGKQQGLQTTL-YYGLTSNGLPK--AKIVA-VELSDLSVWKLCAKFRLSAHMKAKAAIGWGKNCQQYRAMLEASTGNLQSHPAARVDIKWGRLPSSLQRAKNALLENGAPVIASKLEMEIMPKANQKHQVSVILAAMTPRRMNIIVKLPKVTYFQQGILLPFTF---",
@@ -336,11 +490,11 @@
       ]
      },
      "structure": {
-      "aligned": 52,
-      "rmsd": 4.4678,
-      "tm_score": 0.1895
+      "aligned": 49,
+      "rmsd": 3.8612,
+      "tm_score": 0.1929
      },
-     "tm_difference": -0.0027,
+     "tm_difference": 0.0007,
      "usalign": {
       "aligned": 48,
       "aligned_reported": 48,
@@ -354,9 +508,9 @@
     }
    },
    {
-    "aligned": 80,
+    "aligned": 79,
     "extras": 0,
-    "identity": 0.2875,
+    "identity": 0.2785,
     "kind": "positive",
     "length_a": 88,
     "length_b": 80,
@@ -365,25 +519,55 @@
     "only_a": 1,
     "pair": "1NKP_A-1AM9_A",
     "pieces": 0,
-    "rmsd": 2.1426,
+    "rmsd": 1.8531,
     "same_fold": true,
+    "source_stamp": {
+     "checkout_fingerprint": "7879eea05bd9301c",
+     "code_fingerprint": "7879eea05bd9301c",
+     "foldmap": "0.2.0",
+     "git": {
+      "commit": "55e1a78e9d594601040decb04af43f321622d3d9",
+      "dirty": false,
+      "source": "asserted by runner"
+     },
+     "installed_matches_checkout": true,
+     "package": "checkout",
+     "packages": {
+      "PyYAML": "6.0.3",
+      "gemmi": "0.7.5",
+      "matplotlib": "3.11.2",
+      "networkx": "3.7",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1"
+     },
+     "platform": {
+      "machine": "x86_64",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43"
+     },
+     "python": {
+      "implementation": "CPython",
+      "version": "3.13.13"
+     },
+     "script": {
+      "name": "scripts/homologues.py",
+      "sha256": "61e02d7fc4adfff81058b1975974aa1f447a37029f358bb9e66a9c6c2ca7555f"
+     }
+    },
     "stratum": "remote",
-    "tm_score": 0.7423,
+    "tm_score": 0.7488,
     "usalign": {
      "agreement": {
-      "close_within_1": 0.9872,
-      "exact": 0.9494,
-      "foldmap_pairs_in_usalign": 0.975,
-      "within_1": 0.9873
+      "close_within_1": 1.0,
+      "exact": 1.0,
+      "foldmap_pairs_in_usalign": 1.0,
+      "within_1": 1.0
      },
      "auto": {
       "method": "structure",
-      "tm_score": 0.7423,
-      "within_1": 0.9873
+      "tm_score": 0.7488,
+      "within_1": 1.0
      },
-     "disagreements": [
-      "A 980-980 (1): not paired"
-     ],
+     "disagreements": [],
      "limits": {
       "applies": true,
       "pairs": true,
@@ -392,8 +576,8 @@
      },
      "rows": {
       "foldmap": [
-       "GHMNVKRRTHNVLERQRRNELKRSFFALRDQIPELENNEKAPKVVILKKATAYILSVQAEEQKLISEEDLLRKRREQLKHKLEQLGGC",
-       "QSRGEKRTAHNAIEKRYRSSINDKIIELKDLV--VGTEAKLNKSAVLRKAIDYIRFLQHSNQKLKQENLSLRTAVHKSKSLK------"
+       "GHMNVKRRTHNVLERQRRNELKRSFFALRDQIPELE-NNEKAPKVVILKKATAYILSVQAEEQKLISEEDLLRKRREQLKHKLEQLGGC",
+       "QSRGEKRTAHNAIEKRYRSSINDKIIELKDLV--VGTEAK-LNKSAVLRKAIDYIRFLQHSNQKLKQENLSLRTAVHKSKSL--K----"
       ],
       "usalign": [
        "GHMNVKRRTHNVLERQRRNELKRSFFALRDQIPELE-NNEKAPKVVILKKATAYILSVQAEEQKLISEEDLLRKRREQLKHKLEQLGGC",
@@ -401,11 +585,11 @@
       ]
      },
      "structure": {
-      "aligned": 80,
-      "rmsd": 2.1426,
-      "tm_score": 0.7423
+      "aligned": 79,
+      "rmsd": 1.8531,
+      "tm_score": 0.7488
      },
-     "tm_difference": -0.0061,
+     "tm_difference": 0.0003,
      "usalign": {
       "aligned": 79,
       "aligned_reported": 79,
@@ -419,49 +603,79 @@
     }
    },
    {
-    "aligned": 42,
+    "aligned": 44,
     "extras": 14,
-    "identity": 0.0,
+    "identity": 0.0682,
     "kind": "negative",
     "length_a": 80,
     "length_b": 203,
-    "mates": 2,
+    "mates": 1,
     "method": "structure",
-    "only_a": 2,
+    "only_a": 3,
     "pair": "1PZW_A-1QHL_A",
-    "pieces": 0,
-    "rmsd": 4.4195,
+    "pieces": 1,
+    "rmsd": 4.034,
     "same_fold": false,
+    "source_stamp": {
+     "checkout_fingerprint": "7879eea05bd9301c",
+     "code_fingerprint": "7879eea05bd9301c",
+     "foldmap": "0.2.0",
+     "git": {
+      "commit": "55e1a78e9d594601040decb04af43f321622d3d9",
+      "dirty": false,
+      "source": "asserted by runner"
+     },
+     "installed_matches_checkout": true,
+     "package": "checkout",
+     "packages": {
+      "PyYAML": "6.0.3",
+      "gemmi": "0.7.5",
+      "matplotlib": "3.11.2",
+      "networkx": "3.7",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1"
+     },
+     "platform": {
+      "machine": "x86_64",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43"
+     },
+     "python": {
+      "implementation": "CPython",
+      "version": "3.13.13"
+     },
+     "script": {
+      "name": "scripts/homologues.py",
+      "sha256": "61e02d7fc4adfff81058b1975974aa1f447a37029f358bb9e66a9c6c2ca7555f"
+     }
+    },
     "stratum": "negative",
-    "tm_score": 0.2845,
+    "tm_score": 0.3161,
     "usalign": {
      "agreement": {
-      "close_within_1": 0.0,
-      "exact": 0.0,
-      "foldmap_pairs_in_usalign": 0.0,
-      "within_1": 0.0
+      "close_within_1": 0.6765,
+      "exact": 0.0625,
+      "foldmap_pairs_in_usalign": 0.6364,
+      "within_1": 0.5833
      },
      "auto": {
       "method": "structure",
-      "tm_score": 0.2845,
-      "within_1": 0.0
+      "tm_score": 0.3161,
+      "within_1": 0.5833
      },
      "disagreements": [
-      "A 26-28 (3): not paired",
-      "A 29-29 (1): B shifted +58",
-      "A 30-30 (1): B shifted +57",
-      "A 31-31 (1): not paired",
-      "A 32-33 (2): B shifted +57",
-      "A 34-34 (1): not paired",
-      "A 35-36 (2): B shifted +39",
-      "A 38-38 (1): B shifted +39",
-      "A 39-39 (1): B shifted +38",
-      "A 40-40 (1): B shifted +33",
-      "A 41-41 (1): B shifted +32",
-      "A 42-54 (13): not paired",
-      "A 55-69 (15): B shifted -44",
+      "A 26-26 (1): not paired",
+      "A 27-27 (1): B shifted +44",
+      "A 28-28 (1): B shifted +15",
+      "A 29-34 (6): not paired",
+      "A 39-39 (1): B shifted +8",
+      "A 40-40 (1): B shifted +3",
+      "A 41-42 (2): B shifted +2",
+      "A 43-43 (1): B shifted -15",
+      "A 44-44 (1): B shifted -33",
+      "A 45-46 (2): B shifted -47",
+      "A 52-52 (1): B shifted +18",
       "A 70-70 (1): not paired",
-      "A 72-75 (4): not paired"
+      "A 75-75 (1): not paired"
      ],
      "limits": {
       "applies": false,
@@ -471,8 +685,8 @@
      },
      "rows": {
       "foldmap": [
-       "-------------------------------------------------------------DICRLCLR-------------------GVS----GAQMCLQIFDVDSGESKVA-EVL-RQHFWFEVLPNDEISKVICN-------------VCWTQVSEFHQFYVSIQEAQVIYATTS--------------------------------------------------------------",
-       "RGKFRSLTLINWNGFFARTFDLDELVTTLSGGNGAGKSTTMAAFVTALIPDLTLLLHGKLKAGVCY---SMLDTINSRHQRVVVGVRLQQVAGRDRKVDIKPF--------AI-QGL-PMSVQPTQ-------------LVTETLNERQARVLPLNELKDKLEAMEG------------VQFKQFNSITDYHSLMFDLGIIARRLRSASDRSKFYRLIEASLYGGISSAITRSLRDYLLPE"
+       "DICR-----------------------------------------------LCLRGVSGAQMCL--QIFDVDSG--ESKVAEVL---------RQHF----------WFEVL----------PND------------------------------------------------EISKV-----------------ICNVCWTQVSEFHQFYVSIQEAQVIYATTS--------------",
+       "----RGKFRSLTLINWNGFFARTFDLDELVTTLSGGNGAGKSTTMAAFVTAL------------IPDLT-----LLLH------GKLKAGVCYSMLDTINSRHQRVVVGVRLQQVAGRDRKVDIKPFAIQGLPMSVQPTQLVTETLNERQARVLPLNELKDKLEAMEGVQFKQFNSITDYHSLMFDLGIIARRLRSASDRSKFYRLIEASLYG--GIS-------SAITRSLRDYLLPE"
       ],
       "usalign": [
        "DICRLCLRGVSGAQMCLQIFDVDS----------GE-----------------------------SK-VAEVL------------------RQH-F-W-----F-EV-----------------L----------------------------P--------------NDEISKVI-----------------CNVCWTQVSEFHQFYVSIQEAQVIYATTS-------------",
@@ -480,11 +694,11 @@
       ]
      },
      "structure": {
-      "aligned": 42,
-      "rmsd": 4.4195,
-      "tm_score": 0.2845
+      "aligned": 44,
+      "rmsd": 4.034,
+      "tm_score": 0.3161
      },
-     "tm_difference": -0.0381,
+     "tm_difference": -0.0064,
      "usalign": {
       "aligned": 48,
       "aligned_reported": 48,
@@ -498,9 +712,9 @@
     }
    },
    {
-    "aligned": 80,
+    "aligned": 82,
     "extras": 8,
-    "identity": 0.0875,
+    "identity": 0.061,
     "kind": "negative",
     "length_a": 138,
     "length_b": 158,
@@ -509,43 +723,72 @@
     "only_a": 3,
     "pair": "1RPU_A-1ZWT_A",
     "pieces": 0,
-    "rmsd": 4.9818,
+    "rmsd": 4.8962,
     "same_fold": false,
+    "source_stamp": {
+     "checkout_fingerprint": "7879eea05bd9301c",
+     "code_fingerprint": "7879eea05bd9301c",
+     "foldmap": "0.2.0",
+     "git": {
+      "commit": "55e1a78e9d594601040decb04af43f321622d3d9",
+      "dirty": false,
+      "source": "asserted by runner"
+     },
+     "installed_matches_checkout": true,
+     "package": "checkout",
+     "packages": {
+      "PyYAML": "6.0.3",
+      "gemmi": "0.7.5",
+      "matplotlib": "3.11.2",
+      "networkx": "3.7",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1"
+     },
+     "platform": {
+      "machine": "x86_64",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43"
+     },
+     "python": {
+      "implementation": "CPython",
+      "version": "3.13.13"
+     },
+     "script": {
+      "name": "scripts/homologues.py",
+      "sha256": "61e02d7fc4adfff81058b1975974aa1f447a37029f358bb9e66a9c6c2ca7555f"
+     }
+    },
     "stratum": "negative",
-    "tm_score": 0.3235,
+    "tm_score": 0.339,
     "usalign": {
      "agreement": {
-      "close_within_1": 0.1071,
-      "exact": 0.0349,
-      "foldmap_pairs_in_usalign": 0.1125,
-      "within_1": 0.1047
+      "close_within_1": 0.7143,
+      "exact": 0.4535,
+      "foldmap_pairs_in_usalign": 0.6707,
+      "within_1": 0.6395
      },
      "auto": {
       "method": "structure",
-      "tm_score": 0.3235,
-      "within_1": 0.1047
+      "tm_score": 0.339,
+      "within_1": 0.6395
      },
      "disagreements": [
-      "A 25-36 (12): not paired",
-      "A 37-37 (1): B shifted +12",
-      "A 38-38 (1): B shifted +10",
-      "A 39-40 (2): B shifted +9",
-      "A 41-56 (10): B shifted +8",
-      "A 57-59 (3): B shifted -19",
+      "A 25-29 (5): B shifted -3",
+      "A 30-32 (3): B shifted -2",
+      "A 33-34 (2): B shifted -3",
+      "A 36-36 (1): B shifted -3",
+      "A 38-38 (1): B shifted -3",
+      "A 39-40 (2): B shifted -4",
+      "A 41-41 (1): B shifted -5",
+      "A 42-44 (3): B shifted -4",
+      "A 45-55 (5): B shifted -3",
       "A 60-60 (1): not paired",
-      "A 82-84 (3): B shifted +2",
-      "A 87-88 (2): B shifted +4",
-      "A 90-99 (10): B shifted +4",
+      "A 71-71 (1): not paired",
+      "A 83-83 (1): not paired",
+      "A 97-97 (1): not paired",
       "A 102-102 (1): not paired",
-      "A 114-114 (1): B shifted -2",
-      "A 115-118 (4): B shifted -3",
-      "A 119-119 (1): not paired",
-      "A 120-124 (5): B shifted +7",
-      "A 125-125 (1): not paired",
-      "A 126-127 (2): B shifted -2",
-      "A 128-129 (2): not paired",
-      "A 130-139 (10): B shifted -4",
-      "A 140-144 (5): B shifted -5"
+      "A 111-111 (1): not paired",
+      "A 114-114 (1): B shifted -3",
+      "A 137-137 (1): not paired"
      ],
      "limits": {
       "applies": false,
@@ -555,8 +798,8 @@
      },
      "rows": {
       "foldmap": [
-       "DTREQANG-----------------ERW-DGGSGGITSPFKLPDES-------------PSWTEWRLYNDENPLGFKESWGFGKV------------------------VFKRYLRYDRTEASLHRV--LGS-WTGDSVNYAASRFLGANQVGC--TYSIRFRGV-----------SVTISG-GSRTLQHLCEMAIRSKQELLQLTPVEV------",
-       "--------MEQSASDSNKSQNAISEVM-SATSA-------------INGLYIGQTSYSGLDSTILLNTSAIPDNYK---------DTTNKKITNPFGGELNVGPANNNTAFGYYLTLT----RLD--KAAC-VSLATLNLGTS-----------AKGYGVNISG-ENNITSFGNSADQAAK-STA--ITPAEAATACKNTDSTNK-----VTYFMK"
+       "DTREQ------ANGERWDGGSGGITSP-FKLPD--ES--PSWTE-WRL-YNDEN--P-----------------------------LGFKESWGFGKVVFK------RYLRYDRTEASLHRVLGS--WTGDSVNYAASRFLGANQVGCT------YSI----RFRGVSVTISG---------GSRTLQHLCEMA-IR-SKQELLQLTPVEV---",
+       "-----MEQSASD----------SNKSQNAISEVMSATSAINGLYIGQTSYSGLDSTILLNTSAIPDNYKDTTNKKITNPFGGELNVGPA------------NNNTAFGYYLT-----L-TR-LD-KAACVSLAT-LN------------LGTSAKGYGVNISGENNITSFGNSADQAAKSTAITPAEAATACK-NTDSTNKVTY-------FMK"
       ],
       "usalign": [
        "DTREQANGERWDGGSG----------GITSPFKL-PDE--SP--S-WT-EWRLYNDENP---------------------------LGFKESWGFGKVVF-----KRYLRYDRTEASLHRVLGS-WTGDSVNYAASR--FLGANQVGC---TYS--I-RFRGVSVTISG---------GSRTLQHLCEMAIR-SKQELLQLTPVEV----",
@@ -564,11 +807,11 @@
       ]
      },
      "structure": {
-      "aligned": 80,
-      "rmsd": 4.9818,
-      "tm_score": 0.3235
+      "aligned": 82,
+      "rmsd": 4.8962,
+      "tm_score": 0.339
      },
-     "tm_difference": -0.0075,
+     "tm_difference": 0.0081,
      "usalign": {
       "aligned": 86,
       "aligned_reported": 86,
@@ -595,6 +838,38 @@
     "pieces": 0,
     "rmsd": 0.6226,
     "same_fold": true,
+    "source_stamp": {
+     "checkout_fingerprint": "7879eea05bd9301c",
+     "code_fingerprint": "7879eea05bd9301c",
+     "foldmap": "0.2.0",
+     "git": {
+      "commit": "55e1a78e9d594601040decb04af43f321622d3d9",
+      "dirty": false,
+      "source": "asserted by runner"
+     },
+     "installed_matches_checkout": true,
+     "package": "checkout",
+     "packages": {
+      "PyYAML": "6.0.3",
+      "gemmi": "0.7.5",
+      "matplotlib": "3.11.2",
+      "networkx": "3.7",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1"
+     },
+     "platform": {
+      "machine": "x86_64",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43"
+     },
+     "python": {
+      "implementation": "CPython",
+      "version": "3.13.13"
+     },
+     "script": {
+      "name": "scripts/homologues.py",
+      "sha256": "61e02d7fc4adfff81058b1975974aa1f447a37029f358bb9e66a9c6c2ca7555f"
+     }
+    },
     "stratum": "close",
     "tm_score": 0.9771,
     "usalign": {
@@ -647,7 +922,7 @@
    {
     "aligned": 291,
     "extras": 1,
-    "identity": 0.2715,
+    "identity": 0.2749,
     "kind": "positive",
     "length_a": 297,
     "length_b": 307,
@@ -656,25 +931,55 @@
     "only_a": 1,
     "pair": "1TYY_A-3IQ0_A",
     "pieces": 0,
-    "rmsd": 2.3278,
+    "rmsd": 2.2976,
     "same_fold": true,
+    "source_stamp": {
+     "checkout_fingerprint": "7879eea05bd9301c",
+     "code_fingerprint": "7879eea05bd9301c",
+     "foldmap": "0.2.0",
+     "git": {
+      "commit": "55e1a78e9d594601040decb04af43f321622d3d9",
+      "dirty": false,
+      "source": "asserted by runner"
+     },
+     "installed_matches_checkout": true,
+     "package": "checkout",
+     "packages": {
+      "PyYAML": "6.0.3",
+      "gemmi": "0.7.5",
+      "matplotlib": "3.11.2",
+      "networkx": "3.7",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1"
+     },
+     "platform": {
+      "machine": "x86_64",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43"
+     },
+     "python": {
+      "implementation": "CPython",
+      "version": "3.13.13"
+     },
+     "script": {
+      "name": "scripts/homologues.py",
+      "sha256": "61e02d7fc4adfff81058b1975974aa1f447a37029f358bb9e66a9c6c2ca7555f"
+     }
+    },
     "stratum": "remote",
-    "tm_score": 0.8867,
+    "tm_score": 0.8885,
     "usalign": {
      "agreement": {
-      "close_within_1": 0.9964,
-      "exact": 0.9794,
-      "foldmap_pairs_in_usalign": 0.9966,
-      "within_1": 0.9966
+      "close_within_1": 1.0,
+      "exact": 1.0,
+      "foldmap_pairs_in_usalign": 1.0,
+      "within_1": 1.0
      },
      "auto": {
       "method": "structure",
-      "tm_score": 0.8867,
-      "within_1": 0.9966
+      "tm_score": 0.8885,
+      "within_1": 1.0
      },
-     "disagreements": [
-      "A 22-22 (1): B shifted -2"
-     ],
+     "disagreements": [],
      "limits": {
       "applies": true,
       "pairs": true,
@@ -683,7 +988,7 @@
      },
      "rows": {
       "foldmap": [
-       "NKVWVIGDASVDLVPEKQ-------NSYLK-CPGGASANVGVCVARLGGECGFIGCLGDDDAGRFLRQVFQDNGVDVTFLRLDADLTSAVLIVN----SFTYLVHPGADTYVSPQDL--PPFRQYEWFYFSSIGLTDRPAREACLEGARRMREAGGYVLFDVNLRSKMWGNTDEIPELIARSAALASICKVSADELCQLSGASHWQDARYYLRDLGCDTTIISLGADGALLITAEGEFHFPAPRVDVVDTTGAGDAFVGGLLFTLSRANCWDHALLAEAISNANACGAMAVTAKGAMTALPFPDQLNTFLS--",
+       "NKVWVIGDASVDLVPEK--Q-----NSYLK-CPGGASANVGVCVARLGGECGFIGCLGDDDAGRFLRQVFQDNGVDVTFLRLDADLTSAVLIVN---S-FTYLVHPGADTYVSPQ-DLPP-FRQYEWFYFSSIGLTDRPAREACLEGARRMREAGGYVLFDVNLRSKMWGNTDEIPELIARSAALASICKVSADELCQLSGASHWQDARYYLRDLGCDTTIISLGADGALLITAEGEFHFPAPRVDVVDTTGAGDAFVGGLLFTLSRANCWDHALLAEAISNANACGAMAVTAKGAMTALPFPDQLNTFLS--",
        "SKVFTIGEILVEIMASKIGQPFDQPGIWNGPYPSGAPAIFIDQVTRLGVPCGIISCVGNDGFGDINIHRLAADGVDIRGISVLPLEATGSAFVTYHNRDFIFNIKNAACGKLSAQHVDENILKDCTHFHIMGSSLFSFHMVDAVKKAVTIVKANGGVISFDPNIRKE-MLDIPEMRDALHFVLELTDIYMPSEGEVLLLSPHSTPERAIAGFLEEGVKEVIVKRGNQGASYYSANEQFHVESYPVEEVDPTGAGDCFGGAWIACRQLG-----FDAHRALQYANACGALAVTRRGPMEGTSRLMEIETFIQRH"
       ],
       "usalign": [
@@ -693,10 +998,10 @@
      },
      "structure": {
       "aligned": 291,
-      "rmsd": 2.3278,
-      "tm_score": 0.8867
+      "rmsd": 2.2976,
+      "tm_score": 0.8885
      },
-     "tm_difference": -0.0018,
+     "tm_difference": 0.0,
      "usalign": {
       "aligned": 291,
       "aligned_reported": 291,
@@ -710,36 +1015,70 @@
     }
    },
    {
-    "aligned": 33,
-    "extras": 2,
-    "identity": 0.0909,
+    "aligned": 31,
+    "extras": 1,
+    "identity": 0.129,
     "kind": "positive",
     "length_a": 80,
     "length_b": 60,
-    "mates": 1,
+    "mates": 2,
     "method": "structure",
-    "only_a": 3,
+    "only_a": 2,
     "pair": "1XU6_A-1PS2_A",
     "pieces": 0,
-    "rmsd": 3.8248,
+    "rmsd": 2.9168,
     "same_fold": false,
+    "source_stamp": {
+     "checkout_fingerprint": "7879eea05bd9301c",
+     "code_fingerprint": "7879eea05bd9301c",
+     "foldmap": "0.2.0",
+     "git": {
+      "commit": "55e1a78e9d594601040decb04af43f321622d3d9",
+      "dirty": false,
+      "source": "asserted by runner"
+     },
+     "installed_matches_checkout": true,
+     "package": "checkout",
+     "packages": {
+      "PyYAML": "6.0.3",
+      "gemmi": "0.7.5",
+      "matplotlib": "3.11.2",
+      "networkx": "3.7",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1"
+     },
+     "platform": {
+      "machine": "x86_64",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43"
+     },
+     "python": {
+      "implementation": "CPython",
+      "version": "3.13.13"
+     },
+     "script": {
+      "name": "scripts/homologues.py",
+      "sha256": "61e02d7fc4adfff81058b1975974aa1f447a37029f358bb9e66a9c6c2ca7555f"
+     }
+    },
     "stratum": "remote",
-    "tm_score": 0.2233,
+    "tm_score": 0.2643,
     "usalign": {
      "agreement": {
-      "close_within_1": 0.913,
-      "exact": 0.4516,
-      "foldmap_pairs_in_usalign": 0.7879,
-      "within_1": 0.8387
+      "close_within_1": 0.7826,
+      "exact": 0.2581,
+      "foldmap_pairs_in_usalign": 0.7419,
+      "within_1": 0.7419
      },
      "auto": {
       "method": "structure",
-      "tm_score": 0.2233,
-      "within_1": 0.8387
+      "tm_score": 0.2643,
+      "within_1": 0.7419
      },
      "disagreements": [
+      "A 377-377 (1): not paired",
+      "A 380-380 (1): not paired",
+      "A 381-384 (4): B shifted -2",
       "A 390-390 (1): B shifted -2",
-      "A 399-401 (3): B shifted +2",
       "A 410-410 (1): not paired"
      ],
      "limits": {
@@ -750,8 +1089,8 @@
      },
      "rows": {
       "foldmap": [
-       "GSHMLEVLTQKHKPAESQQQAAE--------------TEGSCNKKDQNECK--SPCKWHNDAENKKCTLDKEEAKKVADETAKDGKTGNTNTTGSS-----------",
-       "-----------------------EAQTETCTVAPRERQNCGFPGVTPSQCANKGCCFDDTVRGVPWCFYPNT------------------------IDVPPEEESEF"
+       "GSHMLEVLTQKHKPAESQQQAAET--------------EGSCNKK-DQ-NECK-SPCKWHNDAEN-KKCTLDKEEAKKVADETAKDGKTGNTNTTGSS-----------",
+       "------------------------EAQTETCTVAPRERQN-CGFPGVTPSQCANKGCCFDDTVRGVPWCFYPNT------------------------IDVPPEEESEF"
       ],
       "usalign": [
        "GSHMLEVLTQKHKPAESQQQAAE--------------TEGSCNKKDQNEC--KSPCKWHNDAENK--KCTLDKEEAKKVADETAKDGKTGNTNTTGSS-----------",
@@ -759,11 +1098,11 @@
       ]
      },
      "structure": {
-      "aligned": 33,
-      "rmsd": 3.8248,
-      "tm_score": 0.2233
+      "aligned": 31,
+      "rmsd": 2.9168,
+      "tm_score": 0.2643
      },
-     "tm_difference": -0.0173,
+     "tm_difference": 0.0237,
      "usalign": {
       "aligned": 31,
       "aligned_reported": 31,
@@ -777,55 +1116,98 @@
     }
    },
    {
-    "aligned": 133,
+    "aligned": 136,
     "extras": 6,
-    "identity": 0.0526,
+    "identity": 0.0441,
     "kind": "negative",
     "length_a": 293,
     "length_b": 302,
-    "mates": 8,
+    "mates": 6,
     "method": "structure",
-    "only_a": 4,
+    "only_a": 6,
     "pair": "2C3E_A-1HZF_A",
-    "pieces": 1,
-    "rmsd": 5.817,
+    "pieces": 3,
+    "rmsd": 5.8151,
     "same_fold": false,
+    "source_stamp": {
+     "checkout_fingerprint": "7879eea05bd9301c",
+     "code_fingerprint": "7879eea05bd9301c",
+     "foldmap": "0.2.0",
+     "git": {
+      "commit": "55e1a78e9d594601040decb04af43f321622d3d9",
+      "dirty": false,
+      "source": "asserted by runner"
+     },
+     "installed_matches_checkout": true,
+     "package": "checkout",
+     "packages": {
+      "PyYAML": "6.0.3",
+      "gemmi": "0.7.5",
+      "matplotlib": "3.11.2",
+      "networkx": "3.7",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1"
+     },
+     "platform": {
+      "machine": "x86_64",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43"
+     },
+     "python": {
+      "implementation": "CPython",
+      "version": "3.13.13"
+     },
+     "script": {
+      "name": "scripts/homologues.py",
+      "sha256": "61e02d7fc4adfff81058b1975974aa1f447a37029f358bb9e66a9c6c2ca7555f"
+     }
+    },
     "stratum": "negative",
-    "tm_score": 0.2831,
+    "tm_score": 0.291,
     "usalign": {
      "agreement": {
-      "close_within_1": 0.4328,
-      "exact": 0.2385,
-      "foldmap_pairs_in_usalign": 0.4135,
-      "within_1": 0.4231
+      "close_within_1": 0.4478,
+      "exact": 0.2692,
+      "foldmap_pairs_in_usalign": 0.3897,
+      "within_1": 0.4077
      },
      "auto": {
       "method": "structure",
-      "tm_score": 0.2831,
-      "within_1": 0.4231
+      "tm_score": 0.291,
+      "within_1": 0.4077
      },
      "disagreements": [
+      "A 27-27 (1): not paired",
       "A 38-38 (1): not paired",
-      "A 50-50 (1): not paired",
+      "A 51-51 (1): not paired",
       "A 83-88 (6): B shifted +6",
       "A 89-89 (1): B shifted +2",
-      "A 115-117 (3): B shifted +13",
-      "A 118-120 (3): not paired",
-      "A 121-123 (3): B shifted +10",
-      "A 124-128 (5): B shifted +5",
-      "A 129-129 (1): not paired",
+      "A 115-115 (1): not paired",
+      "A 116-117 (2): B shifted +13",
+      "A 118-119 (2): not paired",
+      "A 120-122 (3): B shifted +11",
+      "A 123-123 (1): not paired",
+      "A 124-125 (2): B shifted +5",
+      "A 126-127 (2): not paired",
+      "A 128-129 (2): B shifted +3",
       "A 131-131 (1): not paired",
-      "A 168-173 (6): not paired",
-      "A 174-176 (3): B shifted -3",
+      "A 168-172 (5): not paired",
+      "A 173-176 (4): B shifted -3",
       "A 177-177 (1): B shifted -11",
       "A 178-180 (3): B shifted -12",
-      "A 181-194 (14): B shifted -7",
-      "A 195-198 (4): not paired",
+      "A 181-181 (1): B shifted -9",
+      "A 182-191 (10): B shifted -7",
+      "A 192-192 (1): not paired",
+      "A 193-193 (1): B shifted -8",
+      "A 194-196 (3): not paired",
+      "A 197-197 (1): B shifted -9",
+      "A 198-198 (1): not paired",
       "A 230-230 (1): not paired",
       "A 245-248 (4): not paired",
-      "A 249-260 (12): B shifted -3",
-      "A 261-261 (1): B shifted -4",
-      "A 262-262 (1): B shifted +2"
+      "A 249-259 (11): B shifted -3",
+      "A 260-260 (1): B shifted -2",
+      "A 261-261 (1): B shifted -3",
+      "A 262-262 (1): B shifted +2",
+      "A 268-268 (1): B shifted -2"
      ],
      "limits": {
       "applies": false,
@@ -835,8 +1217,8 @@
      },
      "rows": {
       "foldmap": [
-       "SDQALSFLKDFLAGGVAAAISKTAVA----------------------PI-ERVKLLLQVQHASKQISAEKQYKGIIDCVVRIPKEQGFLSFWRGNLANVIRYFP------TQALNFAFKDKYKQIFLGGVDRHKQFW----------------------------------RYFAGNLASGGAAGATSLCFVYPLDFARTRLAADVGKGAAQREFTGLGNCITKIFKSDGLRGLYQGFNVSV-----QGIIIYRAAYFGVYDTAKGMLPDPKNV-----HIIVSWMIAQ-TVTA--VAG-----------------------LVSYPFDTVRRRMMMQSGRKGADI------------------------------MYTGTVDCWRKIA---------------KDEGP-------------------KAFFKGAWSNVLRGMGGAFVLVLYDEI------",
-       "--------------------------SPGGVASLLRLPRGCGEQTMIYL-APTLAASRY--------------LDKTEQWSTLPPETKDHAVDLIQKGYMRIQQFRKADGSYAAWLSRDSST----------------WLTAFVLKVLSLAQEQVGGSPEKLQETSNWLLSQQQADGSFQ---DPCPVLDR---------------------------------------------SMQGGLVGNDETVALTAFVTIALHHG-------------LAVFQDEGAEPLKQ-RVE--ASIS-KASSFLGEKASAGLLGAHAAAITAYALT-------------------LTKAPADLRGVAHNNLMAMAQETGDNLYWGQAPALWIETTAYALLHLLLHEGKAEMADQASAWLTRQGSFQGGFRSTQDTVIALDALSAY-------------------WIASHT"
+       "SDQALSFLKDFLAGGVAAAISKTAV----------------------APIERVKLLLQVQHASKQISAEKQYKGIIDCVVRIPKEQGFLSFWRGNLANVIRYFP------TQALNFAFKDKYKQIFLGGVD--------------------------------RHKQ--FWRYFAGNLASGGAAGATSLCFVYPLDFARTRLAADVGKGAAQREFTGLGNCITKIFKSDGLRGLYQGFNVSV---Q--GIIIYRAAYFGVYDT--AKGMLPDPKNV----HIIVSWMIAQ-TV-TAV--A------------------G--LVSYPFDTVRRRMMMQSGRKGADI-----------------------------MYTGTVDCWRK-IA--------------KDEGPK------------------A-FFKGAWSNVLRGMGGAFVLVLYDEI------",
+       "-------------------------SPGGVASLLRLPRGCGEQTMIYL-APTLAASRY-------------L-DKTEQWSTLPPETKDHAVDLIQKGYMRIQQFRKADGSYAAWLSRDSS-----------TWLTAFVLKVLSLAQEQVGGSPEKLQETSNWLL---SQQQADGS--FQ--DPC-PV--LD-------------------------------------------RSMQGGLVGNDETVALTAFVTIAL-H---HGL----------AVFQDEGAEPLKQ-RVEASISKASSFLGEKASAGLLGAHAAAITAYALTL-------------------TKAPADLRGVAHNNLMAMAQETGDNLYWGQAPALWIETTAYALLHLLLHEGKAEMADQASAWLTRQGSFQGGFRSTQDTVIALDALSAY-------------------WIASHT"
       ],
       "usalign": [
        "SDQALSFLKDFLAGGVAAAISKTAVA----------------------PIERVKLLLQVQHASKQISAEKQYKGIIDCVVRIPKEQGFLSFWRGNLANVIRYFPTQALNF----A--FKDKYKQIFLGGVDRHKQFWRYFAG----------------------------NLASGGAAG-----ATSLCFVYPLDFARTRLAADVGKGAAQREFTGLGNCITKIFKSDGLRGLYQGF--------N-VSVQGIIIYRAAYFGVYDTAKGMLPDPKNVHIIVSWMIAQTVTAVAGL-----------------------------------VSYPFDTVRRRMMMQSGRK---------------------------GADIMYTGTVDCWRKI-A---------K--DEGPK----------------------AFFKGAWSNVLRGMGGAFVLVLYDEI------",
@@ -844,11 +1226,11 @@
       ]
      },
      "structure": {
-      "aligned": 133,
-      "rmsd": 5.817,
-      "tm_score": 0.2831
+      "aligned": 136,
+      "rmsd": 5.8151,
+      "tm_score": 0.291
      },
-     "tm_difference": 0.0117,
+     "tm_difference": 0.0196,
      "usalign": {
       "aligned": 130,
       "aligned_reported": 130,
@@ -863,42 +1245,72 @@
    },
    {
     "aligned": 37,
-    "extras": 6,
-    "identity": 0.0811,
+    "extras": 7,
+    "identity": 0.0541,
     "kind": "positive",
     "length_a": 61,
     "length_b": 84,
-    "mates": 2,
+    "mates": 1,
     "method": "structure",
-    "only_a": 3,
+    "only_a": 4,
     "pair": "2D46_A-3F42_B",
     "pieces": 0,
-    "rmsd": 3.4041,
+    "rmsd": 2.9381,
     "same_fold": false,
+    "source_stamp": {
+     "checkout_fingerprint": "7879eea05bd9301c",
+     "code_fingerprint": "7879eea05bd9301c",
+     "foldmap": "0.2.0",
+     "git": {
+      "commit": "55e1a78e9d594601040decb04af43f321622d3d9",
+      "dirty": false,
+      "source": "asserted by runner"
+     },
+     "installed_matches_checkout": true,
+     "package": "checkout",
+     "packages": {
+      "PyYAML": "6.0.3",
+      "gemmi": "0.7.5",
+      "matplotlib": "3.11.2",
+      "networkx": "3.7",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1"
+     },
+     "platform": {
+      "machine": "x86_64",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43"
+     },
+     "python": {
+      "implementation": "CPython",
+      "version": "3.13.13"
+     },
+     "script": {
+      "name": "scripts/homologues.py",
+      "sha256": "61e02d7fc4adfff81058b1975974aa1f447a37029f358bb9e66a9c6c2ca7555f"
+     }
+    },
     "stratum": "remote",
-    "tm_score": 0.3523,
+    "tm_score": 0.3826,
     "usalign": {
      "agreement": {
-      "close_within_1": 0.3,
-      "exact": 0.0,
-      "foldmap_pairs_in_usalign": 0.2973,
-      "within_1": 0.275
+      "close_within_1": 0.8667,
+      "exact": 0.65,
+      "foldmap_pairs_in_usalign": 0.8108,
+      "within_1": 0.75
      },
      "auto": {
       "method": "structure",
-      "tm_score": 0.3523,
-      "within_1": 0.275
+      "tm_score": 0.3826,
+      "within_1": 0.75
      },
      "disagreements": [
-      "A 6-7 (2): not paired",
+      "A 6-7 (2): B shifted +2",
+      "A 9-10 (2): not paired",
+      "A 14-14 (1): not paired",
+      "A 17-18 (2): B shifted -2",
       "A 22-22 (1): not paired",
-      "A 34-38 (5): B shifted +2",
-      "A 41-41 (1): not paired",
-      "A 42-48 (7): B shifted -3",
-      "A 49-52 (4): B shifted -4",
-      "A 53-57 (5): B shifted -3",
-      "A 58-60 (3): B shifted -4",
-      "A 61-61 (1): B shifted -6"
+      "A 34-34 (1): not paired",
+      "A 60-60 (1): B shifted +2"
      ],
      "limits": {
       "applies": false,
@@ -908,8 +1320,8 @@
      },
      "rows": {
       "foldmap": [
-       "GSHMYDN----------------------LYLHGIEDSEAGSADSYTSRPSDSDV-------------SLEEDREAIRQEREQQAAI-QLERAKSKP-----------",
-       "-------GLLDGMKKEFSQLEEKNKDTIHTSK---SGGGMVS-------------VSFNGLGELVDLQIDDSLLE-DKEAMQIYLMSALNDGYKAVEENRKNLAFNML"
+       "GSHM---------------------YDNLYLHGIEDSEA-GSADSYTSRPSDSDVS------------LEE-DRE-A--IRQEREQQ-AAIQLERA-KS--KP-----",
+       "----GLLDGMKKEFSQLEEKNKDTIHTSK------SGGGMVS--------------VSFNGLGELVDLQIDDSLLEDKEAMQIYLMSALNDGYKAVEENRKNLAFNML"
       ],
       "usalign": [
        "GSHMY--------------------DNLYLHGIEDS--EAGSADSYTSRPSDSDV---------SLEED-RE-A--IRQEREQ-QAAIQLERA-KSK--P-----",
@@ -918,10 +1330,10 @@
      },
      "structure": {
       "aligned": 37,
-      "rmsd": 3.4041,
-      "tm_score": 0.3523
+      "rmsd": 2.9381,
+      "tm_score": 0.3826
      },
-     "tm_difference": -0.0277,
+     "tm_difference": 0.0025,
      "usalign": {
       "aligned": 40,
       "aligned_reported": 40,
@@ -948,6 +1360,38 @@
     "pieces": 0,
     "rmsd": 0.3118,
     "same_fold": true,
+    "source_stamp": {
+     "checkout_fingerprint": "7879eea05bd9301c",
+     "code_fingerprint": "7879eea05bd9301c",
+     "foldmap": "0.2.0",
+     "git": {
+      "commit": "55e1a78e9d594601040decb04af43f321622d3d9",
+      "dirty": false,
+      "source": "asserted by runner"
+     },
+     "installed_matches_checkout": true,
+     "package": "checkout",
+     "packages": {
+      "PyYAML": "6.0.3",
+      "gemmi": "0.7.5",
+      "matplotlib": "3.11.2",
+      "networkx": "3.7",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1"
+     },
+     "platform": {
+      "machine": "x86_64",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43"
+     },
+     "python": {
+      "implementation": "CPython",
+      "version": "3.13.13"
+     },
+     "script": {
+      "name": "scripts/homologues.py",
+      "sha256": "61e02d7fc4adfff81058b1975974aa1f447a37029f358bb9e66a9c6c2ca7555f"
+     }
+    },
     "stratum": "close",
     "tm_score": 0.9958,
     "usalign": {
@@ -998,9 +1442,9 @@
     }
    },
    {
-    "aligned": 49,
+    "aligned": 55,
     "extras": 4,
-    "identity": 0.0816,
+    "identity": 0.1091,
     "kind": "negative",
     "length_a": 207,
     "length_b": 76,
@@ -1009,33 +1453,65 @@
     "only_a": 10,
     "pair": "2EX5_A-4NTQ_A",
     "pieces": 0,
-    "rmsd": 4.977,
+    "rmsd": 5.2742,
     "same_fold": false,
+    "source_stamp": {
+     "checkout_fingerprint": "7879eea05bd9301c",
+     "code_fingerprint": "7879eea05bd9301c",
+     "foldmap": "0.2.0",
+     "git": {
+      "commit": "55e1a78e9d594601040decb04af43f321622d3d9",
+      "dirty": false,
+      "source": "asserted by runner"
+     },
+     "installed_matches_checkout": true,
+     "package": "checkout",
+     "packages": {
+      "PyYAML": "6.0.3",
+      "gemmi": "0.7.5",
+      "matplotlib": "3.11.2",
+      "networkx": "3.7",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1"
+     },
+     "platform": {
+      "machine": "x86_64",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43"
+     },
+     "python": {
+      "implementation": "CPython",
+      "version": "3.13.13"
+     },
+     "script": {
+      "name": "scripts/homologues.py",
+      "sha256": "61e02d7fc4adfff81058b1975974aa1f447a37029f358bb9e66a9c6c2ca7555f"
+     }
+    },
     "stratum": "negative",
-    "tm_score": 0.1484,
+    "tm_score": 0.1649,
     "usalign": {
      "agreement": {
-      "close_within_1": 0.7143,
-      "exact": 0.3409,
-      "foldmap_pairs_in_usalign": 0.5714,
-      "within_1": 0.6364
+      "close_within_1": 0.8286,
+      "exact": 0.5227,
+      "foldmap_pairs_in_usalign": 0.6,
+      "within_1": 0.75
      },
      "auto": {
       "method": "structure",
-      "tm_score": 0.1484,
-      "within_1": 0.6364
+      "tm_score": 0.1649,
+      "within_1": 0.75
      },
      "disagreements": [
       "A 93-93 (1): not paired",
-      "A 97-97 (1): not paired",
-      "A 119-119 (1): B shifted -2",
-      "A 120-123 (4): B shifted -3",
-      "A 133-133 (1): B shifted -17",
-      "A 138-140 (3): not paired",
-      "A 141-142 (2): B shifted -23",
-      "A 146-146 (1): B shifted -20",
-      "A 154-154 (1): not paired",
-      "A 156-156 (1): B shifted -12"
+      "A 118-118 (1): B shifted +2",
+      "A 133-133 (1): B shifted -18",
+      "A 138-138 (1): B shifted -25",
+      "A 139-139 (1): not paired",
+      "A 140-141 (2): B shifted -28",
+      "A 142-142 (1): not paired",
+      "A 146-146 (1): B shifted -28",
+      "A 154-154 (1): B shifted -21",
+      "A 156-156 (1): B shifted -20"
      ],
      "limits": {
       "applies": false,
@@ -1045,8 +1521,8 @@
      },
      "rows": {
       "foldmap": [
-       "ILKPGEKLPQDKLEELKKINDAVKKTKNFSKYLIDLRKLFQIDEVQVTSESKLFLAGFLEGEASLNISTKKLATSKFGLVVDPEFNVTRHVNGVKVLYLALEVFKTGRIRHKSGSNATL---VLTIDNRQSLEEKVIPF-------YEQYVVAFSSPEKV--------KRVANFKALLELFNNDAHQDLEQLVNKILPIWDQMRKQQGQSNEGFPNLEAAQDFAR---------",
-       "--------------------------------------------------------LK-----------------------------------GKEAQEAASNLGFDRRIPPQKAPFNSHGQPVFYDGKNYI-------TPDIDSHNVTNGW--------KMFNSKGKRIGTY----------------------------------------------------DSGLNRIKD"
+       "ILKPGEKLPQDKLEELKKINDAVKKTKNFSKYLIDLRKLFQIDEVQVTSESKLFLAGFLEGEASLNISTKKLATSKFGLVVDPEFNVTRHVNGVKVLYLALEVFKTGRIRH-KS-GSNATL-VLTIDNRQSLEEKVIPFYEQYVVAFSSPEK---VKRVA----NFKALLELFNNDAHQDLEQLVNKILPIWDQMRKQQGQSNEGFPNLEAAQDFAR-----------",
+       "--------------------------------------------------------LK----------------------------------GKEAQEAASN-LGFDRRIPPQKAPFNSHGQPVFYDGK-NY---IT-PD---IDSHNV---TNGWKMF-NSKGKRIG-------------------------------------------------TYDSGLNRIKD"
       ],
       "usalign": [
        "ILKPGEKLPQDKLEELKKINDAVKKTKNFSKYLIDLRKLFQIDEVQVTSESKLFLAGFLEGEASLNISTKKLATSKFGLVVDPEFNVTRHVNGVKVLYLALEVFKTGRIRHKSG--S-NATLVLTI-DNRQS------------------LEEKV--------I--PFYEQYVVAFSSPEKVKRVANFKALLELFNNDAHQDLEQLVNKILPIWDQMRKQQGQSNEGFPNLEAAQDFAR",
@@ -1054,11 +1530,11 @@
       ]
      },
      "structure": {
-      "aligned": 49,
-      "rmsd": 4.977,
-      "tm_score": 0.1484
+      "aligned": 55,
+      "rmsd": 5.2742,
+      "tm_score": 0.1649
      },
-     "tm_difference": -0.0159,
+     "tm_difference": 0.0006,
      "usalign": {
       "aligned": 44,
       "aligned_reported": 44,
@@ -1072,9 +1548,9 @@
     }
    },
    {
-    "aligned": 202,
+    "aligned": 201,
     "extras": 2,
-    "identity": 0.2129,
+    "identity": 0.2189,
     "kind": "positive",
     "length_a": 233,
     "length_b": 211,
@@ -1083,28 +1559,55 @@
     "only_a": 8,
     "pair": "2F20_A-1ZN6_A",
     "pieces": 0,
-    "rmsd": 2.226,
+    "rmsd": 2.0039,
     "same_fold": true,
+    "source_stamp": {
+     "checkout_fingerprint": "7879eea05bd9301c",
+     "code_fingerprint": "7879eea05bd9301c",
+     "foldmap": "0.2.0",
+     "git": {
+      "commit": "55e1a78e9d594601040decb04af43f321622d3d9",
+      "dirty": false,
+      "source": "asserted by runner"
+     },
+     "installed_matches_checkout": true,
+     "package": "checkout",
+     "packages": {
+      "PyYAML": "6.0.3",
+      "gemmi": "0.7.5",
+      "matplotlib": "3.11.2",
+      "networkx": "3.7",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1"
+     },
+     "platform": {
+      "machine": "x86_64",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43"
+     },
+     "python": {
+      "implementation": "CPython",
+      "version": "3.13.13"
+     },
+     "script": {
+      "name": "scripts/homologues.py",
+      "sha256": "61e02d7fc4adfff81058b1975974aa1f447a37029f358bb9e66a9c6c2ca7555f"
+     }
+    },
     "stratum": "remote",
-    "tm_score": 0.7728,
+    "tm_score": 0.7817,
     "usalign": {
      "agreement": {
-      "close_within_1": 0.9749,
-      "exact": 0.9055,
-      "foldmap_pairs_in_usalign": 0.9703,
-      "within_1": 0.9751
+      "close_within_1": 1.0,
+      "exact": 1.0,
+      "foldmap_pairs_in_usalign": 1.0,
+      "within_1": 1.0
      },
      "auto": {
       "method": "structure",
-      "tm_score": 0.7728,
-      "within_1": 0.9751
+      "tm_score": 0.7817,
+      "within_1": 1.0
      },
-     "disagreements": [
-      "A 22-22 (1): not paired",
-      "A 31-32 (2): not paired",
-      "A 190-190 (1): not paired",
-      "A 218-218 (1): not paired"
-     ],
+     "disagreements": [],
      "limits": {
       "applies": true,
       "pairs": true,
@@ -1113,8 +1616,8 @@
      },
      "rows": {
       "foldmap": [
-       "CFHNSMSAKAIKVAARYGRQSDVVEIYQSILDEQYHVNAFTFPRYPIITSS----DEVQVFNWGLIPFWVRSEEDATEIRKMTLNARADTIFEKPSFREPIMK-KRCIVPSTGYFEWRHEGANKIPYYIYVKDEPIFSMAGIYDRWLDKDTGEEHETFSIITTDT--NSLTDYIDNT--KHRMPAILTQEEEEKWLNPSLSKAEIASLLKPFDTEKMDAYVIRNDFLKKSPNDPTIVQRALE",
-       "CSHYQALKDQERMRKYFAAH---PSAEV-----PADMWP--RYMGAFIRRPLVPEREAATGRWGMIPPGTRPEKLAEASKKNTSNARSETAHQLWTFRNAWAKAQHCIIPADAIYEPDWRSGKAVPTRFTRADGAPLGIAGLWDRYRN-AAGEWIDSYTMLTINADDDPLFRDYHQAGKEKRMVVILPDGAYGDWLT--APATDTRDFLLPYPADRLVAAAVKL------------------"
+       "CFHNSMSAKAIKVAARYGRQSDVVEIYQSILDEQYHVNAFTFPRYPIITSS----DEVQVFNWGLIPFWVRSEEDATEIR-KMTLNARADTIFEKPSFREPIMK-KRCIVPSTGYFEWRHEGANKIPYYIYVKDEPIFSMAGIYDRWLDKDTGEEHETFSIITTDT--NSLTDYIDNT-K-HRMPAILTQEEEEKWLNPSLSKAEIASLLKPFDTEKMDAYVIRNDFLKKSPNDPTIVQRALE",
+       "CSHYQALKDQERMRKYFAA-H--PS-AE-VP--A-DMWP--RYMGAFIRRPLVPEREAATGRWGMIPPGTRP-EKLAEASKKNTSNARSETAHQLWTFRNAWAKAQHCIIPADAIYEPDWRSGKAVPTRFTRADGAPLGIAGLWDRYRN-AAGEWIDSYTMLTINADDDPLFRDYHQAGKEKRMVVILPDGAYGDWLTA-PAT-DTRDFLLPYPADRLVAAAVK--L----------------"
       ],
       "usalign": [
        "CFHNSMSAKAIKVAARYGRQSDVVEIYQSILDEQYHVNAFTFPRYPIITSS----DEVQVFNWGLIPFWVRSEEDATEIR-KMTLNARADTIFEKPSFREPIMK-KRCIVPSTGYFEWRHEGANKIPYYIYVKDEPIFSMAGIYDRWLDKDTGEEHETFSIITTDT--NSLTDYIDNT-K-HRMPAILTQEEEEKWLNPSLSKAEIASLLKPFDTEKMDAYVIRNDFLKKSPNDPTIVQRALE",
@@ -1122,11 +1625,11 @@
       ]
      },
      "structure": {
-      "aligned": 202,
-      "rmsd": 2.226,
-      "tm_score": 0.7728
+      "aligned": 201,
+      "rmsd": 2.0039,
+      "tm_score": 0.7817
      },
-     "tm_difference": -0.0089,
+     "tm_difference": 0.0,
      "usalign": {
       "aligned": 201,
       "aligned_reported": 201,
@@ -1140,9 +1643,9 @@
     }
    },
    {
-    "aligned": 47,
+    "aligned": 46,
     "extras": 6,
-    "identity": 0.1277,
+    "identity": 0.1087,
     "kind": "negative",
     "length_a": 74,
     "length_b": 114,
@@ -1151,21 +1654,53 @@
     "only_a": 3,
     "pair": "2H5F_A-4Z42_B",
     "pieces": 0,
-    "rmsd": 4.2855,
+    "rmsd": 4.174,
     "same_fold": false,
+    "source_stamp": {
+     "checkout_fingerprint": "7879eea05bd9301c",
+     "code_fingerprint": "7879eea05bd9301c",
+     "foldmap": "0.2.0",
+     "git": {
+      "commit": "55e1a78e9d594601040decb04af43f321622d3d9",
+      "dirty": false,
+      "source": "asserted by runner"
+     },
+     "installed_matches_checkout": true,
+     "package": "checkout",
+     "packages": {
+      "PyYAML": "6.0.3",
+      "gemmi": "0.7.5",
+      "matplotlib": "3.11.2",
+      "networkx": "3.7",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1"
+     },
+     "platform": {
+      "machine": "x86_64",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43"
+     },
+     "python": {
+      "implementation": "CPython",
+      "version": "3.13.13"
+     },
+     "script": {
+      "name": "scripts/homologues.py",
+      "sha256": "61e02d7fc4adfff81058b1975974aa1f447a37029f358bb9e66a9c6c2ca7555f"
+     }
+    },
     "stratum": "negative",
-    "tm_score": 0.2914,
+    "tm_score": 0.2958,
     "usalign": {
      "agreement": {
-      "close_within_1": 0.3939,
-      "exact": 0.2041,
-      "foldmap_pairs_in_usalign": 0.4255,
-      "within_1": 0.4082
+      "close_within_1": 0.4545,
+      "exact": 0.2245,
+      "foldmap_pairs_in_usalign": 0.5,
+      "within_1": 0.4694
      },
      "auto": {
       "method": "structure",
-      "tm_score": 0.2914,
-      "within_1": 0.4082
+      "tm_score": 0.2958,
+      "within_1": 0.4694
      },
      "disagreements": [
       "A 3-3 (1): not paired",
@@ -1176,9 +1711,8 @@
       "A 14-17 (4): B shifted -22",
       "A 18-25 (8): not paired",
       "A 34-35 (2): not paired",
-      "A 36-36 (1): B shifted -17",
-      "A 64-66 (3): B shifted -2",
-      "A 76-76 (1): B shifted -4"
+      "A 36-36 (1): B shifted -18",
+      "A 76-76 (1): not paired"
      ],
      "limits": {
       "applies": false,
@@ -1188,8 +1722,8 @@
      },
      "rows": {
       "foldmap": [
-       "VGLPHG------------------FCIQCNRKTWSNCSIGHRCLPYHMTCY---------------TLYKPDENGEM---KWAVK-------------------------GCARMCPTAKSGERV--KCCTGASCNS----",
-       "------NTPLGGCILADTPITFNENKPVTKVKV------------------RNTGDRPIQVGSHFHFFEVNRAL---EFDRAAAYGKRLNISSTTAIRFEPGDETEVPLIPFGGKQTLYGFNNLVDGWTGEGVVPNSERPD"
+       "VGLPHG------------------FCIQCNRKTWSNCSIGHRCLPYHMTCY--------------TLYK-PDENGEM---KWAV--K-----------------------GCARMCPTAKSG-ER-VKCCTGASCNS-----",
+       "------NTPLGGCILADTPITFNENKPVTKVKV------------------RNTGDRPIQVGSHFHFFEVNRAL---EFDRAAAYGKRLNISSTTAIRFEPGDETEVPLIPFGGKQTLYGFNNLVDGWTGEGVVPN-SERPD"
       ],
       "usalign": [
        "--------------VG--LPHGFC-I-----------------QC-NRKTWSNCSIGHRCLPYHMTCYTLYKPDENGEMKWAVK----------------------GCARM-CPTAKS--G-ERVKCCTG-ASCN---S",
@@ -1197,11 +1731,11 @@
       ]
      },
      "structure": {
-      "aligned": 47,
-      "rmsd": 4.2855,
-      "tm_score": 0.2914
+      "aligned": 46,
+      "rmsd": 4.174,
+      "tm_score": 0.2958
      },
-     "tm_difference": -0.0319,
+     "tm_difference": -0.0275,
      "usalign": {
       "aligned": 49,
       "aligned_reported": 49,
@@ -1216,41 +1750,73 @@
    },
    {
     "aligned": 59,
-    "extras": 12,
-    "identity": 0.0,
+    "extras": 11,
+    "identity": 0.0169,
     "kind": "negative",
     "length_a": 114,
     "length_b": 179,
-    "mates": 3,
+    "mates": 4,
     "method": "structure",
-    "only_a": 7,
+    "only_a": 6,
     "pair": "2IAY_A-4XZD_A",
     "pieces": 0,
-    "rmsd": 4.2502,
+    "rmsd": 3.9839,
     "same_fold": false,
+    "source_stamp": {
+     "checkout_fingerprint": "7879eea05bd9301c",
+     "code_fingerprint": "7879eea05bd9301c",
+     "foldmap": "0.2.0",
+     "git": {
+      "commit": "55e1a78e9d594601040decb04af43f321622d3d9",
+      "dirty": false,
+      "source": "asserted by runner"
+     },
+     "installed_matches_checkout": true,
+     "package": "checkout",
+     "packages": {
+      "PyYAML": "6.0.3",
+      "gemmi": "0.7.5",
+      "matplotlib": "3.11.2",
+      "networkx": "3.7",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1"
+     },
+     "platform": {
+      "machine": "x86_64",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43"
+     },
+     "python": {
+      "implementation": "CPython",
+      "version": "3.13.13"
+     },
+     "script": {
+      "name": "scripts/homologues.py",
+      "sha256": "61e02d7fc4adfff81058b1975974aa1f447a37029f358bb9e66a9c6c2ca7555f"
+     }
+    },
     "stratum": "negative",
-    "tm_score": 0.3161,
+    "tm_score": 0.3285,
     "usalign": {
      "agreement": {
-      "close_within_1": 0.86,
-      "exact": 0.3788,
-      "foldmap_pairs_in_usalign": 0.9153,
-      "within_1": 0.8182
+      "close_within_1": 0.9,
+      "exact": 0.4394,
+      "foldmap_pairs_in_usalign": 0.9322,
+      "within_1": 0.8333
      },
      "auto": {
       "method": "structure",
-      "tm_score": 0.3161,
-      "within_1": 0.8182
+      "tm_score": 0.3285,
+      "within_1": 0.8333
      },
      "disagreements": [
+      "A 3-4 (2): B shifted +2",
+      "A 5-5 (1): not paired",
       "A 64-64 (1): not paired",
-      "A 66-66 (1): not paired",
+      "A 67-67 (1): not paired",
       "A 75-75 (1): B shifted -2",
-      "A 78-78 (1): B shifted -8",
-      "A 79-79 (1): B shifted +2",
       "A 102-102 (1): not paired",
       "A 104-105 (2): not paired",
-      "A 110-113 (4): not paired"
+      "A 110-111 (2): not paired"
      ],
      "limits": {
       "applies": false,
@@ -1260,8 +1826,8 @@
      },
      "rows": {
       "foldmap": [
-       "-------------------GMAYTTTVKLDGDTKTYTLSPTVKKYTLMDLGFVK---GRSGA---FSFERSLDPTSPYQAAFKLKMTVNADLTGFKMTTVT--GNG----------VQRANIFKNDAHPEAVE-----QLRYILANFIERDILTTD------------------------------------------------------------------------------",
-       "STTIQYNSNYADYSISSYLREWANN-----------------------------FGDIDQAPAETKDRGSFSGSSTLFSGTQYAIGSSH---SNPEGMIAEGDLKYSFMPQHTFHGQIDTLQ-----------FGKDLATNAGG------------PSAGKHLEKIDITFNELDLSGEFDSGKSMTENHQGDMHKSVRGLMKGNPDPMLEVMKAKGINVDTAFKDLSIASQYPD"
+       "-------------------GMA--YTTTVKLDGDTKTYTLSPTVKKYTLMDLGFVK--GRSGA---FSFERSLDPTSP-YQAAFKLKMTVNADLTGFKMTTVT--GN--------GV--QRANIFKNDAHPEAVE-----QLRY-ILANFIERDILT------TD---------------------------------------------------------------------",
+       "STTIQYNSNYADYSISSYLREWANNF------------------------------GDIDQAPAETKDRGSFSGS-STLFSGTQYAIGSSH--S-NPEGMIAEGDLKYSFMPQHTFHGQIDTLQ-----------FGKDLATNAGGP----------SAGKHLEKIDITFNELDLSGEFDSGKSMTENHQGDMHKSVRGLMKGNPDPMLEVMKAKGINVDTAFKDLSIASQYPD"
       ],
       "usalign": [
        "-------------------GMAYTTTVKLDGDTKTYTLSPTVKKYTLMDLGFVK---GRSGA---FSFERSLDPTSPYQAAFKLKMTVNADLTGFKMTTV-TGN--------GV-QRANIFKNDAHPEAVEQ-------LRY-IL-AN-FIERDILTTD--------------------------------------------------------------------",
@@ -1270,10 +1836,10 @@
      },
      "structure": {
       "aligned": 59,
-      "rmsd": 4.2502,
-      "tm_score": 0.3161
+      "rmsd": 3.9839,
+      "tm_score": 0.3285
      },
-     "tm_difference": -0.0134,
+     "tm_difference": -0.001,
      "usalign": {
       "aligned": 66,
       "aligned_reported": 66,
@@ -1287,9 +1853,9 @@
     }
    },
    {
-    "aligned": 205,
+    "aligned": 209,
     "extras": 5,
-    "identity": 0.1561,
+    "identity": 0.1531,
     "kind": "positive",
     "length_a": 237,
     "length_b": 308,
@@ -1298,28 +1864,57 @@
     "only_a": 1,
     "pair": "2IJE_S-3T6A_A",
     "pieces": 2,
-    "rmsd": 3.1745,
+    "rmsd": 3.342,
     "same_fold": true,
+    "source_stamp": {
+     "checkout_fingerprint": "7879eea05bd9301c",
+     "code_fingerprint": "7879eea05bd9301c",
+     "foldmap": "0.2.0",
+     "git": {
+      "commit": "55e1a78e9d594601040decb04af43f321622d3d9",
+      "dirty": false,
+      "source": "asserted by runner"
+     },
+     "installed_matches_checkout": true,
+     "package": "checkout",
+     "packages": {
+      "PyYAML": "6.0.3",
+      "gemmi": "0.7.5",
+      "matplotlib": "3.11.2",
+      "networkx": "3.7",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1"
+     },
+     "platform": {
+      "machine": "x86_64",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43"
+     },
+     "python": {
+      "implementation": "CPython",
+      "version": "3.13.13"
+     },
+     "script": {
+      "name": "scripts/homologues.py",
+      "sha256": "61e02d7fc4adfff81058b1975974aa1f447a37029f358bb9e66a9c6c2ca7555f"
+     }
+    },
     "stratum": "remote",
-    "tm_score": 0.7314,
+    "tm_score": 0.7385,
     "usalign": {
      "agreement": {
-      "close_within_1": 0.989,
-      "exact": 0.9286,
-      "foldmap_pairs_in_usalign": 0.9902,
-      "within_1": 0.9667
+      "close_within_1": 1.0,
+      "exact": 0.9857,
+      "foldmap_pairs_in_usalign": 0.9952,
+      "within_1": 0.9905
      },
      "auto": {
       "method": "structure",
-      "tm_score": 0.7314,
-      "within_1": 0.9667
+      "tm_score": 0.7385,
+      "within_1": 0.9905
      },
      "disagreements": [
       "A 1023-1023 (1): not paired",
-      "A 1055-1055 (1): not paired",
-      "A 1188-1189 (2): not paired",
-      "A 1191-1192 (2): not paired",
-      "A 1225-1225 (1): B shifted -3"
+      "A 1063-1063 (1): not paired"
      ],
      "limits": {
       "applies": true,
@@ -1329,8 +1924,8 @@
      },
      "rows": {
       "foldmap": [
-       "G----------------------------------PLGSALEIAEQLTLLDHLVFKS---------------IPYEEFFGQGWMKAEKYERTPYIMKTTKHFNHVSNFIASEIIR-NEDISARASAIEKWVAVADICRC-LHNYNAVLEITSSINRSAIFRLKKTWLKV---SKQTKSLLD-KLQKLVSSDGRFKNLRESLRNCDPPCVPYLGMYLTDLVFIEEGTPNYTEDGLVNFSKM--------------------------RMISHIIREIRQFQQTTY----KIDPQPKVIQYLL---DESFM---------------LDEESLYESSLLIEPK",
-       "-TVSSFRPNEFESKFLPPENKPLETALLKRAKELFTNNDPKVIAQHVLSMDCRVARILGVSEEMRRNMGVSSGLELITLP---------HGHQLRLDIIERHNTMAIGIAVDILGCTGTLEDRAATLSKIIQVAVELKDSMGDLYSFSALMKALEMPQITRLEKTWTALRHQYTQTAILYEKQLKPFSKLLHEGR-ESTCVPPNNV-SVPLLMPLVTLME--------------------RQAVTFEGTDMWEKNDQSCEIMLNHLATARFMAEAADSYRMNAERILAGFQPDEEMNEICKTEFQMRLLWGSKGAQVNQTERYEKFNQILTALSRKLEPP"
+       "G----------------------------------PLGSALEIAEQLTLLDHLVFKS---------------IPYEEFFGQGWMKAEKYERTPYIMKTTKHFNHVSNFIASEIIR-NEDISARASAIEKWVAVADICRC-LHNYNAVLEITSSINRSAIFRLKKTWLKV---SKQTKSLLD-KLQKLVSSDGRFKNLRESLRNCDPPCVPYLGMYLTDLV------------------FIE-EGTPNYTEDGLVNFSKM---RMISHIIREIRQFQQ-TT--YK-IDPQPKVIQYLL--DE--SFM--------------LDEESLYESSLLIEPK",
+       "-TVSSFRPNEFESKFLPPENKPLETALLKRAKELFTNNDPKVIAQHVLSMDCRVARILGVSEEMRRNMGVSSGLELITLP-H--------GHQLRLDIIERHNTMAIGIAVDILGCTGTLEDRAATLSKIIQVAVELKDSMGDLYSFSALMKALEMPQITRLEKTWTALRHQYTQTAILYEKQLKPFSKLLHEGR-ESTCVPPNNV-SVPLLMPLVTLMERQAVTFEGTDMWEKNDQSCE-IML---------------NHLATARFMAEAADSYRMNAERILAGFQPDEEMNEICKTEFQMRLLWGSKGAQVNQTERYEKFNQILTALSRKLEPP"
       ],
       "usalign": [
        "---------------------------------GPLGSALEIAEQLTLLDHLVFKS---------------IPYEEFFGQGWMKAEKYERTPYIMKTTKHFNHVSNFIASEIIR-NEDISARASAIEKWVAVADICRC-LHNYNAVLEITSSINRSAIFRLKKTWLKV---SKQTKSLLD-KLQKLVSSDGRFKNLRESLRNCDPPCVPYLGMYLTDLV------------------FIE-EGTPNYTEDGLVNFSKM---RMISHIIREIRQFQQ-TT--YK-IDPQPKVIQYLL--DE--SFM--------------LDEESLYESSLLIEPK",
@@ -1338,11 +1933,11 @@
       ]
      },
      "structure": {
-      "aligned": 205,
-      "rmsd": 3.1745,
-      "tm_score": 0.7314
+      "aligned": 209,
+      "rmsd": 3.342,
+      "tm_score": 0.7385
      },
-     "tm_difference": -0.0079,
+     "tm_difference": -0.0007,
      "usalign": {
       "aligned": 210,
       "aligned_reported": 210,
@@ -1356,9 +1951,9 @@
     }
    },
    {
-    "aligned": 87,
+    "aligned": 85,
     "extras": 5,
-    "identity": 0.1494,
+    "identity": 0.0824,
     "kind": "positive",
     "length_a": 123,
     "length_b": 128,
@@ -1367,42 +1962,69 @@
     "only_a": 5,
     "pair": "2JCA_A-3LQ9_A",
     "pieces": 0,
-    "rmsd": 4.7742,
+    "rmsd": 4.3793,
     "same_fold": false,
+    "source_stamp": {
+     "checkout_fingerprint": "7879eea05bd9301c",
+     "code_fingerprint": "7879eea05bd9301c",
+     "foldmap": "0.2.0",
+     "git": {
+      "commit": "55e1a78e9d594601040decb04af43f321622d3d9",
+      "dirty": false,
+      "source": "asserted by runner"
+     },
+     "installed_matches_checkout": true,
+     "package": "checkout",
+     "packages": {
+      "PyYAML": "6.0.3",
+      "gemmi": "0.7.5",
+      "matplotlib": "3.11.2",
+      "networkx": "3.7",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1"
+     },
+     "platform": {
+      "machine": "x86_64",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43"
+     },
+     "python": {
+      "implementation": "CPython",
+      "version": "3.13.13"
+     },
+     "script": {
+      "name": "scripts/homologues.py",
+      "sha256": "61e02d7fc4adfff81058b1975974aa1f447a37029f358bb9e66a9c6c2ca7555f"
+     }
+    },
     "stratum": "remote",
-    "tm_score": 0.3693,
+    "tm_score": 0.3952,
     "usalign": {
      "agreement": {
-      "close_within_1": 0.7586,
-      "exact": 0.3908,
-      "foldmap_pairs_in_usalign": 0.7356,
-      "within_1": 0.7356
+      "close_within_1": 0.9655,
+      "exact": 0.8736,
+      "foldmap_pairs_in_usalign": 0.9647,
+      "within_1": 0.9425
      },
      "auto": {
       "method": "structure",
-      "tm_score": 0.3693,
-      "within_1": 0.7356
+      "tm_score": 0.3952,
+      "within_1": 0.9425
      },
      "disagreements": [
-      "A 33-35 (3): B shifted -3",
-      "A 37-39 (3): B shifted -2",
-      "A 62-63 (2): not paired",
-      "A 64-66 (3): B shifted -2",
-      "A 90-96 (7): B shifted +2",
-      "A 99-99 (1): not paired",
-      "A 101-101 (1): not paired",
-      "A 110-112 (3): not paired"
+      "A 90-91 (2): B shifted +2",
+      "A 92-93 (2): not paired",
+      "A 99-99 (1): not paired"
      ],
      "limits": {
       "applies": false,
-      "pairs": false,
+      "pairs": true,
       "tm": true,
       "verdict": "\u2013"
      },
      "rows": {
       "foldmap": [
-       "MSIIGVGIDVAEVERFGAALERTP--ALAGRLFLESELLLP---------GGERRGVASLAARFAAKEALAKALGAPAGLLWTDAEVWVEA--GGRPRLRVT--GTVAARAAELGVASWHVSLSHDAG-------------------------IASAVVIAEG-",
-       "------------------------DEHLCANLMQLLQESLAQARLGSRRPARLLMPSQLVSQVGKELLRLAY--SEPCGLRGALLDVCVEQGKSCHSVGQLALDPSLVPTF------QLTLVLR----LDSRLWKIQGLFSSANSPSQSLTLSTGFRVIKKKLY"
+       "MSIIGVGIDVAEVERFGAALERTPA----LAGRLF-L--ESELLLP-------GGERRGVASLAARFAAKEALAKALGAPAGLLWTDAEVWVEA---GGRP-RLRVT-GTVAARAAELGVASWHVSLSH------------------------DAGIASAVVIAEG",
+       "-------------------------DEHLCA-NLMQLLQESL-AQARLGSRRPARLLMPSQLVSQVGKELLRLAYSEPCG-LRG--ALLDVCVEQGKSCHSVGQLALDPS--LVP----T-FQLTLVLRLDSRLWKIQGLFSSANSPSQSLTLST-GFRVIKKKLY"
       ],
       "usalign": [
        "MSIIGVGIDVAEVERFGAALERTPA----LAGRLF-L--ESELLLP-------GGERRGVASLAARFAAKEALAKALGAPAGLLWTDAEVWVEA---GGRPRLRVTGTVAARAAELGVASWHVSLSH------------------------DAGIASAVVIAEG",
@@ -1410,11 +2032,11 @@
       ]
      },
      "structure": {
-      "aligned": 87,
-      "rmsd": 4.7742,
-      "tm_score": 0.3693
+      "aligned": 85,
+      "rmsd": 4.3793,
+      "tm_score": 0.3952
      },
-     "tm_difference": -0.0246,
+     "tm_difference": 0.0013,
      "usalign": {
       "aligned": 87,
       "aligned_reported": 87,
@@ -1428,9 +2050,9 @@
     }
    },
    {
-    "aligned": 78,
+    "aligned": 77,
     "extras": 0,
-    "identity": 0.141,
+    "identity": 0.1429,
     "kind": "positive",
     "length_a": 80,
     "length_b": 88,
@@ -1439,20 +2061,52 @@
     "only_a": 0,
     "pair": "2LSR_A-4YL6_A",
     "pieces": 1,
-    "rmsd": 1.6588,
+    "rmsd": 1.5479,
     "same_fold": true,
+    "source_stamp": {
+     "checkout_fingerprint": "7879eea05bd9301c",
+     "code_fingerprint": "7879eea05bd9301c",
+     "foldmap": "0.2.0",
+     "git": {
+      "commit": "55e1a78e9d594601040decb04af43f321622d3d9",
+      "dirty": false,
+      "source": "asserted by runner"
+     },
+     "installed_matches_checkout": true,
+     "package": "checkout",
+     "packages": {
+      "PyYAML": "6.0.3",
+      "gemmi": "0.7.5",
+      "matplotlib": "3.11.2",
+      "networkx": "3.7",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1"
+     },
+     "platform": {
+      "machine": "x86_64",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43"
+     },
+     "python": {
+      "implementation": "CPython",
+      "version": "3.13.13"
+     },
+     "script": {
+      "name": "scripts/homologues.py",
+      "sha256": "61e02d7fc4adfff81058b1975974aa1f447a37029f358bb9e66a9c6c2ca7555f"
+     }
+    },
     "stratum": "remote",
-    "tm_score": 0.8059,
+    "tm_score": 0.8106,
     "usalign": {
      "agreement": {
       "close_within_1": 1.0,
-      "exact": 0.961,
-      "foldmap_pairs_in_usalign": 0.9872,
+      "exact": 1.0,
+      "foldmap_pairs_in_usalign": 1.0,
       "within_1": 1.0
      },
      "auto": {
       "method": "structure",
-      "tm_score": 0.8059,
+      "tm_score": 0.8106,
       "within_1": 1.0
      },
      "disagreements": [],
@@ -1464,8 +2118,8 @@
      },
      "rows": {
       "foldmap": [
-       "-M--DRKVAREFRHKVDFLIENDAEKDYLYDVLRMYHQTMDVAVLVGDLKLVINEPSRLPLFDAIRPLIPLKHQVEYDQLTPR-------",
-       "LSASATELLQDYMLTLRTKL-SSQEIQQFAALLHEYRNGASIHEFCINLRQLYGDS-RKFLLLGLRPFIPEKDSQHFENFLETIGVKDLE"
+       "-M--DRKVAREFRHKVDFLIENDAEKDYLYDVLRMYHQTMDVAVLVGDLKLVINEPSRLPLFDAIRPLIPLKHQVEYDQLTPR--------",
+       "LSASATELLQDYMLTLRTKL-SSQEIQQFAALLHEYRNGASIHEFCINLRQLYGDS-RKFLLLGLRPFIPEKDSQHFEN-FLETIGVKDLE"
       ],
       "usalign": [
        "-M--DRKVAREFRHKVDFLIENDAEKDYLYDVLRMYHQTMDVAVLVGDLKLVINEPSRLPLFDAIRPLIPLKHQVEYDQLTPR--------",
@@ -1473,11 +2127,11 @@
       ]
      },
      "structure": {
-      "aligned": 78,
-      "rmsd": 1.6588,
-      "tm_score": 0.8059
+      "aligned": 77,
+      "rmsd": 1.5479,
+      "tm_score": 0.8106
      },
-     "tm_difference": -0.0046,
+     "tm_difference": 0.0,
      "usalign": {
       "aligned": 77,
       "aligned_reported": 77,
@@ -1491,9 +2145,9 @@
     }
    },
    {
-    "aligned": 88,
+    "aligned": 87,
     "extras": 4,
-    "identity": 0.1023,
+    "identity": 0.0805,
     "kind": "positive",
     "length_a": 141,
     "length_b": 126,
@@ -1502,27 +2156,55 @@
     "only_a": 2,
     "pair": "2MJ7_A-2EHB_D",
     "pieces": 0,
-    "rmsd": 2.8107,
+    "rmsd": 2.678,
     "same_fold": false,
+    "source_stamp": {
+     "checkout_fingerprint": "7879eea05bd9301c",
+     "code_fingerprint": "7879eea05bd9301c",
+     "foldmap": "0.2.0",
+     "git": {
+      "commit": "55e1a78e9d594601040decb04af43f321622d3d9",
+      "dirty": false,
+      "source": "asserted by runner"
+     },
+     "installed_matches_checkout": true,
+     "package": "checkout",
+     "packages": {
+      "PyYAML": "6.0.3",
+      "gemmi": "0.7.5",
+      "matplotlib": "3.11.2",
+      "networkx": "3.7",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1"
+     },
+     "platform": {
+      "machine": "x86_64",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43"
+     },
+     "python": {
+      "implementation": "CPython",
+      "version": "3.13.13"
+     },
+     "script": {
+      "name": "scripts/homologues.py",
+      "sha256": "61e02d7fc4adfff81058b1975974aa1f447a37029f358bb9e66a9c6c2ca7555f"
+     }
+    },
     "stratum": "remote",
-    "tm_score": 0.4839,
+    "tm_score": 0.4918,
     "usalign": {
      "agreement": {
-      "close_within_1": 0.9625,
-      "exact": 0.8736,
-      "foldmap_pairs_in_usalign": 0.9432,
-      "within_1": 0.954
+      "close_within_1": 1.0,
+      "exact": 1.0,
+      "foldmap_pairs_in_usalign": 1.0,
+      "within_1": 1.0
      },
      "auto": {
       "method": "structure",
-      "tm_score": 0.4839,
-      "within_1": 0.954
+      "tm_score": 0.4918,
+      "within_1": 1.0
      },
-     "disagreements": [
-      "A 54-54 (1): B shifted +2",
-      "A 78-78 (1): not paired",
-      "A 118-119 (2): not paired"
-     ],
+     "disagreements": [],
      "limits": {
       "applies": false,
       "pairs": true,
@@ -1531,8 +2213,8 @@
      },
      "rows": {
       "foldmap": [
-       "MGHHHHHHSHMQELPDSGALMLVPNRQLTADYFEKTWLSLKV-------------------------------AHQQVLPWRGE--FHPDTLQMALQVVNIQTIAMSRAGSRPWKAYLSAQDDTGC-LFLTELLLEPGN---SEMQISVKQNEARTETLNSFISVLETVIGTIEEIKS-",
-       "------------------------------------------EGPLMMNAFEMITLSQGLNLSALFDRRQDFVKRQTRFVSRREPSEIIANIEAVANSMGFKSHTRN------FKTRLEGLSSIKAGQLAVVIEIYEVAPSLFMVDVRKAAGET--LEYHKFYKKLCSKLENIIW---R"
+       "MGHHHHHHSHMQELPDSGALMLVPNRQLTADYFEKTWLSLKV-------------------------------AHQQVLPWRGEF-H-PDTLQMALQVVNIQTIAMSRAGSRPWKAYLSAQDDTGC-LFLTELLLEPGN---SEMQISVKQNEARTETLNSFISVLETVIGTIEEIKS--",
+       "------------------------------------------EGPLMMNAFEMITLSQGLNLSALFDRRQDFVKRQTRFVSRREPSEIIANIEAVANSMGFKS-HTR---N--FKTRLEGLSSIKAGQLAVVIEIYEVAPSLFMVDVRKAAG-ETL-EYHKFYKKLCSKLEN-II---WR"
       ],
       "usalign": [
        "MGHHHHHHSHMQELPDSGALMLVPNRQLTADYFEKTWLSLKV-------------------------------AHQQVLPWRGEF-H-PDTLQMALQVVNIQTIAMSRAGSRPWKAYLSAQDDTGC-LFLTELLLEPGN---SEMQISVKQNEARTETLNSFISVLETVIGTIEEIKS--",
@@ -1540,11 +2222,11 @@
       ]
      },
      "structure": {
-      "aligned": 88,
-      "rmsd": 2.8107,
-      "tm_score": 0.4839
+      "aligned": 87,
+      "rmsd": 2.678,
+      "tm_score": 0.4918
      },
-     "tm_difference": -0.0078,
+     "tm_difference": 0.0001,
      "usalign": {
       "aligned": 87,
       "aligned_reported": 87,
@@ -1571,6 +2253,38 @@
     "pieces": 0,
     "rmsd": 0.8532,
     "same_fold": true,
+    "source_stamp": {
+     "checkout_fingerprint": "7879eea05bd9301c",
+     "code_fingerprint": "7879eea05bd9301c",
+     "foldmap": "0.2.0",
+     "git": {
+      "commit": "55e1a78e9d594601040decb04af43f321622d3d9",
+      "dirty": false,
+      "source": "asserted by runner"
+     },
+     "installed_matches_checkout": true,
+     "package": "checkout",
+     "packages": {
+      "PyYAML": "6.0.3",
+      "gemmi": "0.7.5",
+      "matplotlib": "3.11.2",
+      "networkx": "3.7",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1"
+     },
+     "platform": {
+      "machine": "x86_64",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43"
+     },
+     "python": {
+      "implementation": "CPython",
+      "version": "3.13.13"
+     },
+     "script": {
+      "name": "scripts/homologues.py",
+      "sha256": "61e02d7fc4adfff81058b1975974aa1f447a37029f358bb9e66a9c6c2ca7555f"
+     }
+    },
     "stratum": "close",
     "tm_score": 0.976,
     "usalign": {
@@ -1621,9 +2335,9 @@
     }
    },
    {
-    "aligned": 76,
+    "aligned": 73,
     "extras": 3,
-    "identity": 0.0395,
+    "identity": 0.0411,
     "kind": "positive",
     "length_a": 114,
     "length_b": 85,
@@ -1632,24 +2346,58 @@
     "only_a": 5,
     "pair": "2Q82_A-2JTR_A",
     "pieces": 1,
-    "rmsd": 4.2095,
+    "rmsd": 3.8438,
     "same_fold": false,
+    "source_stamp": {
+     "checkout_fingerprint": "7879eea05bd9301c",
+     "code_fingerprint": "7879eea05bd9301c",
+     "foldmap": "0.2.0",
+     "git": {
+      "commit": "55e1a78e9d594601040decb04af43f321622d3d9",
+      "dirty": false,
+      "source": "asserted by runner"
+     },
+     "installed_matches_checkout": true,
+     "package": "checkout",
+     "packages": {
+      "PyYAML": "6.0.3",
+      "gemmi": "0.7.5",
+      "matplotlib": "3.11.2",
+      "networkx": "3.7",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1"
+     },
+     "platform": {
+      "machine": "x86_64",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43"
+     },
+     "python": {
+      "implementation": "CPython",
+      "version": "3.13.13"
+     },
+     "script": {
+      "name": "scripts/homologues.py",
+      "sha256": "61e02d7fc4adfff81058b1975974aa1f447a37029f358bb9e66a9c6c2ca7555f"
+     }
+    },
     "stratum": "remote",
-    "tm_score": 0.3917,
+    "tm_score": 0.3967,
     "usalign": {
      "agreement": {
       "close_within_1": 0.9833,
-      "exact": 0.7746,
-      "foldmap_pairs_in_usalign": 0.9211,
-      "within_1": 0.9859
+      "exact": 0.7324,
+      "foldmap_pairs_in_usalign": 0.9315,
+      "within_1": 0.9577
      },
      "auto": {
       "method": "structure",
-      "tm_score": 0.3917,
-      "within_1": 0.9859
+      "tm_score": 0.3967,
+      "within_1": 0.9577
      },
      "disagreements": [
-      "A 89-89 (1): not paired"
+      "A 72-72 (1): not paired",
+      "A 93-93 (1): not paired",
+      "A 116-116 (1): not paired"
      ],
      "limits": {
       "applies": false,
@@ -1659,8 +2407,8 @@
      },
      "rows": {
       "foldmap": [
-       "ELQNRLAQYETSLMVMSHNGDVP-VITGFNVMRVTTMLDALKVPAVAVLGDDAQDLAYVFGARPLAVGVNIIRVVDVPGQQPSALVDAELG-----ALHEVSMVRVLNDIADEQLVKANM---",
-       "----------AEHWIDVRVPEQYQQEHVQ--------------GAINIPLKEVKERIATAVPDKN---DTVKVY--CNAGRQSGQAKEILSEMGYTHVENAGGLKDIAMPK---------VKG"
+       "ELQNRLAQYETSLMVMSHNGDVP-VITGFNVMRVTTMLDALKVPAVAVLGDDAQDLAYV--FGARPLAVGVNIIRVVDVPGQQPSALVDAELG----A-LHEVS-MVRVLNDIADEQLVKANM---",
+       "----------AEHWIDVRVPEQYQQEHVQ--------------GAINIPLKEVKERI-ATAV-PDKN-D--TVKVYC-NA-GRQSGQAKEILSEMGYTHVENAGGLKDI-AMPK---------VKG"
       ],
       "usalign": [
        "ELQNRLAQYETSLMVMSHNGDVP--VITGFNVMRVTTMLDALKVPAVAVLGDDAQDLAYV-FGARPLAVGVNIIRVVDVPGQQPS-ALVDAELG----A-LHEVSM-VRVLNDIADEQLVKANM----",
@@ -1668,11 +2416,11 @@
       ]
      },
      "structure": {
-      "aligned": 76,
-      "rmsd": 4.2095,
-      "tm_score": 0.3917
+      "aligned": 73,
+      "rmsd": 3.8438,
+      "tm_score": 0.3967
      },
-     "tm_difference": -0.0005,
+     "tm_difference": 0.0046,
      "usalign": {
       "aligned": 71,
       "aligned_reported": 71,
@@ -1686,61 +2434,106 @@
     }
    },
    {
-    "aligned": 86,
-    "extras": 21,
-    "identity": 0.0581,
+    "aligned": 123,
+    "extras": 19,
+    "identity": 0.0407,
     "kind": "negative",
     "length_a": 224,
     "length_b": 356,
-    "mates": 6,
+    "mates": 8,
     "method": "structure",
-    "only_a": 13,
+    "only_a": 11,
     "pair": "3BUU_A-3VDI_A",
     "pieces": 0,
-    "rmsd": 4.4747,
+    "rmsd": 5.602,
     "same_fold": false,
+    "source_stamp": {
+     "checkout_fingerprint": "7879eea05bd9301c",
+     "code_fingerprint": "7879eea05bd9301c",
+     "foldmap": "0.2.0",
+     "git": {
+      "commit": "55e1a78e9d594601040decb04af43f321622d3d9",
+      "dirty": false,
+      "source": "asserted by runner"
+     },
+     "installed_matches_checkout": true,
+     "package": "checkout",
+     "packages": {
+      "PyYAML": "6.0.3",
+      "gemmi": "0.7.5",
+      "matplotlib": "3.11.2",
+      "networkx": "3.7",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1"
+     },
+     "platform": {
+      "machine": "x86_64",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43"
+     },
+     "python": {
+      "implementation": "CPython",
+      "version": "3.13.13"
+     },
+     "script": {
+      "name": "scripts/homologues.py",
+      "sha256": "61e02d7fc4adfff81058b1975974aa1f447a37029f358bb9e66a9c6c2ca7555f"
+     }
+    },
     "stratum": "negative",
-    "tm_score": 0.2671,
+    "tm_score": 0.3301,
     "usalign": {
      "agreement": {
-      "close_within_1": 0.0,
-      "exact": 0.0,
-      "foldmap_pairs_in_usalign": 0.0,
-      "within_1": 0.0
+      "close_within_1": 0.5,
+      "exact": 0.2769,
+      "foldmap_pairs_in_usalign": 0.374,
+      "within_1": 0.3538
      },
      "auto": {
       "method": "structure",
-      "tm_score": 0.2671,
-      "within_1": 0.0
+      "tm_score": 0.3301,
+      "within_1": 0.3538
      },
      "disagreements": [
       "A 44-44 (1): not paired",
       "A 46-50 (5): not paired",
-      "A 57-122 (66): not paired",
-      "A 144-149 (6): not paired",
-      "A 159-165 (7): not paired",
-      "A 166-169 (4): B shifted -102",
-      "A 170-172 (3): not paired",
-      "A 173-175 (3): B shifted -187",
-      "A 176-176 (1): B shifted -189",
-      "A 177-183 (7): B shifted -225",
-      "A 184-192 (9): B shifted -218",
-      "A 198-201 (4): B shifted -215",
-      "A 204-210 (7): B shifted -226",
-      "A 214-214 (1): B shifted -238",
-      "A 220-220 (1): B shifted -245",
-      "A 222-226 (5): B shifted -246"
+      "A 60-62 (3): not paired",
+      "A 63-64 (2): B shifted +5",
+      "A 65-67 (3): B shifted +4",
+      "A 80-80 (1): not paired",
+      "A 103-103 (1): B shifted +6",
+      "A 111-111 (1): B shifted +7",
+      "A 114-115 (2): not paired",
+      "A 116-121 (6): B shifted -2",
+      "A 122-122 (1): not paired",
+      "A 144-144 (1): B shifted -5",
+      "A 145-148 (4): B shifted -6",
+      "A 149-149 (1): not paired",
+      "A 159-165 (7): B shifted +3",
+      "A 166-166 (1): not paired",
+      "A 167-170 (4): B shifted +2",
+      "A 171-188 (18): not paired",
+      "A 189-192 (4): B shifted -91",
+      "A 198-198 (1): B shifted -67",
+      "A 199-200 (2): not paired",
+      "A 201-201 (1): B shifted -67",
+      "A 204-204 (1): B shifted -75",
+      "A 205-206 (2): not paired",
+      "A 207-210 (4): B shifted -41",
+      "A 214-214 (1): B shifted -49",
+      "A 220-220 (1): B shifted -55",
+      "A 222-224 (3): B shifted -55",
+      "A 225-226 (2): not paired"
      ],
      "limits": {
       "applies": false,
       "pairs": false,
-      "tm": false,
+      "tm": true,
       "verdict": "\u2013"
      },
      "rows": {
       "foldmap": [
-       "-------------------AVTAQSILEKADEIRFPQDSFQVNVAIRTAAPDHAEDLYRYQVLSKGNENSIVMITEPASERGQAILMKGRDLWVFMPSVSQPIRLSLSQRLTGQVANGDIARANFTGDYHPQLLRNESIDDEDYYVLELTG-------IDRSVTY---QKVLLWVNQSN-------FRPYKAEFYSVSGRLLKTSRYENFDNI-LGEMRPTRIIMEDALKSGEVSVLDYSDMKLR------------------DLP---------------------------------------------------DKI--FTKD-YLKRLE-----------------------------------------------------------------------------------------------------------------------------------------------------------------",
-       "TTTAHSDYEIILEGGSSSWGQIKG-------------------------------------------------------------------------------------------------------------------------------RAKVNVPAALP---LLPADCNIKIEAKPLDAQKGVVRFTSQIESIVDSTKNKLVVEVDIANETKDRRIAVGEGEVSVGDFSHKFSFEGSVVNMYYYRSDAVRRNVPNPVYMQGR-QFHDIMMKVPLDNKDLIETWEGFQQSISGGGVNFGDWIREFWFIGPAYTAIN--EGGQR-ISP----IQVNNFGVESGPVGVSRWKFSHAGSGIVDSISRWAELFPVEQLNKPASIEGGFRSDSQGIEVKVDGNLPGVSRDAGGGLRRILNHPLIPLVHHGMVGKFNDFTVDTQLKVVLPKGYKIRYAAPQFRSQNLEEYRWSGGAYARWVEHVCKGGTGQFEVLYAQ"
+       "AVTAQSILEKADEIRFP---------------QDSFQVNVAIRT-------AAPDH--AEDLYRYQVLS--KG-NENSIVMITEPA------SERGQAILMK------GRDLWVFM------PSVSQPIRLSLSQRLTGQVANGDIARANFTGDYHPQLLR--NESIDDE-----DYYVLELTGIDRSVTYQKVLLWVNQSNFRPYK------------------------------------------------AEFYSVS---------------------GRLLK--TSR---YEN------------------------------------FDNIL-----GEMRPTR-II-MEDALKSGEVSVLDYSDMKLRDLPDKIFTKDYLKRLE----------------------------------------------------------------",
+       "-----------------TTTAHSDYEIILEGGSSSWGQIKG---RAKVNVPAALPLLPADCNIKIEAKPLDA-QKGVVRFTSQIESIVDSTKNKLVVEVDIANETKDRRIAVGEGEVSVGDFSHK--FSFEGS----------V--------VNMYYYRS-DAV------RRNVPNPVYMQGRQ-FHDI------------------MMKVPLDNKDLIETWEGFQQSISGGGVNFGDWIREFWFIGPAYTAINEGGQRISPIQVNNFGVESGPVGVSRWKFSHAG--SGIVDSISR--WAELFPVEQLNKPASIEGGFRSDSQGIEVKVDGNLPGVSRDAGGGLRRILNHPLIPLVHHG---MVG---------------------------KFNDFTVDTQLKVVLPKGYKIRYAAPQFRSQNLEEYRWSGGAYARWVEHVCKGGTGQFEVLYAQ"
       ],
       "usalign": [
        "AVTAQSILEK-------------AD-EIRFPQDSFQVNVAIRTAA-PDH------AEDLYRYQVLS--KGNENSIVMITEPA------SERGQAILMKG-----RDLWVFMP-------SVSQPIRLSLSQRLTGQVANGDIARANFTGDY------H-PQLLRNESIDDEDYYVLELTGIDRSV-------------------------------------------------------------------------------------TYQKV--L------------------------------------LWVNQSNFRPYKAEFYSVSGR--LLKTSR-------------YENFDNILGE----------------MRPTRI------------IM--EDALKSGEVSVLDYSDMKLRDLPDKIFTKDYLKRLE----------",
@@ -1748,11 +2541,11 @@
       ]
      },
      "structure": {
-      "aligned": 86,
-      "rmsd": 4.4747,
-      "tm_score": 0.2671
+      "aligned": 123,
+      "rmsd": 5.602,
+      "tm_score": 0.3301
      },
-     "tm_difference": -0.0805,
+     "tm_difference": -0.0175,
      "usalign": {
       "aligned": 130,
       "aligned_reported": 130,
@@ -1779,6 +2572,38 @@
     "pieces": 0,
     "rmsd": 0.7429,
     "same_fold": true,
+    "source_stamp": {
+     "checkout_fingerprint": "7879eea05bd9301c",
+     "code_fingerprint": "7879eea05bd9301c",
+     "foldmap": "0.2.0",
+     "git": {
+      "commit": "55e1a78e9d594601040decb04af43f321622d3d9",
+      "dirty": false,
+      "source": "asserted by runner"
+     },
+     "installed_matches_checkout": true,
+     "package": "checkout",
+     "packages": {
+      "PyYAML": "6.0.3",
+      "gemmi": "0.7.5",
+      "matplotlib": "3.11.2",
+      "networkx": "3.7",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1"
+     },
+     "platform": {
+      "machine": "x86_64",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43"
+     },
+     "python": {
+      "implementation": "CPython",
+      "version": "3.13.13"
+     },
+     "script": {
+      "name": "scripts/homologues.py",
+      "sha256": "61e02d7fc4adfff81058b1975974aa1f447a37029f358bb9e66a9c6c2ca7555f"
+     }
+    },
     "stratum": "close",
     "tm_score": 0.9567,
     "usalign": {
@@ -1829,9 +2654,9 @@
     }
    },
    {
-    "aligned": 115,
+    "aligned": 111,
     "extras": 2,
-    "identity": 0.1043,
+    "identity": 0.1081,
     "kind": "positive",
     "length_a": 118,
     "length_b": 134,
@@ -1840,23 +2665,58 @@
     "only_a": 4,
     "pair": "3N4H_A-4JCU_A",
     "pieces": 0,
-    "rmsd": 3.2819,
+    "rmsd": 2.8781,
     "same_fold": true,
+    "source_stamp": {
+     "checkout_fingerprint": "7879eea05bd9301c",
+     "code_fingerprint": "7879eea05bd9301c",
+     "foldmap": "0.2.0",
+     "git": {
+      "commit": "55e1a78e9d594601040decb04af43f321622d3d9",
+      "dirty": false,
+      "source": "asserted by runner"
+     },
+     "installed_matches_checkout": true,
+     "package": "checkout",
+     "packages": {
+      "PyYAML": "6.0.3",
+      "gemmi": "0.7.5",
+      "matplotlib": "3.11.2",
+      "networkx": "3.7",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1"
+     },
+     "platform": {
+      "machine": "x86_64",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43"
+     },
+     "python": {
+      "implementation": "CPython",
+      "version": "3.13.13"
+     },
+     "script": {
+      "name": "scripts/homologues.py",
+      "sha256": "61e02d7fc4adfff81058b1975974aa1f447a37029f358bb9e66a9c6c2ca7555f"
+     }
+    },
     "stratum": "remote",
-    "tm_score": 0.7381,
+    "tm_score": 0.7424,
     "usalign": {
      "agreement": {
       "close_within_1": 1.0,
-      "exact": 0.9286,
-      "foldmap_pairs_in_usalign": 0.9739,
-      "within_1": 1.0
+      "exact": 0.9732,
+      "foldmap_pairs_in_usalign": 0.991,
+      "within_1": 0.9821
      },
      "auto": {
       "method": "structure",
-      "tm_score": 0.7381,
-      "within_1": 1.0
+      "tm_score": 0.7424,
+      "within_1": 0.9821
      },
-     "disagreements": [],
+     "disagreements": [
+      "A 55-55 (1): not paired",
+      "A 57-57 (1): B shifted -2"
+     ],
      "limits": {
       "applies": true,
       "pairs": true,
@@ -1865,8 +2725,8 @@
      },
      "rows": {
       "foldmap": [
-       "-------XTYTCWSQRIRISREAKQRIAEAITDAHH-ELAHAPKYLVQVIFNEVEPDSYFIAAQSASENHIWVQATIRSGRTEKQKEELLLRLTQEIALILGIPN----EEVWVYITEI-PGSNMTEYGRL------",
-       "NLYFQSMPHLTLEYTDNLPEP-RIPELLQKLNGVLLARPDIFPVGGIRARAYRLS-EYALADSSEPSDAFVHLRLQIGAGRSEEVKKETGDALFAVLTDHFAAEFAQRGLMLSAEISEFSEAGTWKKNNI-HARYRK"
+       "-------XTYTCWSQRIRISREAKQRIAEAITDAHH-ELAHAPKYLVQVIFNEVEPDSYFIAAQS---ASENHIWVQATIRSGRTEKQKEELLLRLTQEIALILG-IPN----EEVWVYITEI-PGSNMTEYG-RL-----",
+       "NLYFQSMPHLTLEYTDNLPEP-RIPELLQKLNGVLLARPDIFPVGGIRARAYRLS-EYALA--DSSEPSDA-FVHLRLQIGAGRSEEVKKETGDALFAVLTDHFAAEF-AQRGLMLSAEISEFSEAGTWKKNNIH-ARYRK"
       ],
       "usalign": [
        "-------XTYTCWSQRIRISREAKQRIAEAITDAHH-ELAHAPKYLVQVIFNEVEPDSYFIAAQ-S-ASENHIWVQATIRSGRTEKQKEELLLRLTQEIALILG-IPN----EEVWVYITEI-PGSNMTEYG-RL-----",
@@ -1874,11 +2734,11 @@
       ]
      },
      "structure": {
-      "aligned": 115,
-      "rmsd": 3.2819,
-      "tm_score": 0.7381
+      "aligned": 111,
+      "rmsd": 2.8781,
+      "tm_score": 0.7424
      },
-     "tm_difference": -0.004,
+     "tm_difference": 0.0003,
      "usalign": {
       "aligned": 112,
       "aligned_reported": 112,
@@ -1892,9 +2752,9 @@
     }
    },
    {
-    "aligned": 137,
+    "aligned": 136,
     "extras": 2,
-    "identity": 0.2336,
+    "identity": 0.2279,
     "kind": "positive",
     "length_a": 150,
     "length_b": 155,
@@ -1903,25 +2763,57 @@
     "only_a": 1,
     "pair": "3O7I_A-2O8I_A",
     "pieces": 0,
-    "rmsd": 3.0424,
+    "rmsd": 2.9432,
     "same_fold": true,
+    "source_stamp": {
+     "checkout_fingerprint": "7879eea05bd9301c",
+     "code_fingerprint": "7879eea05bd9301c",
+     "foldmap": "0.2.0",
+     "git": {
+      "commit": "55e1a78e9d594601040decb04af43f321622d3d9",
+      "dirty": false,
+      "source": "asserted by runner"
+     },
+     "installed_matches_checkout": true,
+     "package": "checkout",
+     "packages": {
+      "PyYAML": "6.0.3",
+      "gemmi": "0.7.5",
+      "matplotlib": "3.11.2",
+      "networkx": "3.7",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1"
+     },
+     "platform": {
+      "machine": "x86_64",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43"
+     },
+     "python": {
+      "implementation": "CPython",
+      "version": "3.13.13"
+     },
+     "script": {
+      "name": "scripts/homologues.py",
+      "sha256": "61e02d7fc4adfff81058b1975974aa1f447a37029f358bb9e66a9c6c2ca7555f"
+     }
+    },
     "stratum": "remote",
-    "tm_score": 0.7215,
+    "tm_score": 0.7236,
     "usalign": {
      "agreement": {
       "close_within_1": 1.0,
-      "exact": 0.971,
-      "foldmap_pairs_in_usalign": 0.9927,
+      "exact": 0.9565,
+      "foldmap_pairs_in_usalign": 1.0,
       "within_1": 0.9855
      },
      "auto": {
       "method": "structure",
-      "tm_score": 0.7215,
+      "tm_score": 0.7236,
       "within_1": 0.9855
      },
      "disagreements": [
-      "A 73-73 (1): not paired",
-      "A 94-94 (1): not paired"
+      "A 94-94 (1): not paired",
+      "A 97-97 (1): not paired"
      ],
      "limits": {
       "applies": true,
@@ -1931,8 +2823,8 @@
      },
      "rows": {
       "foldmap": [
-       "MIALSQFNSLSKDEAAGLLAPCV-ALPAWGETLVS--LRPFASR-HALLQTAREAMANWGEDELNAALSAHPRIGEKP--TDSE-----------NERLAQALREGNARYEARFGRVFLIRAKGRSGEEILQALTRRLQHTADEEVAEALAQLREITMLRLEGAIGE-",
-       "--------MVTREEFVARFGGVFEHSPFIAERAYDAGGAGLELTAKAVHGALCAQFRVASEAERLGVLRAHPDLAG--KLA---IAGELTGLDRLSPQEHARFTQLNSAYTEKFGFPFIIAVKGLNRHDILSAFDTRIDNNAAQEFATATGQVEKIAWLRLASMLPEG"
+       "MIALSQFNSLSKDEAAGLLAPCV-ALPAWGETLVS-L-RPFASR-HALLQTAREAMANWGEDELNAALSAHPRIGE--KPTDSE----------NER-LA-QALREGNARYEARFGRVFLIRAKGRSGEEILQALTRRLQHTADEEVAEALAQLREITMLRLEGAIG-E",
+       "--------MVTREEFVARFGGVFEHSPFIAERAYDAGGAGLELTAKAVHGALCAQFRVASEAERLGVLRAHPDLAGKLA-----IAGELTGLDRLS-PQEHARFTQLNSAYTEKFGFPFIIAVKGLNRHDILSAFDTRIDNNAAQEFATATGQVEKIAWLRLASMLPEG"
       ],
       "usalign": [
        "MIALSQFNSLSKDEAAGLLAPCV-ALPAWGETLVS-L-RPFASR-HALLQTAREAMANWGEDELNAALSAHPRIGE--KPTDS----------ENERLAQALREGNARYEARFGRVFLIRAKGRSGEEILQALTRRLQHTADEEVAEALAQLREITMLRLEGAIG-E",
@@ -1940,11 +2832,11 @@
       ]
      },
      "structure": {
-      "aligned": 137,
-      "rmsd": 3.0424,
-      "tm_score": 0.7215
+      "aligned": 136,
+      "rmsd": 2.9432,
+      "tm_score": 0.7236
      },
-     "tm_difference": -0.0027,
+     "tm_difference": -0.0006,
      "usalign": {
       "aligned": 138,
       "aligned_reported": 138,
@@ -1971,6 +2863,38 @@
     "pieces": 0,
     "rmsd": 1.1321,
     "same_fold": true,
+    "source_stamp": {
+     "checkout_fingerprint": "7879eea05bd9301c",
+     "code_fingerprint": "7879eea05bd9301c",
+     "foldmap": "0.2.0",
+     "git": {
+      "commit": "55e1a78e9d594601040decb04af43f321622d3d9",
+      "dirty": false,
+      "source": "asserted by runner"
+     },
+     "installed_matches_checkout": true,
+     "package": "checkout",
+     "packages": {
+      "PyYAML": "6.0.3",
+      "gemmi": "0.7.5",
+      "matplotlib": "3.11.2",
+      "networkx": "3.7",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1"
+     },
+     "platform": {
+      "machine": "x86_64",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43"
+     },
+     "python": {
+      "implementation": "CPython",
+      "version": "3.13.13"
+     },
+     "script": {
+      "name": "scripts/homologues.py",
+      "sha256": "61e02d7fc4adfff81058b1975974aa1f447a37029f358bb9e66a9c6c2ca7555f"
+     }
+    },
     "stratum": "close",
     "tm_score": 0.988,
     "usalign": {
@@ -2022,50 +2946,84 @@
    },
    {
     "aligned": 32,
-    "extras": 5,
+    "extras": 4,
     "identity": 0.0938,
     "kind": "negative",
     "length_a": 71,
     "length_b": 75,
-    "mates": 1,
+    "mates": 2,
     "method": "structure",
-    "only_a": 5,
+    "only_a": 4,
     "pair": "3VDJ_A-2JXW_A",
     "pieces": 0,
-    "rmsd": 5.0238,
+    "rmsd": 3.6065,
     "same_fold": false,
+    "source_stamp": {
+     "checkout_fingerprint": "7879eea05bd9301c",
+     "code_fingerprint": "7879eea05bd9301c",
+     "foldmap": "0.2.0",
+     "git": {
+      "commit": "55e1a78e9d594601040decb04af43f321622d3d9",
+      "dirty": false,
+      "source": "asserted by runner"
+     },
+     "installed_matches_checkout": true,
+     "package": "checkout",
+     "packages": {
+      "PyYAML": "6.0.3",
+      "gemmi": "0.7.5",
+      "matplotlib": "3.11.2",
+      "networkx": "3.7",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1"
+     },
+     "platform": {
+      "machine": "x86_64",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43"
+     },
+     "python": {
+      "implementation": "CPython",
+      "version": "3.13.13"
+     },
+     "script": {
+      "name": "scripts/homologues.py",
+      "sha256": "61e02d7fc4adfff81058b1975974aa1f447a37029f358bb9e66a9c6c2ca7555f"
+     }
+    },
     "stratum": "negative",
-    "tm_score": 0.1881,
+    "tm_score": 0.2599,
     "usalign": {
      "agreement": {
-      "close_within_1": 0.3478,
-      "exact": 0.0968,
-      "foldmap_pairs_in_usalign": 0.375,
-      "within_1": 0.3871
+      "close_within_1": 0.0,
+      "exact": 0.0,
+      "foldmap_pairs_in_usalign": 0.0,
+      "within_1": 0.0
      },
      "auto": {
       "method": "structure",
-      "tm_score": 0.1881,
-      "within_1": 0.3871
+      "tm_score": 0.2599,
+      "within_1": 0.0
      },
      "disagreements": [
-      "A 306-310 (5): not paired",
-      "A 311-318 (8): B shifted -3",
-      "A 320-321 (2): B shifted -2",
-      "A 322-323 (2): B shifted -5",
-      "A 336-336 (1): not paired",
-      "A 365-365 (1): not paired"
+      "A 306-318 (13): not paired",
+      "A 320-323 (4): not paired",
+      "A 326-327 (2): not paired",
+      "A 332-336 (5): B shifted -38",
+      "A 338-338 (1): not paired",
+      "A 343-346 (4): B shifted -44",
+      "A 348-348 (1): not paired",
+      "A 365-365 (1): B shifted -37"
      ],
      "limits": {
       "applies": false,
       "pairs": false,
-      "tm": false,
+      "tm": true,
       "verdict": "\u2013"
      },
      "rows": {
       "foldmap": [
-       "YVEFE---------------------------PSDKHIKEYLNKI---QNSLSTEWSPCSVT--CGNG--IQVRIKPGSANKPKDELDYANDIEKKICKMEKCPH---------",
-       "-----DPSKGRWVEGITSEGYHYYYDLISGASQWEKPEGFQGDLKKTAVKTVW---VEGL--SEDG--FTYYYNTETG---------------------------ESRWEKPDD"
+       "YVEFEPSDKHIKEYLNKIQNSL-----STEWSPCSVTCGNGIQVRIKPGSANKPKDELDYANDIEKK-------------------ICKMEKCPH-------------------",
+       "----------------------DPSKGRWVEGITSE----GYHYYY---DLISG---A----SQWEKPEGFQGDLKKTAVKTVWVEGLSEDG---FTYYYNTETGESRWEKPDD"
       ],
       "usalign": [
        "-------------------------YVEFEPSDKHIKEYLN---KIQNSLSTEWSPCSVT---CGNGI----QVRIKPGSANKPKDELDYANDIEKKICKMEKCPH---------",
@@ -2074,10 +3032,10 @@
      },
      "structure": {
       "aligned": 32,
-      "rmsd": 5.0238,
-      "tm_score": 0.1881
+      "rmsd": 3.6065,
+      "tm_score": 0.2599
      },
-     "tm_difference": -0.056,
+     "tm_difference": 0.0157,
      "usalign": {
       "aligned": 31,
       "aligned_reported": 31,
@@ -2104,6 +3062,38 @@
     "pieces": 0,
     "rmsd": 0.6722,
     "same_fold": true,
+    "source_stamp": {
+     "checkout_fingerprint": "7879eea05bd9301c",
+     "code_fingerprint": "7879eea05bd9301c",
+     "foldmap": "0.2.0",
+     "git": {
+      "commit": "55e1a78e9d594601040decb04af43f321622d3d9",
+      "dirty": false,
+      "source": "asserted by runner"
+     },
+     "installed_matches_checkout": true,
+     "package": "checkout",
+     "packages": {
+      "PyYAML": "6.0.3",
+      "gemmi": "0.7.5",
+      "matplotlib": "3.11.2",
+      "networkx": "3.7",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1"
+     },
+     "platform": {
+      "machine": "x86_64",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43"
+     },
+     "python": {
+      "implementation": "CPython",
+      "version": "3.13.13"
+     },
+     "script": {
+      "name": "scripts/homologues.py",
+      "sha256": "61e02d7fc4adfff81058b1975974aa1f447a37029f358bb9e66a9c6c2ca7555f"
+     }
+    },
     "stratum": "close",
     "tm_score": 0.9696,
     "usalign": {
@@ -2156,7 +3146,7 @@
    {
     "aligned": 135,
     "extras": 0,
-    "identity": 0.1852,
+    "identity": 0.1926,
     "kind": "positive",
     "length_a": 168,
     "length_b": 138,
@@ -2165,27 +3155,55 @@
     "only_a": 3,
     "pair": "4E2U_A-2LWY_A",
     "pieces": 0,
-    "rmsd": 2.1678,
+    "rmsd": 2.0854,
     "same_fold": true,
+    "source_stamp": {
+     "checkout_fingerprint": "7879eea05bd9301c",
+     "code_fingerprint": "7879eea05bd9301c",
+     "foldmap": "0.2.0",
+     "git": {
+      "commit": "55e1a78e9d594601040decb04af43f321622d3d9",
+      "dirty": false,
+      "source": "asserted by runner"
+     },
+     "installed_matches_checkout": true,
+     "package": "checkout",
+     "packages": {
+      "PyYAML": "6.0.3",
+      "gemmi": "0.7.5",
+      "matplotlib": "3.11.2",
+      "networkx": "3.7",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1"
+     },
+     "platform": {
+      "machine": "x86_64",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43"
+     },
+     "python": {
+      "implementation": "CPython",
+      "version": "3.13.13"
+     },
+     "script": {
+      "name": "scripts/homologues.py",
+      "sha256": "61e02d7fc4adfff81058b1975974aa1f447a37029f358bb9e66a9c6c2ca7555f"
+     }
+    },
     "stratum": "remote",
-    "tm_score": 0.6954,
+    "tm_score": 0.7005,
     "usalign": {
      "agreement": {
-      "close_within_1": 0.9923,
-      "exact": 0.9481,
-      "foldmap_pairs_in_usalign": 0.9778,
-      "within_1": 0.9778
+      "close_within_1": 1.0,
+      "exact": 1.0,
+      "foldmap_pairs_in_usalign": 1.0,
+      "within_1": 1.0
      },
      "auto": {
       "method": "structure",
-      "tm_score": 0.6954,
-      "within_1": 0.9778
+      "tm_score": 0.7005,
+      "within_1": 1.0
      },
-     "disagreements": [
-      "A -4--4 (1): not paired",
-      "A 25-25 (1): not paired",
-      "A 28-28 (1): not paired"
-     ],
+     "disagreements": [],
      "limits": {
       "applies": true,
       "pairs": true,
@@ -2195,7 +3213,7 @@
      "rows": {
       "foldmap": [
        "SQHMAFARDTEVYYENDTVPHMESIEEMYSKYASMNGELPFDNGYAVPLDNVFVYTLDIASGEIKKTRASYIYREKVEKLIEIKLSSGYSLKVTPSHPVLLFRDGLQWVPAAEVKPGDVVVGVRNGELEFHEVSSVRIIDY--NNWVYDLVIPETHNFIA-PNGLVLHNAQ",
-       "-SMKAFVAGTMILTA----TGLVAIENI--------------------KAGDKVIATNPETFEVAEKTVLETYVRETTELLHLTIGG-EVIKTTFDHPFYVK--DVGFVEAGKLQVGDKLLDSR---GNVLVVEEKKLEIADKPVKVYNFKVDDFHTYHVGDNEVLVHN--"
+       "SM-KAFVAGTMILTA----TGLVAIE-NI--K----------------AG-DKVIATNPETFEVAEKTVLETYVRETTELLHLTIGG-EVIKTTFDHPFYVK--DVGFVEAGKLQVGDKLLDSR---GNVLVVEEKKLEIADKPVKVYNFKVDDFHTYHVGDNEVLVHN--"
       ],
       "usalign": [
        "SQHMAFARDTEVYYENDTVPHMESIEEMYSKYASMNGELPFDNGYAVPLDNVFVYTLDIASGEIKKTRASYIYREKVEKLIEIKLSSGYSLKVTPSHPVLLFRDGLQWVPAAEVKPGDVVVGVRNGELEFHEVSSVRIIDY--NNWVYDLVIPETHNFIA-PNGLVLHNAQ",
@@ -2204,10 +3222,10 @@
      },
      "structure": {
       "aligned": 135,
-      "rmsd": 2.1678,
-      "tm_score": 0.6954
+      "rmsd": 2.0854,
+      "tm_score": 0.7005
      },
-     "tm_difference": -0.0052,
+     "tm_difference": -0.0001,
      "usalign": {
       "aligned": 135,
       "aligned_reported": 135,
@@ -2221,52 +3239,82 @@
     }
    },
    {
-    "aligned": 66,
-    "extras": 3,
-    "identity": 0.0152,
+    "aligned": 61,
+    "extras": 6,
+    "identity": 0.1148,
     "kind": "negative",
     "length_a": 129,
     "length_b": 143,
-    "mates": 5,
+    "mates": 3,
     "method": "structure",
-    "only_a": 6,
+    "only_a": 8,
     "pair": "4IPV_A-4N2P_A",
-    "pieces": 1,
-    "rmsd": 5.0412,
+    "pieces": 0,
+    "rmsd": 4.0675,
     "same_fold": false,
+    "source_stamp": {
+     "checkout_fingerprint": "7879eea05bd9301c",
+     "code_fingerprint": "7879eea05bd9301c",
+     "foldmap": "0.2.0",
+     "git": {
+      "commit": "55e1a78e9d594601040decb04af43f321622d3d9",
+      "dirty": false,
+      "source": "asserted by runner"
+     },
+     "installed_matches_checkout": true,
+     "package": "checkout",
+     "packages": {
+      "PyYAML": "6.0.3",
+      "gemmi": "0.7.5",
+      "matplotlib": "3.11.2",
+      "networkx": "3.7",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1"
+     },
+     "platform": {
+      "machine": "x86_64",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43"
+     },
+     "python": {
+      "implementation": "CPython",
+      "version": "3.13.13"
+     },
+     "script": {
+      "name": "scripts/homologues.py",
+      "sha256": "61e02d7fc4adfff81058b1975974aa1f447a37029f358bb9e66a9c6c2ca7555f"
+     }
+    },
     "stratum": "negative",
-    "tm_score": 0.2604,
+    "tm_score": 0.3032,
     "usalign": {
      "agreement": {
-      "close_within_1": 0.0,
-      "exact": 0.0,
-      "foldmap_pairs_in_usalign": 0.0,
-      "within_1": 0.0
+      "close_within_1": 0.0513,
+      "exact": 0.0704,
+      "foldmap_pairs_in_usalign": 0.1148,
+      "within_1": 0.0986
      },
      "auto": {
       "method": "structure",
-      "tm_score": 0.2604,
-      "within_1": 0.0
+      "tm_score": 0.3032,
+      "within_1": 0.0986
      },
      "disagreements": [
-      "A 31-34 (4): not paired",
-      "A 35-38 (4): B shifted -46",
-      "A 39-46 (8): B shifted -35",
-      "A 47-48 (2): not paired",
-      "A 49-50 (2): B shifted -35",
-      "A 51-51 (1): not paired",
-      "A 52-52 (1): B shifted -35",
-      "A 57-62 (6): B shifted -31",
-      "A 66-70 (5): B shifted -24",
+      "A 31-48 (18): B shifted +4",
+      "A 49-52 (4): not paired",
+      "A 57-58 (2): not paired",
+      "A 59-62 (4): B shifted -2",
+      "A 66-70 (5): B shifted -2",
       "A 90-90 (1): not paired",
-      "A 92-95 (4): not paired",
-      "A 98-100 (3): not paired",
-      "A 106-112 (7): B shifted -2",
-      "A 113-114 (2): not paired",
-      "A 117-119 (3): not paired",
-      "A 142-149 (8): not paired",
-      "A 150-155 (6): B shifted +6",
-      "A 156-159 (4): not paired"
+      "A 92-95 (4): B shifted +2",
+      "A 98-100 (3): B shifted +2",
+      "A 106-111 (6): B shifted +2",
+      "A 112-114 (3): not paired",
+      "A 144-144 (1): not paired",
+      "A 147-148 (2): B shifted -2",
+      "A 149-155 (7): B shifted -3",
+      "A 156-156 (1): not paired",
+      "A 157-158 (2): B shifted +2",
+      "A 159-159 (1): not paired"
      ],
      "limits": {
       "applies": false,
@@ -2276,8 +3324,8 @@
      },
      "rows": {
       "foldmap": [
-       "NELQ--------------SAAE-----------ELNAMLQYAR--SEA-VSQRRAISIQALKD----KDWGK--GLSIGVLASGSIAAPLRKHDGFRAATLTAKEK--------------SAVEHLTFTANGTLVPPTERTFAICQNGKTD---------------------GGRVLSISQAGRIQLEPSSKAPQSCY--------",
-       "----MLKKWEHYEHTADIGIRGYGDSLEEAFEAVAIALFDV--MVNV-NKVEKKEVREIEVEAEDLEALLYSFLEELLVI-----HDIEGLV--------------FRDFEVKIERVNGKYRLRAKAYGE---------------------KLDLKKHEPKEEVKAITYHDMKIER------------LPNGKW----MAQLVPDI"
+       "------------------------------------------------------------NELQSAAEELNAMLQYARSEAVSQRRAISIQALKDKDWGKGLSIGVLASGSIAAPLRKHDG-------FRAATLTAKEKSAVEHLTFTANGTLVPPTERTFAICQNGKTDGGRVLSISQAGRIQLEPSSKAPQ---------SCY------",
+       "MLKKWEHYEHTADIGIRGYGDSLEEAFEAVAIALFDVMVNVNKVEKKEVREIEVEAEDLEALLYSFLEELLVIHDIEG----------LVFR---DFEVK---------------------IERVNGKYRLR--AKA-----YGEKLD---LKKHEP---------------------KE-EVKAITYHDMK-IERLPNGKWMA-QLVPDI"
       ],
       "usalign": [
        "--------------------------------------------------------NELQSAAEELNAMLQYARSEAVSQRRAISIQALKDKDWGKGLSIGVLASGSIAAPLRKH-DG-FRAATLTAKEKSAVEHLTFTANGTL-VPPTERTFAICQNGKTDGGRVLSISQAGRI--QL-EPSSKAPQ---SCY-------",
@@ -2285,11 +3333,11 @@
       ]
      },
      "structure": {
-      "aligned": 66,
-      "rmsd": 5.0412,
-      "tm_score": 0.2604
+      "aligned": 61,
+      "rmsd": 4.0675,
+      "tm_score": 0.3032
      },
-     "tm_difference": -0.0489,
+     "tm_difference": -0.0061,
      "usalign": {
       "aligned": 71,
       "aligned_reported": 71,
@@ -2303,9 +3351,9 @@
     }
    },
    {
-    "aligned": 75,
+    "aligned": 74,
     "extras": 0,
-    "identity": 0.2533,
+    "identity": 0.2568,
     "kind": "positive",
     "length_a": 80,
     "length_b": 80,
@@ -2314,26 +3362,56 @@
     "only_a": 0,
     "pair": "4U12_A-4NPX_A",
     "pieces": 0,
-    "rmsd": 2.0749,
+    "rmsd": 1.7941,
     "same_fold": true,
+    "source_stamp": {
+     "checkout_fingerprint": "7879eea05bd9301c",
+     "code_fingerprint": "7879eea05bd9301c",
+     "foldmap": "0.2.0",
+     "git": {
+      "commit": "55e1a78e9d594601040decb04af43f321622d3d9",
+      "dirty": false,
+      "source": "asserted by runner"
+     },
+     "installed_matches_checkout": true,
+     "package": "checkout",
+     "packages": {
+      "PyYAML": "6.0.3",
+      "gemmi": "0.7.5",
+      "matplotlib": "3.11.2",
+      "networkx": "3.7",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1"
+     },
+     "platform": {
+      "machine": "x86_64",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43"
+     },
+     "python": {
+      "implementation": "CPython",
+      "version": "3.13.13"
+     },
+     "script": {
+      "name": "scripts/homologues.py",
+      "sha256": "61e02d7fc4adfff81058b1975974aa1f447a37029f358bb9e66a9c6c2ca7555f"
+     }
+    },
     "stratum": "remote",
-    "tm_score": 0.7627,
+    "tm_score": 0.768,
     "usalign": {
      "agreement": {
-      "close_within_1": 0.9028,
-      "exact": 0.8667,
-      "foldmap_pairs_in_usalign": 0.8667,
-      "within_1": 0.8667
+      "close_within_1": 0.9861,
+      "exact": 0.96,
+      "foldmap_pairs_in_usalign": 1.0,
+      "within_1": 0.9867
      },
      "auto": {
       "method": "structure",
-      "tm_score": 0.7627,
-      "within_1": 0.8667
+      "tm_score": 0.768,
+      "within_1": 0.9867
      },
      "disagreements": [
-      "A 57-64 (8): B shifted +2",
-      "A 65-65 (1): not paired",
-      "A 67-67 (1): not paired"
+      "A 65-65 (1): not paired"
      ],
      "limits": {
       "applies": true,
@@ -2343,8 +3421,8 @@
      },
      "rows": {
       "foldmap": [
-       "---NPLDKWNDIIFHASKKLSKKELERLLELLALLETFIEKEDLEEKFESFAKALRIDEELQQKIESRKTDIVIQSMANILSG--",
-       "FNKTPKEKFIEIIQNGNLGALEKVFEEFFADHIAMVELLEKQGLTEMDVKNFILE-----NGDFIEERQNDIYIELGAKILGHEG"
+       "---NPLDKWNDIIFHASKKLSKKELERLLELLALLETFIEKEDLEEKFESFAK-ALRIDEELQQKIESRKTDIVIQSMANILSG--",
+       "FNKTPKEKFIEIIQNGNLGALEKVFEEFFADHIAMVELLEKQGLT--EMDVKNFIL--E--NGDFIEERQNDIYIELGAKILGHEG"
       ],
       "usalign": [
        "---NPLDKWNDIIFHASKKLSKKELERLLELLALLETFIEKEDLEEKFESFAKALRIDEELQQKIESRKTDIVIQSMANILSG--",
@@ -2352,11 +3430,11 @@
       ]
      },
      "structure": {
-      "aligned": 75,
-      "rmsd": 2.0749,
-      "tm_score": 0.7627
+      "aligned": 74,
+      "rmsd": 1.7941,
+      "tm_score": 0.768
      },
-     "tm_difference": -0.0037,
+     "tm_difference": 0.0016,
      "usalign": {
       "aligned": 75,
       "aligned_reported": 75,
@@ -2370,9 +3448,9 @@
     }
    },
    {
-    "aligned": 93,
+    "aligned": 94,
     "extras": 0,
-    "identity": 0.0645,
+    "identity": 0.0745,
     "kind": "positive",
     "length_a": 111,
     "length_b": 115,
@@ -2381,30 +3459,58 @@
     "only_a": 2,
     "pair": "5E4E_A-3TGX_B",
     "pieces": 0,
-    "rmsd": 3.0714,
+    "rmsd": 3.0983,
     "same_fold": true,
+    "source_stamp": {
+     "checkout_fingerprint": "7879eea05bd9301c",
+     "code_fingerprint": "7879eea05bd9301c",
+     "foldmap": "0.2.0",
+     "git": {
+      "commit": "55e1a78e9d594601040decb04af43f321622d3d9",
+      "dirty": false,
+      "source": "asserted by runner"
+     },
+     "installed_matches_checkout": true,
+     "package": "checkout",
+     "packages": {
+      "PyYAML": "6.0.3",
+      "gemmi": "0.7.5",
+      "matplotlib": "3.11.2",
+      "networkx": "3.7",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1"
+     },
+     "platform": {
+      "machine": "x86_64",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43"
+     },
+     "python": {
+      "implementation": "CPython",
+      "version": "3.13.13"
+     },
+     "script": {
+      "name": "scripts/homologues.py",
+      "sha256": "61e02d7fc4adfff81058b1975974aa1f447a37029f358bb9e66a9c6c2ca7555f"
+     }
+    },
     "stratum": "remote",
-    "tm_score": 0.6092,
+    "tm_score": 0.6181,
     "usalign": {
      "agreement": {
-      "close_within_1": 0.9639,
-      "exact": 0.8737,
-      "foldmap_pairs_in_usalign": 0.9462,
-      "within_1": 0.9263
+      "close_within_1": 0.9759,
+      "exact": 0.9474,
+      "foldmap_pairs_in_usalign": 0.9787,
+      "within_1": 0.9684
      },
      "auto": {
       "method": "structure",
-      "tm_score": 0.6092,
-      "within_1": 0.9263
+      "tm_score": 0.6181,
+      "within_1": 0.9684
      },
      "disagreements": [
-      "A 4-4 (1): not paired",
-      "A 40-40 (1): B shifted +3",
-      "A 41-41 (1): B shifted +2",
       "A 51-51 (1): not paired",
-      "A 58-58 (1): B shifted +2",
       "A 82-82 (1): not paired",
-      "A 112-112 (1): not paired"
+      "A 110-110 (1): not paired"
      ],
      "limits": {
       "applies": true,
@@ -2414,8 +3520,8 @@
      },
      "rows": {
       "foldmap": [
-       "PGPV---PPSTAVRELIEELINITQNAPLCNGSMVWSINR-----TAGMYCAALESLINVSGC-------SAIEKTQRMLSGFCPHKVSAGQFSS-------LHVRSSKIEVAQFVKDLLFHLRTLFREGQFN",
-       "----GQDRHMIRMRQLIDIVDQLKNYVNDLVPEFLPAPEDVETNCEWSAFSCFQKA--QLKSANTGNNERIINVSIKKLKRKPPS----------THRLTCPSCDSYEKKPPKEFLERFKSLLQKMIHQHL--"
+       "PGP-V-PPSTAVRELIEELINITQNAPLCNGSMVWSIN-R-T-A--GMYCAALESLINVSGC-----S--AIEKTQRMLSGFCPHKVSAGQFSS-------LHVRSSKIEVAQFVKDLLFHLRTLFREGQFN",
+       "---GQDRHMIRMRQLIDIVDQLKNYVNDLVPEFLPAPEDVETNCEWSAFSCFQKA--QLKSANTGNNERIINVSIKKLKRKPPS----------THRLTCPSCDSYEKKPPKEFLERFKSLLQKMIHQ-HL-"
       ],
       "usalign": [
        "PGP-V-PPSTAVRELIEELINITQNAPLCNGSMVWSI-NR-T-A--GMYCAALESLINVSGC-----S--AIEKTQRMLSGFCPHKVSAGQFS------SLHVRSSKIEVAQFVKDLLFHLRTLFREGQFN",
@@ -2423,11 +3529,11 @@
       ]
      },
      "structure": {
-      "aligned": 93,
-      "rmsd": 3.0714,
-      "tm_score": 0.6092
+      "aligned": 94,
+      "rmsd": 3.0983,
+      "tm_score": 0.6181
      },
-     "tm_difference": -0.009,
+     "tm_difference": -0.0001,
      "usalign": {
       "aligned": 95,
       "aligned_reported": 95,
@@ -2441,9 +3547,9 @@
     }
    },
    {
-    "aligned": 161,
+    "aligned": 156,
     "extras": 3,
-    "identity": 0.1118,
+    "identity": 0.1026,
     "kind": "positive",
     "length_a": 269,
     "length_b": 187,
@@ -2452,48 +3558,65 @@
     "only_a": 10,
     "pair": "5GL3_A-1WPN_A",
     "pieces": 0,
-    "rmsd": 4.4178,
+    "rmsd": 3.8171,
     "same_fold": false,
+    "source_stamp": {
+     "checkout_fingerprint": "7879eea05bd9301c",
+     "code_fingerprint": "7879eea05bd9301c",
+     "foldmap": "0.2.0",
+     "git": {
+      "commit": "55e1a78e9d594601040decb04af43f321622d3d9",
+      "dirty": false,
+      "source": "asserted by runner"
+     },
+     "installed_matches_checkout": true,
+     "package": "checkout",
+     "packages": {
+      "PyYAML": "6.0.3",
+      "gemmi": "0.7.5",
+      "matplotlib": "3.11.2",
+      "networkx": "3.7",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1"
+     },
+     "platform": {
+      "machine": "x86_64",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43"
+     },
+     "python": {
+      "implementation": "CPython",
+      "version": "3.13.13"
+     },
+     "script": {
+      "name": "scripts/homologues.py",
+      "sha256": "61e02d7fc4adfff81058b1975974aa1f447a37029f358bb9e66a9c6c2ca7555f"
+     }
+    },
     "stratum": "remote",
-    "tm_score": 0.4308,
+    "tm_score": 0.4463,
     "usalign": {
      "agreement": {
-      "close_within_1": 0.7222,
-      "exact": 0.5705,
-      "foldmap_pairs_in_usalign": 0.6211,
-      "within_1": 0.641
+      "close_within_1": 1.0,
+      "exact": 1.0,
+      "foldmap_pairs_in_usalign": 1.0,
+      "within_1": 1.0
      },
      "auto": {
       "method": "structure",
-      "tm_score": 0.4308,
-      "within_1": 0.641
+      "tm_score": 0.4463,
+      "within_1": 1.0
      },
-     "disagreements": [
-      "A 89-90 (2): B shifted -2",
-      "A 91-93 (3): B shifted -3",
-      "A 125-125 (1): not paired",
-      "A 150-150 (1): not paired",
-      "A 164-164 (1): not paired",
-      "A 187-187 (1): B shifted +3",
-      "A 195-198 (4): B shifted -2",
-      "A 199-199 (1): not paired",
-      "A 200-206 (7): B shifted -3",
-      "A 208-208 (1): B shifted -2",
-      "A 214-229 (16): B shifted +3",
-      "A 234-238 (5): not paired",
-      "A 246-249 (4): B shifted -2",
-      "A 250-258 (9): B shifted -3"
-     ],
+     "disagreements": [],
      "limits": {
       "applies": false,
-      "pairs": false,
+      "pairs": true,
       "tm": true,
       "verdict": "\u2013"
      },
      "rows": {
       "foldmap": [
-       "MIAHLINTDIGNRGVLKVYLDYRRKNFNFLHNSTKMFLDNLERVLIVTGFPIPPMMVAETDGPPGALAIYRAVEMLG-GKAEILTYSEVEKALE-----PFGVSLARTPEPEDYSLIISVETPGRAADGRYYSMSALEIKRDPLDGIFLKARALGIPTIGVGDGGNEIGMGKIRELVVGHVPHGEKIASVVE--TDELIVSAVSNWGAYGLVAQASIEVGRNLLEGWDERRVIEAISSAGLIDGVSKTLAPSVDGIRLMVHEGIVELLKAVVDEAIL------------------",
-       "-----------------------------------------EKILIFGHQN------PDTDTICSAIAYADLKNKLGFNAEPVRLGQVNGETQYALDYFKQESPRLVETAANEVNGVILVDHNER----------------QQSIKDIEEVQ----VLEVIDHHRI---------------------ANFETAEPLYYRAEPVGCT-ATILNKMYKENNVKIEKEIAGLMLSAIISD-----------SLLFKSPTCTDQDVAAAKELA--------EIAGVDAEEYGLNMLKAG"
+       "MIAHLINTDIGNRGVLKVYLDYRRKNFNFLHNSTKMFLDNLERVLIVTGFPIPPMMVAETDGPPGALAIYRAVEM-LGGKAEILTYSEV--EK-ALE--PFGVSLARTPEPEDYSLIISVETPGRAADGRYYSMSALEIKRDPLDGIFLKARALGIPTIGVGDGGNEIGMGKIRELVVGHVPHGEKIASVVET---DELIVS-A-VSNWGAYGLVAQASIEVGRNLLEGWDERRVIEAISSAGLIDGVSKTLAPSV-DGIR-LMVHEGIVELLKAVVDEAIL------------------",
+       "-----------------------------------------EKILIFGHQN------PDTDTICSAIAYADLKNKLGFNAEPVRLGQVNGETQYALDYFKQESPRLVETAANEVNGVILVDHNER-----Q-----------QSIKDIEEV----QVLEVIDHHR----I------------------ANFETAEPLYYRAEPVGCTATILNKMYKE-N-----NVKIEKEIAGLMLSAI----ISDSL---LFKSPTCTDQDVAAAKELA-----------EIAGVDAEEYGLNMLKAG"
       ],
       "usalign": [
        "MIAHLINTDIGNRGVLKVYLDYRRKNFNFLHNSTKMFLDNLERVLIVTGFPIPPMMVAETDGPPGALAIYRAVEM-LGGKAEILTYSEV--EK-ALE--PFGVSLARTPEPEDYSLIISVETPGRAADGRYYSMSALEIKRDPLDGIFLKARALGIPTIGVGDGGNEIGMGKIRELVVGHVPHGEKIASVVET---DELIVS-A-VSNWGAYGLVAQASIEVGRNLLEGWDERRVIEAISSAGLIDGVSKTLAPSV-DGIR-LMVHEGIVELLKAVVDEAIL------------------",
@@ -2501,11 +3624,11 @@
       ]
      },
      "structure": {
-      "aligned": 161,
-      "rmsd": 4.4178,
-      "tm_score": 0.4308
+      "aligned": 156,
+      "rmsd": 3.8171,
+      "tm_score": 0.4463
      },
-     "tm_difference": -0.0154,
+     "tm_difference": 0.0,
      "usalign": {
       "aligned": 156,
       "aligned_reported": 156,
@@ -2519,45 +3642,68 @@
     }
    },
    {
-    "aligned": 161,
-    "extras": 1,
-    "identity": 0.1677,
+    "aligned": 162,
+    "extras": 2,
+    "identity": 0.1667,
     "kind": "positive",
     "length_a": 169,
     "length_b": 214,
-    "mates": 6,
+    "mates": 5,
     "method": "structure",
-    "only_a": 2,
+    "only_a": 3,
     "pair": "5GY2_C-2D4X_A",
     "pieces": 0,
-    "rmsd": 2.7344,
+    "rmsd": 2.5702,
     "same_fold": true,
+    "source_stamp": {
+     "checkout_fingerprint": "7879eea05bd9301c",
+     "code_fingerprint": "7879eea05bd9301c",
+     "foldmap": "0.2.0",
+     "git": {
+      "commit": "55e1a78e9d594601040decb04af43f321622d3d9",
+      "dirty": false,
+      "source": "asserted by runner"
+     },
+     "installed_matches_checkout": true,
+     "package": "checkout",
+     "packages": {
+      "PyYAML": "6.0.3",
+      "gemmi": "0.7.5",
+      "matplotlib": "3.11.2",
+      "networkx": "3.7",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1"
+     },
+     "platform": {
+      "machine": "x86_64",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43"
+     },
+     "python": {
+      "implementation": "CPython",
+      "version": "3.13.13"
+     },
+     "script": {
+      "name": "scripts/homologues.py",
+      "sha256": "61e02d7fc4adfff81058b1975974aa1f447a37029f358bb9e66a9c6c2ca7555f"
+     }
+    },
     "stratum": "remote",
-    "tm_score": 0.7854,
+    "tm_score": 0.7989,
     "usalign": {
      "agreement": {
-      "close_within_1": 0.9073,
-      "exact": 0.7485,
-      "foldmap_pairs_in_usalign": 0.8882,
-      "within_1": 0.8773
+      "close_within_1": 0.9868,
+      "exact": 0.9693,
+      "foldmap_pairs_in_usalign": 0.9938,
+      "within_1": 0.9877
      },
      "auto": {
       "method": "structure",
-      "tm_score": 0.7854,
-      "within_1": 0.8773
+      "tm_score": 0.7989,
+      "within_1": 0.9877
      },
      "disagreements": [
       "A 140-140 (1): B shifted +15",
-      "A 153-153 (1): not paired",
-      "A 155-155 (1): not paired",
-      "A 165-167 (3): B shifted -2",
-      "A 168-169 (2): B shifted -18",
-      "A 170-170 (1): B shifted -2",
-      "A 171-172 (2): B shifted -3",
-      "A 173-174 (2): B shifted -4",
-      "A 177-178 (2): B shifted -2",
-      "A 179-179 (1): B shifted -3",
-      "A 180-183 (4): B shifted +2"
+      "A 144-144 (1): not paired"
      ],
      "limits": {
       "applies": true,
@@ -2567,8 +3713,8 @@
      },
      "rows": {
       "foldmap": [
-       "----GQIRGLEMASKNSQDGISLIQTAEGALTETHAILQRMRELTVQAGNTGTQQAEDLGAIKDEMDALIEEIDGISNRTEFNGKKLLDG----------------TNSTDGFTFQIGANAGQQLNVK-IDSMSSTA----------------LGVNA---LDVTD-------------FAATAFDDQLKSIDTAINTVSTQRAKLGAVQNRLEHTINNLGA",
-       "VVLSQAQAQNSQYALARTFATQKVSLEESVLSQVTTAIQTAQEKIVYAGNGTL-SDDDRASLATDLQGIRDQLMNLANSTDGNGRYIFAGYKTEAAPFDQATGGYHGGEKSVTQQVDS----ARTMVIGHTGAQIFNSITSNAVPEPDGSDSEKNLFVMLDTAIAALKTPVEGNNVEKEKAAAAIDKTNRGLKNSLNNVLTVRAELGTQLSELSTLDSL---"
+       "---G-QIRGLEMASKNSQDGISLIQTAEGALTETHAILQRMRELTVQAGNTGTQQAEDLGAIKDEMDALIEEIDGISNRTEFNGKKLLDG----------------TNSTDGFTFQIGANAGQQLNVKIDS--MSS----------------TAL-GV-NALD-VT-D--------FAAT-A-FDDQLKSIDTAINTVSTQRAKLGAVQNRLEHTINNLGA",
+       "VVLSQAQAQNSQYALARTFATQKVSLEESVLSQVTTAIQTAQEKIVYAGNGTL-SDDDRASLATDLQGIRDQLMNLANSTDGNGRYIFAGYKTEAAPFDQATGGYHGGEK-SVTQQVD-S-ARTMVIGHTGAQIFNSITSNAVPEPDGSDSEKNLFVMLDTAIAALKTPVEGNNVEKEKAAAAIDKTNRGLKNSLNNVLTVRAELGTQLSELSTLDSL---"
       ],
       "usalign": [
        "---G-QIRGLEMASKNSQDGISLIQTAEGALTETHAILQRMRELTVQAGNTGTQQAEDLGAIKDEMDALIEEIDGISNRTEFNGKKLLDG-T--------------NSTDGFTFQIGANAGQQLNVKIDS--MSS----------------TAL-GV-NALD-VT-D--------FAAT-A-FDDQLKSIDTAINTVSTQRAKLGAVQNRLEHTINNLGA",
@@ -2576,11 +3722,11 @@
       ]
      },
      "structure": {
-      "aligned": 161,
-      "rmsd": 2.7344,
-      "tm_score": 0.7854
+      "aligned": 162,
+      "rmsd": 2.5702,
+      "tm_score": 0.7989
      },
-     "tm_difference": -0.0128,
+     "tm_difference": 0.0007,
      "usalign": {
       "aligned": 163,
       "aligned_reported": 163,
@@ -2605,26 +3751,55 @@
     "only_a": 3,
     "pair": "5KDI_A-4NT2_A",
     "pieces": 0,
-    "rmsd": 2.5409,
+    "rmsd": 2.5018,
     "same_fold": true,
+    "source_stamp": {
+     "checkout_fingerprint": "7879eea05bd9301c",
+     "code_fingerprint": "7879eea05bd9301c",
+     "foldmap": "0.2.0",
+     "git": {
+      "commit": "55e1a78e9d594601040decb04af43f321622d3d9",
+      "dirty": false,
+      "source": "asserted by runner"
+     },
+     "installed_matches_checkout": true,
+     "package": "checkout",
+     "packages": {
+      "PyYAML": "6.0.3",
+      "gemmi": "0.7.5",
+      "matplotlib": "3.11.2",
+      "networkx": "3.7",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1"
+     },
+     "platform": {
+      "machine": "x86_64",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43"
+     },
+     "python": {
+      "implementation": "CPython",
+      "version": "3.13.13"
+     },
+     "script": {
+      "name": "scripts/homologues.py",
+      "sha256": "61e02d7fc4adfff81058b1975974aa1f447a37029f358bb9e66a9c6c2ca7555f"
+     }
+    },
     "stratum": "remote",
-    "tm_score": 0.7932,
+    "tm_score": 0.7967,
     "usalign": {
      "agreement": {
-      "close_within_1": 0.9892,
-      "exact": 0.9692,
-      "foldmap_pairs_in_usalign": 0.9897,
-      "within_1": 0.9897
+      "close_within_1": 1.0,
+      "exact": 1.0,
+      "foldmap_pairs_in_usalign": 1.0,
+      "within_1": 1.0
      },
      "auto": {
       "method": "structure",
-      "tm_score": 0.7932,
-      "within_1": 0.9897
+      "tm_score": 0.7967,
+      "within_1": 1.0
      },
-     "disagreements": [
-      "A 375-375 (1): not paired",
-      "A 477-477 (1): not paired"
-     ],
+     "disagreements": [],
      "limits": {
       "applies": true,
       "pairs": true,
@@ -2633,8 +3808,8 @@
      },
      "rows": {
       "foldmap": [
-       "PTFFSTMNTSFSDIELL---EDSGIPTEAFLASCYAVVPVLDKLGPTVFAPVKMDLVGNIKKVNQKYITNKAKFTTLQKIVLHEVEADVAQVRNSATEALLWLKRGLKFLKGFLTEVKNGE--KDIQTALNNAYGKTLRQHHGWVVRGVFALALRAAPSYEDFVAALTVKEGDHQKEAFSIGMQRDLSLYLPAMEKQLAILDTLYEVHGLESDEVV",
-       "DKPLRKISAAFKKLAIIVNSPNPEVPVTQFSHACSLVSPLFGCLG-IAFKFAEMDYVAKVDDLVRASSS----ISTLVVMMDKDIEADCVRKAGSHTRNLLRVKRGLDMVKVLFEQIIASEGDNSLKDPATKSYAQVFAPHHGWAIRKAVSLGMYALPTRAHLLNMLKE---------DEAAAKIHMQSYVNSSAPLITYLDNLFLSKQLGIDW--"
+       "PTFFSTMNTSFSDI-ELL--EDSGIPTEAFLASCYAVVPVLDKLGPTVFAPVKMDLVGNIKKVNQKYITNKAKFTTLQKIVLHEVEADVAQVRNSATEALLWLKRGLKFLKGFLTEVKNGE-K-DIQTALNNAYGKTLRQHHGWVVRGVFALALRAAPSYEDFVAALTVKEGDHQKEAFSIGMQRDLSLYLPAMEKQLAILDTLYEVHGLESDEVV",
+       "DKPLRKISAAFKKLAIIVNSPNPEVPVTQFSHACSLVSPLFGCLG-IAFKFAEMDYVAKVDDLVRASS-S---ISTLVVMMDKDIEADCVRKAGSHTRNLLRVKRGLDMVKVLFEQIIASEGDNSLKDPATKSYAQVFAPHHGWAIRKAVSLGMYALPTRAHLLNMLK-----E----DEAAAKIHMQSYVNSSAPLITYLDNLFLSKQLGIDW--"
       ],
       "usalign": [
        "PTFFSTMNTSFSDI-ELL--EDSGIPTEAFLASCYAVVPVLDKLGPTVFAPVKMDLVGNIKKVNQKYITNKAKFTTLQKIVLHEVEADVAQVRNSATEALLWLKRGLKFLKGFLTEVKNGE-K-DIQTALNNAYGKTLRQHHGWVVRGVFALALRAAPSYEDFVAALTVKEGDHQKEAFSIGMQRDLSLYLPAMEKQLAILDTLYEVHGLESDEVV",
@@ -2643,10 +3818,10 @@
      },
      "structure": {
       "aligned": 195,
-      "rmsd": 2.5409,
-      "tm_score": 0.7932
+      "rmsd": 2.5018,
+      "tm_score": 0.7967
      },
-     "tm_difference": -0.0035,
+     "tm_difference": 0.0,
      "usalign": {
       "aligned": 195,
       "aligned_reported": 195,
@@ -2673,14 +3848,46 @@
     "pieces": 0,
     "rmsd": 4.6483,
     "same_fold": true,
+    "source_stamp": {
+     "checkout_fingerprint": "7879eea05bd9301c",
+     "code_fingerprint": "7879eea05bd9301c",
+     "foldmap": "0.2.0",
+     "git": {
+      "commit": "55e1a78e9d594601040decb04af43f321622d3d9",
+      "dirty": false,
+      "source": "asserted by runner"
+     },
+     "installed_matches_checkout": true,
+     "package": "checkout",
+     "packages": {
+      "PyYAML": "6.0.3",
+      "gemmi": "0.7.5",
+      "matplotlib": "3.11.2",
+      "networkx": "3.7",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1"
+     },
+     "platform": {
+      "machine": "x86_64",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43"
+     },
+     "python": {
+      "implementation": "CPython",
+      "version": "3.13.13"
+     },
+     "script": {
+      "name": "scripts/homologues.py",
+      "sha256": "61e02d7fc4adfff81058b1975974aa1f447a37029f358bb9e66a9c6c2ca7555f"
+     }
+    },
     "stratum": "close",
     "tm_score": 0.6979,
     "usalign": {
      "agreement": {
-      "close_within_1": 0.9691,
-      "exact": 0.8991,
-      "foldmap_pairs_in_usalign": 0.9266,
-      "within_1": 0.9266
+      "close_within_1": 1.0,
+      "exact": 0.9908,
+      "foldmap_pairs_in_usalign": 1.0,
+      "within_1": 0.9908
      },
      "auto": {
       "method": "sequence",
@@ -2688,11 +3895,6 @@
       "within_1": 0.8165
      },
      "disagreements": [
-      "A 28-28 (1): not paired",
-      "A 30-30 (1): not paired",
-      "A 39-39 (1): B shifted -6",
-      "A 40-40 (1): not paired",
-      "A 41-43 (3): B shifted -2",
       "A 47-47 (1): not paired"
      ],
      "limits": {
@@ -2703,8 +3905,8 @@
      },
      "rows": {
       "foldmap": [
-       "MNLMITLLTNFTLATLLVTIAFWLPQLNVYSEKTSPYECG-----FDPMGSA-RLPFSMKFFLVAITFLLFDLEIALLLPLPWASQTTNLNTMLTMALLLIFLLAVSLAYEWTQKGLEWTE",
-       "MNLYTVIFINILLSLTLILVAFWLPQM---NLYSEKANP-YECGFDPTSSA-RLPFSM-KFFLVAITFLLFDLEIALLLPLPWAIQTIKTSTMMIMAFILVTILSLGLAYEWTQKGLEWTE"
+       "MNLMITLLTNFTLATLLVTIAFWLPQLNVYSEKTSP-YE-----CGFDPMGSA-RLPFSMKFFLVAITFLLFDLEIALLLPLPWASQTTNLNTMLTMALLLIFLLAVSLAYEWTQKGLEWTE",
+       "MNLYTVIFINILLSLTLILVAFWLP--Q-MNLYSEKANPYECGFDPTSS-A--RLPFSM-KFFLVAITFLLFDLEIALLLPLPWAIQTIKTSTMMIMAFILVTILSLGLAYEWTQKGLEWTE"
       ],
       "usalign": [
        "MNLMITLLTNFTLATLLVTIAFWLPQLNVYSEKTSP-YE-----CGFDPMGSARLPFSMKFFLVAITFLLFDLEIALLLPLPWASQTTNLNTMLTMALLLIFLLAVSLAYEWTQKGLEWTE",
@@ -2712,11 +3914,11 @@
       ]
      },
      "structure": {
-      "aligned": 109,
-      "rmsd": 2.7448,
-      "tm_score": 0.7586
+      "aligned": 108,
+      "rmsd": 2.5497,
+      "tm_score": 0.7669
      },
-     "tm_difference": -0.0095,
+     "tm_difference": -0.0012,
      "usalign": {
       "aligned": 109,
       "aligned_reported": 109,
@@ -2743,23 +3945,53 @@
     "pieces": 0,
     "rmsd": 1.6469,
     "same_fold": true,
+    "source_stamp": {
+     "checkout_fingerprint": "7879eea05bd9301c",
+     "code_fingerprint": "7879eea05bd9301c",
+     "foldmap": "0.2.0",
+     "git": {
+      "commit": "55e1a78e9d594601040decb04af43f321622d3d9",
+      "dirty": false,
+      "source": "asserted by runner"
+     },
+     "installed_matches_checkout": true,
+     "package": "checkout",
+     "packages": {
+      "PyYAML": "6.0.3",
+      "gemmi": "0.7.5",
+      "matplotlib": "3.11.2",
+      "networkx": "3.7",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1"
+     },
+     "platform": {
+      "machine": "x86_64",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43"
+     },
+     "python": {
+      "implementation": "CPython",
+      "version": "3.13.13"
+     },
+     "script": {
+      "name": "scripts/homologues.py",
+      "sha256": "61e02d7fc4adfff81058b1975974aa1f447a37029f358bb9e66a9c6c2ca7555f"
+     }
+    },
     "stratum": "close",
     "tm_score": 0.9372,
     "usalign": {
      "agreement": {
       "close_within_1": 1.0,
-      "exact": 0.9732,
+      "exact": 1.0,
       "foldmap_pairs_in_usalign": 1.0,
-      "within_1": 0.9911
+      "within_1": 1.0
      },
      "auto": {
       "method": "sequence",
       "tm_score": 0.9372,
       "within_1": 1.0
      },
-     "disagreements": [
-      "A 2-2 (1): not paired"
-     ],
+     "disagreements": [],
      "limits": {
       "applies": true,
       "pairs": true,
@@ -2768,8 +4000,8 @@
      },
      "rows": {
       "foldmap": [
-       "-------GK-LSEQLKHCNGILKELLSKKHAAYAWPFYKPVDASALGLHDYHDIIKHPMDLSTVKRKMENRDYRDAQEFAADVRLMFSNCYKYNPPDHDVVAMARKLQDVFEFRYAKMPD----",
-       "QHKVLKTV-KVTEQLKHCSEILKEMLAKKHLPYAWPFYNPVDADALGLHNYYDVVKNPMDLGTIKGKMDNQEYKDAYEFAADVRLMFMNCYKYNPPDHEVVAMARTLQDVFELHFAKIPDEPIE"
+       "------GK-LSEQLKHCNGILKELLSKKHAAYAWPFYKPVDASALGLHDYHDIIKHPMDLSTVKRKMENRDYRDAQEFAADVRLMFSNCYKYNPPDHDVVAMARKLQDVFEFRYAKMP-D---",
+       "QHKVLKTVKVTEQLKHCSEILKEMLAKKHLPYAWPFYNPVDADALGLHNYYDVVKNPMDLGTIKGKMDNQEYKDAYEFAADVRLMFMNCYKYNPPDHEVVAMARTLQDVFELHFAKIPDEPIE"
       ],
       "usalign": [
        "------GK-LSEQLKHCNGILKELLSKKHAAYAWPFYKPVDASALGLHDYHDIIKHPMDLSTVKRKMENRDYRDAQEFAADVRLMFSNCYKYNPPDHDVVAMARKLQDVFEFRYAKMP-D---",
@@ -2777,11 +4009,11 @@
       ]
      },
      "structure": {
-      "aligned": 111,
-      "rmsd": 1.294,
-      "tm_score": 0.9363
+      "aligned": 112,
+      "rmsd": 1.5063,
+      "tm_score": 0.9393
      },
-     "tm_difference": -0.0029,
+     "tm_difference": 0.0,
      "usalign": {
       "aligned": 112,
       "aligned_reported": 112,
@@ -2808,24 +4040,54 @@
     "only_a": 2,
     "pair": "1EMA_A-1G7K_A",
     "pieces": 1,
-    "rmsd": 1.7652,
+    "rmsd": 1.7585,
     "same_fold": true,
-    "tm_score": 0.8867,
+    "source_stamp": {
+     "checkout_fingerprint": "7879eea05bd9301c",
+     "code_fingerprint": "7879eea05bd9301c",
+     "foldmap": "0.2.0",
+     "git": {
+      "commit": "55e1a78e9d594601040decb04af43f321622d3d9",
+      "dirty": false,
+      "source": "asserted by runner"
+     },
+     "installed_matches_checkout": true,
+     "package": "checkout",
+     "packages": {
+      "PyYAML": "6.0.3",
+      "gemmi": "0.7.5",
+      "matplotlib": "3.11.2",
+      "networkx": "3.7",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1"
+     },
+     "platform": {
+      "machine": "x86_64",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43"
+     },
+     "python": {
+      "implementation": "CPython",
+      "version": "3.13.13"
+     },
+     "script": {
+      "name": "scripts/homologues.py",
+      "sha256": "61e02d7fc4adfff81058b1975974aa1f447a37029f358bb9e66a9c6c2ca7555f"
+     }
+    },
+    "tm_score": 0.8871,
     "usalign": {
      "agreement": {
-      "close_within_1": 0.9952,
-      "exact": 0.9953,
-      "foldmap_pairs_in_usalign": 0.9953,
-      "within_1": 0.9953
+      "close_within_1": 1.0,
+      "exact": 1.0,
+      "foldmap_pairs_in_usalign": 1.0,
+      "within_1": 1.0
      },
      "auto": {
       "method": "structure",
-      "tm_score": 0.8867,
-      "within_1": 0.9953
+      "tm_score": 0.8871,
+      "within_1": 1.0
      },
-     "disagreements": [
-      "A 157-157 (1): not paired"
-     ],
+     "disagreements": [],
      "limits": {
       "applies": true,
       "pairs": true,
@@ -2835,7 +4097,7 @@
      "rows": {
       "foldmap": [
        "SKGEELFTGVVPILVELDGDVNGHKFSVSGEGEGDATYGKLTLKFICTT-GKLPVPWPTLVTTFTVQCFSRYPDHMKRHDFFKSAMPEGYVQERTIFFKDDGNYKTRAEVKFEGDTLVNRIELKGIDFKEDGNILGHKLEYNYNSHNVYIMADKQKNGIKVNFKIRHNIEDGSVQLADHYQQNTPIGDGPVLLPDNHYLSTQSALSKDPNEKRDHMVLLEFVTAAGI---",
-       "----NVIKEFMRFKVRMEGTVNGHEFEIEGEGEGRPYEGHNTVKLKVTKGGPLPFAWDILSPQFQSKVYVKHPADI--PDYKKLSFPEGFKWERVMNFEDGGVVTVTQDSSLQDGCFIYKVKFIGVNFPSDGPVMQKKTM-GWEASTERLYPR--DGVLKGEIHKALKLKDGGHYLVEFKSIYMAKK--PVQLPGYYYVDSKLDITSHN-EDYTIVEQYERTEGRHHLFL"
+       "----NVIKEFMRFKVRMEGTVNGHEFEIEGEGEGRPYEGHNTVKLKVTKGGPLPFAWDILSPQFQSKVYVKHPADI--PDYKKLSFPEGFKWERVMNFEDGGVVTVTQDSSLQDGCFIYKVKFIGVNFPSDGPVMQKKTM-GWEASTERLYPR-D-GVLKGEIHKALKLKDGGHYLVEFKSIYMAKK--PVQLPGYYYVDSKLDITSHN-EDYTIVEQYERTEGRHHLFL"
       ],
       "usalign": [
        "SKGEELFTGVVPILVELDGDVNGHKFSVSGEGEGDATYGKLTLKFICTT-GKLPVPWPTLVTTFXVQCFSRYPDHMKRHDFFKSAMPEGYVQERTIFFKDDGNYKTRAEVKFEGDTLVNRIELKGIDFKEDGNILGHKLEYNYNSHNVYIMADKQKNGIKVNFKIRHNIEDGSVQLADHYQQNTPIGDGPVLLPDNHYLSTQSALSKDPNEKRDHMVLLEFVTAAGI---",
@@ -2844,10 +4106,10 @@
      },
      "structure": {
       "aligned": 214,
-      "rmsd": 1.7652,
-      "tm_score": 0.8867
+      "rmsd": 1.7585,
+      "tm_score": 0.8871
      },
-     "tm_difference": -0.0004,
+     "tm_difference": 0.0,
      "usalign": {
       "aligned": 214,
       "aligned_reported": 214,
@@ -2863,7 +4125,7 @@
    {
     "aligned": 235,
     "extras": 2,
-    "identity": 0.2723,
+    "identity": 0.2638,
     "kind": "positive",
     "length_a": 253,
     "length_b": 242,
@@ -2872,25 +4134,54 @@
     "only_a": 2,
     "pair": "1HDC_A-1CYD_A",
     "pieces": 0,
-    "rmsd": 2.0332,
+    "rmsd": 1.9979,
     "same_fold": true,
-    "tm_score": 0.8568,
+    "source_stamp": {
+     "checkout_fingerprint": "7879eea05bd9301c",
+     "code_fingerprint": "7879eea05bd9301c",
+     "foldmap": "0.2.0",
+     "git": {
+      "commit": "55e1a78e9d594601040decb04af43f321622d3d9",
+      "dirty": false,
+      "source": "asserted by runner"
+     },
+     "installed_matches_checkout": true,
+     "package": "checkout",
+     "packages": {
+      "PyYAML": "6.0.3",
+      "gemmi": "0.7.5",
+      "matplotlib": "3.11.2",
+      "networkx": "3.7",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1"
+     },
+     "platform": {
+      "machine": "x86_64",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43"
+     },
+     "python": {
+      "implementation": "CPython",
+      "version": "3.13.13"
+     },
+     "script": {
+      "name": "scripts/homologues.py",
+      "sha256": "61e02d7fc4adfff81058b1975974aa1f447a37029f358bb9e66a9c6c2ca7555f"
+     }
+    },
+    "tm_score": 0.8606,
     "usalign": {
      "agreement": {
-      "close_within_1": 0.9957,
-      "exact": 0.9574,
-      "foldmap_pairs_in_usalign": 0.9915,
-      "within_1": 0.9915
+      "close_within_1": 1.0,
+      "exact": 1.0,
+      "foldmap_pairs_in_usalign": 1.0,
+      "within_1": 1.0
      },
      "auto": {
       "method": "structure",
-      "tm_score": 0.8568,
-      "within_1": 0.9915
+      "tm_score": 0.8606,
+      "within_1": 1.0
      },
-     "disagreements": [
-      "A 196-196 (1): not paired",
-      "A 247-247 (1): not paired"
-     ],
+     "disagreements": [],
      "limits": {
       "applies": true,
       "pairs": true,
@@ -2899,8 +4190,8 @@
      },
      "rows": {
       "foldmap": [
-       "NDLSGKTVIITGGARGLGAEAARQAVAAGARVVLADVLDEEGAATARELGDAARYQHLDVTIEEDWQRVVAYAREEFGSVDGLVNNAGISTGMFLETESVERFRKVVEINLTGVFIGMKTVIPAMKDA-GGGSIVNISSAAGLMGLALTSSYGASKWGVRGLSKLAAVELGTDRIRVNSVHPGMTYTPMTAE--TGIRQGE----GNYPNTPMGRVGEPGEIAGAVVKLLSDTSSYVTGAELAVDGGWTTGPTVKYVMGQ",
-       "LNFSGLRALVTGAGKGIGRDTVKALHASGAKVVAVTRTNSDLVSLAKECPG-IEPVCVDLGDWDATEKALGGIG----PVDLLVNNAALVIMQPFLEVTKEAFDRSFSVNLRSVFQVSQMVARDMINRGVPGSIVNVSSMVAHVTFPNLITYSSTKGAMTMLTKAMAMELGPHKIRVNSVNPTVVLTDMGKKVSADP----EFARKLKERHPLRKFAEVEDVVNSILFLLSDRSASTSGGGILVDAGYLAS---------"
+       "NDLSG-KTVIITGGARGLGAEAARQAVAAGARVVLADVLDEEGAATARELGDAARYQHLDVTIEEDWQRVVAYAREEFGSVDGLVNNAGISTGMFLETESVERFRKVVEINLTGVFIGMKTVIPAMKDA-GGGSIVNISSAAGLMGLALTSSYGASKWGVRGLSKLAAVELGTDRIRVNSVHPGMTYTPMTAE-TGIRQGE----GNYPNTPMGRVGEPGEIAGAVVKLLSDTSSYVTGAELAVDGGWTTGPTVKYVMGQ",
+       "-LNFSGLRALVTGAGKGIGRDTVKALHASGAKVVAVTRTNSDLVSLAKECPG-IEPVCVDLGDWDATEKALGGIG----PVDLLVNNAALVIMQPFLEVTKEAFDRSFSVNLRSVFQVSQMVARDMINRGVPGSIVNVSSMVAHVTFPNLITYSSTKGAMTMLTKAMAMELGPHKIRVNSVNPTVVLTDMGKKVSADP---EFARKLKERHPLRKFAEVEDVVNSILFLLSDRSASTSGGGILVDAGYL-AS--------"
       ],
       "usalign": [
        "NDLSG-KTVIITGGARGLGAEAARQAVAAGARVVLADVLDEEGAATARELGDAARYQHLDVTIEEDWQRVVAYAREEFGSVDGLVNNAGISTGMFLETESVERFRKVVEINLTGVFIGMKTVIPAMKDA-GGGSIVNISSAAGLMGLALTSSYGASKWGVRGLSKLAAVELGTDRIRVNSVHPGMTYTPMTAE-TGIRQGE----GNYPNTPMGRVGEPGEIAGAVVKLLSDTSSYVTGAELAVDGGWTTGPTVKYVMGQ",
@@ -2909,10 +4200,10 @@
      },
      "structure": {
       "aligned": 235,
-      "rmsd": 2.0332,
-      "tm_score": 0.8568
+      "rmsd": 1.9979,
+      "tm_score": 0.8606
      },
-     "tm_difference": -0.0037,
+     "tm_difference": 0.0,
      "usalign": {
       "aligned": 235,
       "aligned_reported": 235,
@@ -2937,26 +4228,54 @@
     "only_a": 1,
     "pair": "1MBN_A-1ECA_A",
     "pieces": 0,
-    "rmsd": 1.648,
+    "rmsd": 1.6103,
     "same_fold": true,
-    "tm_score": 0.7954,
+    "source_stamp": {
+     "checkout_fingerprint": "7879eea05bd9301c",
+     "code_fingerprint": "7879eea05bd9301c",
+     "foldmap": "0.2.0",
+     "git": {
+      "commit": "55e1a78e9d594601040decb04af43f321622d3d9",
+      "dirty": false,
+      "source": "asserted by runner"
+     },
+     "installed_matches_checkout": true,
+     "package": "checkout",
+     "packages": {
+      "PyYAML": "6.0.3",
+      "gemmi": "0.7.5",
+      "matplotlib": "3.11.2",
+      "networkx": "3.7",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1"
+     },
+     "platform": {
+      "machine": "x86_64",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43"
+     },
+     "python": {
+      "implementation": "CPython",
+      "version": "3.13.13"
+     },
+     "script": {
+      "name": "scripts/homologues.py",
+      "sha256": "61e02d7fc4adfff81058b1975974aa1f447a37029f358bb9e66a9c6c2ca7555f"
+     }
+    },
+    "tm_score": 0.7982,
     "usalign": {
      "agreement": {
-      "close_within_1": 0.9779,
-      "exact": 0.9632,
-      "foldmap_pairs_in_usalign": 0.9779,
-      "within_1": 0.9779
+      "close_within_1": 1.0,
+      "exact": 1.0,
+      "foldmap_pairs_in_usalign": 1.0,
+      "within_1": 1.0
      },
      "auto": {
       "method": "structure",
-      "tm_score": 0.7954,
-      "within_1": 0.9779
+      "tm_score": 0.7982,
+      "within_1": 1.0
      },
-     "disagreements": [
-      "A 20-20 (1): not paired",
-      "A 23-23 (1): not paired",
-      "A 120-120 (1): not paired"
-     ],
+     "disagreements": [],
      "limits": {
       "applies": true,
       "pairs": true,
@@ -2966,7 +4285,7 @@
      "rows": {
       "foldmap": [
        "VLSEGEWQLVLHVWAKVEADVAGHGQDILIRLFKSHPETLEKFDRFKHLKTEAEMKASEDLKKHGVTVLTALGAILKKKGHHEAELKPLAQSHATKHKIPIKYLEFISEAIIHVLHSRHPGDFGADAQGAMNKALELFRKDIAAKYKELGYQG",
-       "-LSADQISTVQASFDKVKG----DPVGILYAVFKADPSIMAKFTQFAGKDLE-SIKGTAPFETHANRIVGFFSKIIGELPNIEADVNTFVASHKP-RGVTHDQLNNFRAGFVSYMKAHT---DFAGAEAAWGATLDTFFGMIFSKM-------"
+       "-LSADQISTVQASFDKVK-G--D-PVGILYAVFKADPSIMAKFTQFAGKDLE-SIKGTAPFETHANRIVGFFSKIIGELPNIEADVNTFVASHKP-RGVTHDQLNNFRAGFVSYMKAHTD--FA-GAEAAWGATLDTFFGMIFSKM-------"
       ],
       "usalign": [
        "VLSEGEWQLVLHVWAKVEADVAGHGQDILIRLFKSHPETLEKFDRFKHLKTEAEMKASEDLKKHGVTVLTALGAILKKKGHHEAELKPLAQSHATKHKIPIKYLEFISEAIIHVLHSRHPGDFGADAQGAMNKALELFRKDIAAKYKELGYQG",
@@ -2975,10 +4294,10 @@
      },
      "structure": {
       "aligned": 136,
-      "rmsd": 1.648,
-      "tm_score": 0.7954
+      "rmsd": 1.6103,
+      "tm_score": 0.7982
      },
-     "tm_difference": -0.0028,
+     "tm_difference": 0.0,
      "usalign": {
       "aligned": 136,
       "aligned_reported": 136,
@@ -2992,42 +4311,77 @@
     }
    },
    {
-    "aligned": 80,
-    "extras": 4,
-    "identity": 0.075,
+    "aligned": 77,
+    "extras": 5,
+    "identity": 0.0649,
     "kind": "negative",
     "length_a": 107,
     "length_b": 152,
-    "mates": 7,
+    "mates": 6,
     "method": "structure",
-    "only_a": 4,
+    "only_a": 5,
     "pair": "1REI_A-1TNF_A",
     "pieces": 0,
-    "rmsd": 4.8072,
+    "rmsd": 4.3926,
     "same_fold": false,
-    "tm_score": 0.4045,
+    "source_stamp": {
+     "checkout_fingerprint": "7879eea05bd9301c",
+     "code_fingerprint": "7879eea05bd9301c",
+     "foldmap": "0.2.0",
+     "git": {
+      "commit": "55e1a78e9d594601040decb04af43f321622d3d9",
+      "dirty": false,
+      "source": "asserted by runner"
+     },
+     "installed_matches_checkout": true,
+     "package": "checkout",
+     "packages": {
+      "PyYAML": "6.0.3",
+      "gemmi": "0.7.5",
+      "matplotlib": "3.11.2",
+      "networkx": "3.7",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1"
+     },
+     "platform": {
+      "machine": "x86_64",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43"
+     },
+     "python": {
+      "implementation": "CPython",
+      "version": "3.13.13"
+     },
+     "script": {
+      "name": "scripts/homologues.py",
+      "sha256": "61e02d7fc4adfff81058b1975974aa1f447a37029f358bb9e66a9c6c2ca7555f"
+     }
+    },
+    "tm_score": 0.4192,
     "usalign": {
      "agreement": {
       "close_within_1": 0.8036,
-      "exact": 0.3735,
-      "foldmap_pairs_in_usalign": 0.775,
-      "within_1": 0.747
+      "exact": 0.2892,
+      "foldmap_pairs_in_usalign": 0.7922,
+      "within_1": 0.7349
      },
      "auto": {
       "method": "structure",
-      "tm_score": 0.4045,
-      "within_1": 0.747
+      "tm_score": 0.4192,
+      "within_1": 0.7349
      },
      "disagreements": [
-      "A 8-8 (1): not paired",
-      "A 9-12 (4): B shifted +12",
+      "A 7-7 (1): B shifted +5",
+      "A 10-10 (1): B shifted +4",
+      "A 11-12 (2): B shifted +12",
       "A 16-17 (2): not paired",
-      "A 29-29 (1): not paired",
+      "A 26-26 (1): not paired",
+      "A 27-28 (2): B shifted -2",
+      "A 29-29 (1): B shifted -9",
       "A 41-41 (1): not paired",
       "A 70-75 (6): B shifted +2",
       "A 76-76 (1): not paired",
-      "A 78-78 (1): not paired",
-      "A 82-83 (2): B shifted +2",
+      "A 79-79 (1): not paired",
+      "A 92-92 (1): not paired",
       "A 106-107 (2): not paired"
      ],
      "limits": {
@@ -3038,8 +4392,8 @@
      },
      "rows": {
       "foldmap": [
-       "------------------DIQMTQSP-----------------SSLSASVGDRVTITCQASQDI---------IKYLNWYQQTPG-KAPKLLIYEASNLQAGVPSRFSGSG------------------SGTDYTFTISSLQPEDIATYYCQQYQSLPYTF--------GQGTKLQIT-",
-       "RTPSDKPVAHVVANPQAEGQLQWLN-RRANALLANGVELRDNQLVVPSEG--LYLIYSQVLFK-GQGCPSTHVLLTHTISRIAV-SYQTKVNLLSAI--------------KSPCQRETPEGAEAKPWYEPIYLGGVF---QLEKGDRLSAEINRPDY---LLFAESGQVYFGIIA--L"
+       "------------------DIQMTQ-----SPS---S--------LSASVGDRVTITCQASQDI---------IKYLNWYQQTPG-KAPKLLIYEASNLQAGVPSRFSGSG------------------SGTDYTFTISSLQPEDI--ATYYCQQYQSLPYTF----------GQGTKLQIT-",
+       "RTPSDKPVAHVVANPQAEGQLQWLNRRANALLANGVELRDNQLVVPSEG--LYLIYSQV-LFKGQGCPSTHVLLTHTISRIAV-SYQTKVNLLSAI--------------KSPCQRETPEGAEAKPWYEPIYLGGVF--Q---LEKGDRLSAEIN-RPD---YLLFAESGQVYFGI-IA--L"
       ],
       "usalign": [
        "-----------------DIQMTQ-S----PSSLS------------ASVGDRVTITCQASQD-------IIKYLNWYQQTPG-KAPKLLIYEASNLQAGVPSRFSGSG----------------SGTDYTFTISSLQPEDI--ATYYCQQYQSLPYTF---------GQGTKLQIT",
@@ -3047,11 +4401,11 @@
       ]
      },
      "structure": {
-      "aligned": 80,
-      "rmsd": 4.8072,
-      "tm_score": 0.4045
+      "aligned": 77,
+      "rmsd": 4.3926,
+      "tm_score": 0.4192
      },
-     "tm_difference": -0.0097,
+     "tm_difference": 0.0049,
      "usalign": {
       "aligned": 83,
       "aligned_reported": 83,
@@ -3078,6 +4432,38 @@
     "pieces": 0,
     "rmsd": 1.1329,
     "same_fold": true,
+    "source_stamp": {
+     "checkout_fingerprint": "7879eea05bd9301c",
+     "code_fingerprint": "7879eea05bd9301c",
+     "foldmap": "0.2.0",
+     "git": {
+      "commit": "55e1a78e9d594601040decb04af43f321622d3d9",
+      "dirty": false,
+      "source": "asserted by runner"
+     },
+     "installed_matches_checkout": true,
+     "package": "checkout",
+     "packages": {
+      "PyYAML": "6.0.3",
+      "gemmi": "0.7.5",
+      "matplotlib": "3.11.2",
+      "networkx": "3.7",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1"
+     },
+     "platform": {
+      "machine": "x86_64",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43"
+     },
+     "python": {
+      "implementation": "CPython",
+      "version": "3.13.13"
+     },
+     "script": {
+      "name": "scripts/homologues.py",
+      "sha256": "61e02d7fc4adfff81058b1975974aa1f447a37029f358bb9e66a9c6c2ca7555f"
+     }
+    },
     "tm_score": 0.8431,
     "usalign": {
      "agreement": {
@@ -3127,60 +4513,92 @@
     }
    },
    {
-    "aligned": 164,
-    "extras": 5,
-    "identity": 0.0915,
+    "aligned": 163,
+    "extras": 4,
+    "identity": 0.0798,
     "kind": "negative",
     "length_a": 247,
     "length_b": 253,
-    "mates": 14,
+    "mates": 15,
     "method": "structure",
-    "only_a": 7,
+    "only_a": 6,
     "pair": "1TIM_A-1HDC_A",
     "pieces": 0,
-    "rmsd": 6.0377,
+    "rmsd": 5.7329,
     "same_fold": false,
-    "tm_score": 0.3866,
+    "source_stamp": {
+     "checkout_fingerprint": "7879eea05bd9301c",
+     "code_fingerprint": "7879eea05bd9301c",
+     "foldmap": "0.2.0",
+     "git": {
+      "commit": "55e1a78e9d594601040decb04af43f321622d3d9",
+      "dirty": false,
+      "source": "asserted by runner"
+     },
+     "installed_matches_checkout": true,
+     "package": "checkout",
+     "packages": {
+      "PyYAML": "6.0.3",
+      "gemmi": "0.7.5",
+      "matplotlib": "3.11.2",
+      "networkx": "3.7",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1"
+     },
+     "platform": {
+      "machine": "x86_64",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43"
+     },
+     "python": {
+      "implementation": "CPython",
+      "version": "3.13.13"
+     },
+     "script": {
+      "name": "scripts/homologues.py",
+      "sha256": "61e02d7fc4adfff81058b1975974aa1f447a37029f358bb9e66a9c6c2ca7555f"
+     }
+    },
+    "tm_score": 0.3991,
     "usalign": {
      "agreement": {
       "close_within_1": 0.5495,
-      "exact": 0.1706,
-      "foldmap_pairs_in_usalign": 0.5854,
-      "within_1": 0.5647
+      "exact": 0.1824,
+      "foldmap_pairs_in_usalign": 0.6012,
+      "within_1": 0.5765
      },
      "auto": {
       "method": "structure",
-      "tm_score": 0.3866,
-      "within_1": 0.5647
+      "tm_score": 0.3991,
+      "within_1": 0.5765
      },
      "disagreements": [
-      "A 5-7 (3): B shifted +2",
+      "A 2-2 (1): not paired",
       "A 9-9 (1): B shifted -2",
-      "A 10-14 (5): B shifted -3",
+      "A 10-11 (2): B shifted -3",
+      "A 12-14 (3): B shifted -2",
       "A 21-21 (1): not paired",
-      "A 28-28 (1): B shifted +2",
-      "A 29-29 (1): not paired",
-      "A 34-34 (1): not paired",
-      "A 46-46 (1): B shifted +3",
       "A 48-48 (1): not paired",
       "A 52-52 (1): not paired",
-      "A 57-57 (1): not paired",
-      "A 59-59 (1): not paired",
+      "A 56-57 (2): not paired",
       "A 68-69 (2): not paired",
       "A 72-72 (1): not paired",
       "A 90-90 (1): B shifted -2",
-      "A 99-99 (1): B shifted +16",
-      "A 100-100 (1): B shifted +6",
-      "A 101-102 (2): B shifted +4",
-      "A 103-120 (18): B shifted +3",
+      "A 100-100 (1): B shifted +4",
+      "A 101-102 (2): B shifted +3",
+      "A 103-105 (3): B shifted +2",
+      "A 106-120 (15): B shifted +3",
       "A 132-137 (6): B shifted -2",
-      "A 138-138 (1): B shifted +4",
-      "A 139-154 (16): B shifted +3",
-      "A 170-171 (2): B shifted -4",
-      "A 175-175 (1): B shifted +3",
-      "A 182-182 (1): not paired",
-      "A 185-185 (1): not paired",
-      "A 220-220 (1): not paired",
+      "A 138-138 (1): B shifted +3",
+      "A 139-139 (1): B shifted +2",
+      "A 140-140 (1): not paired",
+      "A 141-142 (2): B shifted +2",
+      "A 143-154 (12): B shifted +3",
+      "A 170-170 (1): B shifted -4",
+      "A 174-175 (2): B shifted +7",
+      "A 176-178 (3): B shifted +5",
+      "A 179-180 (2): not paired",
+      "A 181-182 (2): B shifted +5",
+      "A 185-185 (1): B shifted +3",
       "A 223-223 (1): not paired"
      ],
      "limits": {
@@ -3191,8 +4609,8 @@
      },
      "rows": {
       "foldmap": [
-       "APRKFFV-GGNWKMNGKRKSLGE-------LIH-TLDGAKLSADTEVVCGAPS-----IYLD--FAR-QKLDAKIGVAAQNCYKVPKG--AFTGEISPAMIKDIGAAW-VILGHSER-----------------RHVFGESDELIGQKVAHALAEG-LGVIACIGEKLDEREAG------ITEKVVFQETKAIADNVKDWSKVVLAYEPVWAIG-----TGK---------TATPQQAQEVHEKLRGWLKTHVS----------------DAVAVQ-SRIIYGGSVTGGNCKELASQHDVDGFLVGGASLKPEFVDIINAKH--------------",
-       "NDLSGK-TVIITGGAR-------GLGAEAARQ-AVA--------AGARVVLADVLDEEGA--ATAR-ELGDA---ARYQHLDV-----TIEEDWQRVVAYAREEFGSVDGLVNNAGISTGMFLETESVERFRKVVEINLTGVFIGMKTVIPAMKDAGGGSIVNISSAAGLMGLALTSSYGASKWGVRGLSKLAAVELGTDRIRVNSVHPGMTYTPMTAETGIRQGEGNYPNTPMGRVG----------------EPGEIAGAVVKLLSDTSSYVT-GAELAVDG--------------------------------------GWTTGPTVKYVMGQ"
+       "APRKFFV--GGN-WKMNGKRKSLGE------LIHT-LDGAKLSADTEVVCGAPS--I---YLD--FAR-QKLDAKIGVAAQNCYKVPKG--AFTGE-ISPAMIKDIGAAW-VILGHSERR---------------H-VFGES-DELIGQKVAHALAEG-LGVIACIGEKLDEREAG-----ITE-KV-VFQETKAIADNVKDWSKVVLAYEPVWAI---G--T-G------K------TATPQQ--AQEV--HEKL---RGWLKTHVS----DAVAVQSRIIYGGSVTGGNCKELASQHDVDGFLVGGASLKPEFVDIINAKH--------------",
+       "--NDLSGKTVIITGGAR--------GLGAEAAR--QAV----A--AGARVVLADVLDEEGA--ATAR-ELGD---AARYQHLDV-----TIEE-DWQRVVAYAREEFGSVDGLVNNAGISTGMFLETESVERFRKVVEINLTGVFIGMKTVIPAMKDAGGGSIVNISSAAGLMGLALTSSYGA-SKWGVRGLSKLAAVELGTDRIRVNSVHPGMTYTPMTAETGIRQGEGNYPNTPMGRVGE--PGEI--AGA---VVKL--------LSDTSSYVT-GAELAVD---------G----------------------------GWTTGPTVKYVMGQ"
       ],
       "usalign": [
        "APRKFFV-----G-GNWKMNGKRKS--LGE--LIHT-LDGAKLSADTEVVCGAPS--I--YLD-FARQKLDAKIGVAAQNCYKVPKGAFTGEISPAMIKDIG-AA-WVILGHSERR----------H--VF-GESDELIGQKVAHALAEG-----LGVIACIGEKL-DEREAGI-TEKVVFQETKAIADNV--KD--WSKVVLAYEPVWA---IG-TGK------T--ATPQQAQEV----HEKLRGWLKTHVS------------DAVAVQSRIIYGGSVTGGNCKELASQHDVDGFLVGGASLKPEFVDIINAKH-------------",
@@ -3200,11 +4618,11 @@
       ]
      },
      "structure": {
-      "aligned": 164,
-      "rmsd": 6.0377,
-      "tm_score": 0.3866
+      "aligned": 163,
+      "rmsd": 5.7329,
+      "tm_score": 0.3991
      },
-     "tm_difference": -0.0242,
+     "tm_difference": -0.0117,
      "usalign": {
       "aligned": 170,
       "aligned_reported": 170,
@@ -3218,9 +4636,9 @@
     }
    },
    {
-    "aligned": 197,
+    "aligned": 190,
     "extras": 2,
-    "identity": 0.0863,
+    "identity": 0.1158,
     "kind": "positive",
     "length_a": 247,
     "length_b": 247,
@@ -3229,45 +4647,69 @@
     "only_a": 3,
     "pair": "1TIM_A-1IGS_A",
     "pieces": 0,
-    "rmsd": 3.8718,
+    "rmsd": 3.325,
     "same_fold": true,
-    "tm_score": 0.6045,
+    "source_stamp": {
+     "checkout_fingerprint": "7879eea05bd9301c",
+     "code_fingerprint": "7879eea05bd9301c",
+     "foldmap": "0.2.0",
+     "git": {
+      "commit": "55e1a78e9d594601040decb04af43f321622d3d9",
+      "dirty": false,
+      "source": "asserted by runner"
+     },
+     "installed_matches_checkout": true,
+     "package": "checkout",
+     "packages": {
+      "PyYAML": "6.0.3",
+      "gemmi": "0.7.5",
+      "matplotlib": "3.11.2",
+      "networkx": "3.7",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1"
+     },
+     "platform": {
+      "machine": "x86_64",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43"
+     },
+     "python": {
+      "implementation": "CPython",
+      "version": "3.13.13"
+     },
+     "script": {
+      "name": "scripts/homologues.py",
+      "sha256": "61e02d7fc4adfff81058b1975974aa1f447a37029f358bb9e66a9c6c2ca7555f"
+     }
+    },
+    "tm_score": 0.6195,
     "usalign": {
      "agreement": {
-      "close_within_1": 0.8204,
-      "exact": 0.6283,
-      "foldmap_pairs_in_usalign": 0.7716,
-      "within_1": 0.7958
+      "close_within_1": 0.988,
+      "exact": 0.9738,
+      "foldmap_pairs_in_usalign": 0.9789,
+      "within_1": 0.9738
      },
      "auto": {
       "method": "structure",
-      "tm_score": 0.6045,
-      "within_1": 0.7958
+      "tm_score": 0.6195,
+      "within_1": 0.9738
      },
      "disagreements": [
-      "A 16-16 (1): B shifted -4",
-      "A 17-19 (3): not paired",
-      "A 20-29 (10): B shifted -4",
-      "A 32-34 (3): B shifted -2",
-      "A 45-45 (1): B shifted -7",
-      "A 46-54 (9): B shifted -3",
-      "A 99-99 (1): not paired",
-      "A 140-140 (1): not paired",
-      "A 154-154 (1): not paired",
-      "A 201-202 (2): not paired",
-      "A 240-240 (1): not paired",
-      "A 241-246 (6): B shifted -2"
+      "A 1-1 (1): not paired",
+      "A 2-4 (2): B shifted -2",
+      "A 32-32 (1): not paired",
+      "A 56-56 (1): not paired"
      ],
      "limits": {
       "applies": true,
-      "pairs": false,
+      "pairs": true,
       "tm": true,
-      "verdict": "miss"
+      "verdict": "pass"
      },
      "rows": {
       "foldmap": [
-       "------------------------------------APRK-----FFVGGNWKMNGKRK---SLGELIHTLDGAKLSADTEVVCGAPS----IYLDFARQK--LDAKIGVAAQNCYKVPKGAFTGEISPAMIKDIGAAWVILGHSERRHVFGESDELIGQKVAHALAEGLGVIACIGEKLDEREAGITEKVVFQETKAIADNVKDWSKVVLAYEPVWAIGTGKTATPQQAQEVHEKLRGWLKTHVSDAVAVQSRIIYGGSVTGGNCKELASQHDVDGFLVGGASLKPEFVDIINAKH",
-       "PRYLKGWLKDVVQLSLRRPSFRASRQRPIISLNERILEFNKRNITAIIAEYKRKSP---SGLDVERDPIEYSKFMERYAVGLSILTEEKYFNGSYETLRKIASSVSIPILMKDFIVKE--------SQIDDAYNLGADTVLLIVK------ILTERELESLLEYARSYGMEPLIEIND-----------ENDLDIALRIGA-------RFIGINSRDLETLEINKE--NQRKLISMIPS------------NVVKVAESGISERNEIEELRKLGVNAFLIGSSLMRNP-EKIKEFIL"
+       "A-----------------------------------PR--K----FFVGGNWKMN-----GKRKSLGELIHTLDGAKLSADTEVVCGAP--------SIYLDFARQKLDAKIGVAAQN-CYKVPKGAFTGEISPAMIKDIGAAWVILGHSERRHVFGESDELIGQKVAHALAEGLGVIACIGEKLDEREAGITEKVVFQETKAIADNVKDWSKVVLAYEPVWA-IGTGKTATPQQAQEVHEKLRGWLKTHVSDAVAVQSRIIYGGSVTGGNCKELASQHDVDGFLVGGASL-KPEFVDIINAKH",
+       "-PRYLKGWLKDVVQLSLRRPSFRASRQRPIISLNERILEFNKRNITAIIAEYKRKSPSGLDVERDPIEYSKFME-R-YA---VGLSILTEEKYFNGSYETLRKIASSV-S-IPILMKDFIVKE--------SQIDDAYNLGADTVLLIV---K---ILTERELESLLEYARSYGMEPLIEIND----------E-NDLDIALRIG--A-----RFIGINSRDLETLEIN-KE--NQRKLISMIP-----------SN-VVKVAESGISERNEIEELRKLGVNAFLIGSSLMRNPEKIKEFIL--"
       ],
       "usalign": [
        "------------------------------------APRK----FFVGGNWKMN-----GKRKSLGELIHTLDGAKLSADTEVVCGAP--------SIYLDFARQKLDAKIGVAAQN-CYKVPKGAFTGEISPAMIKDIGAAWVILGHSERRHVFGESDELIGQKVAHALAEGLGVIACIGEKLDEREAGITEKVVFQETKAIADNVKDWSKVVLAYEPVWA-IGTGKTATPQQAQEVHEKLRGWLKTHVSDAVAVQSRIIYGGSVTGGNCKELASQHDVDGFLVGGASL-KPEFVDIINAKH",
@@ -3275,11 +4717,11 @@
       ]
      },
      "structure": {
-      "aligned": 197,
-      "rmsd": 3.8718,
-      "tm_score": 0.6045
+      "aligned": 190,
+      "rmsd": 3.325,
+      "tm_score": 0.6195
      },
-     "tm_difference": -0.0158,
+     "tm_difference": -0.0008,
      "usalign": {
       "aligned": 191,
       "aligned_reported": 191,
@@ -3306,6 +4748,38 @@
     "pieces": 0,
     "rmsd": 1.3169,
     "same_fold": true,
+    "source_stamp": {
+     "checkout_fingerprint": "7879eea05bd9301c",
+     "code_fingerprint": "7879eea05bd9301c",
+     "foldmap": "0.2.0",
+     "git": {
+      "commit": "55e1a78e9d594601040decb04af43f321622d3d9",
+      "dirty": false,
+      "source": "asserted by runner"
+     },
+     "installed_matches_checkout": true,
+     "package": "checkout",
+     "packages": {
+      "PyYAML": "6.0.3",
+      "gemmi": "0.7.5",
+      "matplotlib": "3.11.2",
+      "networkx": "3.7",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1"
+     },
+     "platform": {
+      "machine": "x86_64",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43"
+     },
+     "python": {
+      "implementation": "CPython",
+      "version": "3.13.13"
+     },
+     "script": {
+      "name": "scripts/homologues.py",
+      "sha256": "61e02d7fc4adfff81058b1975974aa1f447a37029f358bb9e66a9c6c2ca7555f"
+     }
+    },
     "tm_score": 0.8044,
     "usalign": {
      "agreement": {
@@ -3355,20 +4829,52 @@
     }
    },
    {
-    "aligned": 50,
-    "extras": 3,
-    "identity": 0.1,
+    "aligned": 49,
+    "extras": 4,
+    "identity": 0.0204,
     "kind": "negative",
     "length_a": 76,
     "length_b": 98,
-    "mates": 4,
+    "mates": 3,
     "method": "structure",
-    "only_a": 4,
+    "only_a": 5,
     "pair": "1UBQ_A-2ACY_A",
     "pieces": 0,
-    "rmsd": 4.0447,
+    "rmsd": 3.6704,
     "same_fold": false,
-    "tm_score": 0.3369,
+    "source_stamp": {
+     "checkout_fingerprint": "7879eea05bd9301c",
+     "code_fingerprint": "7879eea05bd9301c",
+     "foldmap": "0.2.0",
+     "git": {
+      "commit": "55e1a78e9d594601040decb04af43f321622d3d9",
+      "dirty": false,
+      "source": "asserted by runner"
+     },
+     "installed_matches_checkout": true,
+     "package": "checkout",
+     "packages": {
+      "PyYAML": "6.0.3",
+      "gemmi": "0.7.5",
+      "matplotlib": "3.11.2",
+      "networkx": "3.7",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1"
+     },
+     "platform": {
+      "machine": "x86_64",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43"
+     },
+     "python": {
+      "implementation": "CPython",
+      "version": "3.13.13"
+     },
+     "script": {
+      "name": "scripts/homologues.py",
+      "sha256": "61e02d7fc4adfff81058b1975974aa1f447a37029f358bb9e66a9c6c2ca7555f"
+     }
+    },
+    "tm_score": 0.3529,
     "usalign": {
      "agreement": {
       "close_within_1": 0.0,
@@ -3378,20 +4884,22 @@
      },
      "auto": {
       "method": "structure",
-      "tm_score": 0.3369,
+      "tm_score": 0.3529,
       "within_1": 0.0
      },
      "disagreements": [
-      "A 9-12 (4): B shifted +38",
-      "A 18-19 (2): B shifted +37",
-      "A 20-32 (13): B shifted +35",
+      "A 9-9 (1): B shifted +9",
+      "A 10-10 (1): not paired",
+      "A 11-12 (2): B shifted +9",
+      "A 18-19 (2): B shifted +18",
+      "A 20-21 (2): B shifted +33",
+      "A 22-32 (11): B shifted +35",
       "A 34-36 (3): B shifted +42",
-      "A 40-40 (1): not paired",
-      "A 41-43 (3): B shifted +42",
+      "A 40-43 (4): B shifted +42",
       "A 50-50 (1): B shifted +43",
-      "A 54-54 (1): B shifted +44",
-      "A 55-55 (1): not paired",
-      "A 57-61 (5): B shifted +44",
+      "A 54-55 (2): B shifted +44",
+      "A 57-57 (1): not paired",
+      "A 58-61 (4): B shifted +43",
       "A 62-66 (5): B shifted +17",
       "A 67-68 (2): not paired",
       "A 70-74 (5): not paired"
@@ -3404,8 +4912,8 @@
      },
      "rows": {
       "foldmap": [
-       "-------------------------MQ----------IFVKTLTGKTITLEV----EPSDTIENVKAKIQDK------EGIPPDQQRLIFAGKQLEDGRTL--SDYNIQKESTLHLVLRLRGG-",
-       "AEGDTLISVDYEIFGKVQGVFFRKYTQAEGKKLGLVGWVQNTDQGTVQ----GQLQGPASKVRHMQEWLETKGSPKSHIDRA---SFH-----NEK--V--IVKLDYTDFQIV----------K"
+       "MQIF----------VKTLTG-KT---IT--L--EV---EP-----------------SD--TIENVKAKIQD-K-----EGIPPDQQRLIFAGKQLEDGRTLS-DYNI-QKESTLHLVLRLRGG-",
+       "----AEGDTLISVDYEIFG-KVQGVFFRKYTQAEGKKLGLVGWVQNTDQGTVQGQLQGPASKVRHMQEWLETKGSPKSHIDR---ASFH-----NEK--VI--VKLDYTDFQIV----------K"
       ],
       "usalign": [
        "MQIFVKTL-----TGKTITLEV------EP--SDTIENVKAKIQDKEGIPPDQQRLIFAGKQLEDGRTL-SDYNI---------------------------QKESTLHL------VLRLRGG-----",
@@ -3413,11 +4921,11 @@
       ]
      },
      "structure": {
-      "aligned": 50,
-      "rmsd": 4.0447,
-      "tm_score": 0.3369
+      "aligned": 49,
+      "rmsd": 3.6704,
+      "tm_score": 0.3529
      },
-     "tm_difference": 0.0153,
+     "tm_difference": 0.0313,
      "usalign": {
       "aligned": 46,
       "aligned_reported": 46,
@@ -3431,9 +4939,9 @@
     }
    },
    {
-    "aligned": 74,
-    "extras": 5,
-    "identity": 0.0811,
+    "aligned": 72,
+    "extras": 4,
+    "identity": 0.0556,
     "kind": "negative",
     "length_a": 106,
     "length_b": 153,
@@ -3441,30 +4949,60 @@
     "method": "structure",
     "only_a": 3,
     "pair": "256B_A-1MBN_A",
-    "pieces": 1,
-    "rmsd": 4.4667,
+    "pieces": 2,
+    "rmsd": 4.0368,
     "same_fold": false,
-    "tm_score": 0.4172,
+    "source_stamp": {
+     "checkout_fingerprint": "7879eea05bd9301c",
+     "code_fingerprint": "7879eea05bd9301c",
+     "foldmap": "0.2.0",
+     "git": {
+      "commit": "55e1a78e9d594601040decb04af43f321622d3d9",
+      "dirty": false,
+      "source": "asserted by runner"
+     },
+     "installed_matches_checkout": true,
+     "package": "checkout",
+     "packages": {
+      "PyYAML": "6.0.3",
+      "gemmi": "0.7.5",
+      "matplotlib": "3.11.2",
+      "networkx": "3.7",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1"
+     },
+     "platform": {
+      "machine": "x86_64",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43"
+     },
+     "python": {
+      "implementation": "CPython",
+      "version": "3.13.13"
+     },
+     "script": {
+      "name": "scripts/homologues.py",
+      "sha256": "61e02d7fc4adfff81058b1975974aa1f447a37029f358bb9e66a9c6c2ca7555f"
+     }
+    },
+    "tm_score": 0.4353,
     "usalign": {
      "agreement": {
       "close_within_1": 0.9444,
-      "exact": 0.5946,
-      "foldmap_pairs_in_usalign": 0.8784,
+      "exact": 0.8514,
+      "foldmap_pairs_in_usalign": 0.9028,
       "within_1": 0.8784
      },
      "auto": {
       "method": "structure",
-      "tm_score": 0.4172,
+      "tm_score": 0.4353,
       "within_1": 0.8784
      },
      "disagreements": [
-      "A 12-13 (2): not paired",
-      "A 14-14 (1): B shifted -18",
-      "A 15-16 (2): not paired",
-      "A 17-17 (1): B shifted -5",
-      "A 20-20 (1): not paired",
-      "A 23-23 (1): not paired",
-      "A 46-46 (1): B shifted -2"
+      "A 1-1 (1): not paired",
+      "A 2-6 (5): B shifted -4",
+      "A 7-7 (1): B shifted -35",
+      "A 30-30 (1): not paired",
+      "A 55-55 (1): not paired"
      ],
      "limits": {
       "applies": false,
@@ -3474,8 +5012,8 @@
      },
      "rows": {
       "foldmap": [
-       "-------------------------ADLEDN--------------------------------METLNDN--LKV---------------IEKA-DNA-AQVKDALTKMRAAALDAQKATPPK-LEDKSPDSPEMKDFRHGFDILVGQIDDALKLANEGKVKEAQAAAEQLKTTRNAYHQKYR--",
-       "VLSEGEWQLVLHVWAKVEADVAGHGQDILIRLFKSHPETLEKFDRFKHLKTEAEMKASEDLKKHGVTV--LTA--LGAILKKKGHHEAELKPL-AQS-HATKHKIPIKYLEFISEAIIHVLH-SRHPGDFGADAQGAMNKALELFRKDIAAKYKELGY-------------------------QG"
+       "A----------------------DLED-NM-----------------------------------ETLN--D----------------NLKVIEKADNAAQVKDALTK-MR-AAALDAQKATP-PKLEDKSPDSPEMKDFRHGFDILVGQIDDALKLANEGKVKEAQAAAEQLKTTRNAYHQKYR--",
+       "-VLSEGEWQLVLHVWAKVEADVAGHGQDILIRLFKSHPETLEKFDRFKHLKTEAEMKASEDLKKHGVTVLTALGAILKKKGHHEAELKPLAQS--H--ATKH-KI-PIKYLEFISEAIIHVLHSR-HPGDFGA-DAQGAMNKALELFRKDIAAKYKELGY-------------------------QG"
       ],
       "usalign": [
        "-------------------------ADLED-N-------------------------------METLN--D----------------NLKVIEKADNAAQVKDALTKMR-AAALDAQKATP-PKLEDKSPDSPEMKDFRHGFDILVGQIDDALKLANEGKVKEAQAAAEQLKTTRNAYHQKYR--",
@@ -3483,11 +5021,11 @@
       ]
      },
      "structure": {
-      "aligned": 74,
-      "rmsd": 4.4667,
-      "tm_score": 0.4172
+      "aligned": 72,
+      "rmsd": 4.0368,
+      "tm_score": 0.4353
      },
-     "tm_difference": -0.0178,
+     "tm_difference": 0.0003,
      "usalign": {
       "aligned": 74,
       "aligned_reported": 74,
@@ -3512,24 +5050,57 @@
     "only_a": 1,
     "pair": "2ACY_A-1URN_A",
     "pieces": 0,
-    "rmsd": 3.6109,
+    "rmsd": 3.5417,
     "same_fold": true,
-    "tm_score": 0.5117,
+    "source_stamp": {
+     "checkout_fingerprint": "7879eea05bd9301c",
+     "code_fingerprint": "7879eea05bd9301c",
+     "foldmap": "0.2.0",
+     "git": {
+      "commit": "55e1a78e9d594601040decb04af43f321622d3d9",
+      "dirty": false,
+      "source": "asserted by runner"
+     },
+     "installed_matches_checkout": true,
+     "package": "checkout",
+     "packages": {
+      "PyYAML": "6.0.3",
+      "gemmi": "0.7.5",
+      "matplotlib": "3.11.2",
+      "networkx": "3.7",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1"
+     },
+     "platform": {
+      "machine": "x86_64",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43"
+     },
+     "python": {
+      "implementation": "CPython",
+      "version": "3.13.13"
+     },
+     "script": {
+      "name": "scripts/homologues.py",
+      "sha256": "61e02d7fc4adfff81058b1975974aa1f447a37029f358bb9e66a9c6c2ca7555f"
+     }
+    },
+    "tm_score": 0.5246,
     "usalign": {
      "agreement": {
-      "close_within_1": 1.0,
-      "exact": 0.7407,
-      "foldmap_pairs_in_usalign": 0.9506,
-      "within_1": 0.9506
+      "close_within_1": 0.9722,
+      "exact": 0.7778,
+      "foldmap_pairs_in_usalign": 0.9259,
+      "within_1": 0.9259
      },
      "auto": {
       "method": "structure",
-      "tm_score": 0.5117,
-      "within_1": 0.9506
+      "tm_score": 0.5246,
+      "within_1": 0.9259
      },
      "disagreements": [
-      "A 88-88 (1): not paired",
-      "A 89-90 (2): B shifted +2",
+      "A 15-15 (1): not paired",
+      "A 65-65 (1): not paired",
+      "A 88-90 (3): B shifted +2",
       "A 91-91 (1): not paired"
      ],
      "limits": {
@@ -3540,8 +5111,8 @@
      },
      "rows": {
       "foldmap": [
-       "AEGDTL-------ISVDYEIFGKVQGV--FFRKYTQAEGKKLGLV-GWVQNTDQ--GTVQGQLQGPASKVRHMQEWLETKGSPKSHIDRASFHNEKVI--VK-LDYTDFQIVK",
-       "------AVPETRPNHTIYINNLNEKIKKDELKKSLHAIFSRFGQILDILVSRSLKMRGQAFVIFKEVSSATNALRSMQGFPFYDKPMRIQYAKTDS--DII-AKM--------"
+       "-----AEGDTLISVDYEIFGKVQGV---FFRKYTQAEGKKL-GLVGWVQNTDQ--GTVQGQLQGPASKVRHMQE-WLETKGSPKSHIDRAS-FHNEKVI--VKLDYTDFQIVK",
+       "AVPETRP----NHTIYINN-LNEKIKKDELKKSLHAIFSRFGQILDILVSRSLKMRGQAFVIFKEVSSATNALRSM-QGFPF-YDKPMRIQYAKTDS--DIIAKM--------"
       ],
       "usalign": [
        "AEGDTL-------ISVDYEIFGKVQGV--FFRKYTQAEGKK-LGLVGWVQNTDQ--GTVQGQLQGPASKVRHMQEWLETKGSPKSHIDRASFHNEKVIV--KLDYTDFQIVK-",
@@ -3550,10 +5121,10 @@
      },
      "structure": {
       "aligned": 81,
-      "rmsd": 3.6109,
-      "tm_score": 0.5117
+      "rmsd": 3.5417,
+      "tm_score": 0.5246
      },
-     "tm_difference": -0.0067,
+     "tm_difference": 0.0062,
      "usalign": {
       "aligned": 81,
       "aligned_reported": 81,
@@ -3580,6 +5151,38 @@
     "pieces": 0,
     "rmsd": 1.2699,
     "same_fold": true,
+    "source_stamp": {
+     "checkout_fingerprint": "7879eea05bd9301c",
+     "code_fingerprint": "7879eea05bd9301c",
+     "foldmap": "0.2.0",
+     "git": {
+      "commit": "55e1a78e9d594601040decb04af43f321622d3d9",
+      "dirty": false,
+      "source": "asserted by runner"
+     },
+     "installed_matches_checkout": true,
+     "package": "checkout",
+     "packages": {
+      "PyYAML": "6.0.3",
+      "gemmi": "0.7.5",
+      "matplotlib": "3.11.2",
+      "networkx": "3.7",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1"
+     },
+     "platform": {
+      "machine": "x86_64",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43"
+     },
+     "python": {
+      "implementation": "CPython",
+      "version": "3.13.13"
+     },
+     "script": {
+      "name": "scripts/homologues.py",
+      "sha256": "61e02d7fc4adfff81058b1975974aa1f447a37029f358bb9e66a9c6c2ca7555f"
+     }
+    },
     "tm_score": 0.9782,
     "usalign": {
      "agreement": {
@@ -3629,9 +5232,9 @@
     }
    },
    {
-    "aligned": 379,
+    "aligned": 373,
     "extras": 7,
-    "identity": 0.1319,
+    "identity": 0.126,
     "kind": "positive",
     "length_a": 413,
     "length_b": 424,
@@ -3640,28 +5243,59 @@
     "only_a": 6,
     "pair": "2VWD_A-2ZB5_A",
     "pieces": 0,
-    "rmsd": 4.6663,
+    "rmsd": 4.2769,
     "same_fold": true,
-    "tm_score": 0.7105,
+    "source_stamp": {
+     "checkout_fingerprint": "7879eea05bd9301c",
+     "code_fingerprint": "7879eea05bd9301c",
+     "foldmap": "0.2.0",
+     "git": {
+      "commit": "55e1a78e9d594601040decb04af43f321622d3d9",
+      "dirty": false,
+      "source": "asserted by runner"
+     },
+     "installed_matches_checkout": true,
+     "package": "checkout",
+     "packages": {
+      "PyYAML": "6.0.3",
+      "gemmi": "0.7.5",
+      "matplotlib": "3.11.2",
+      "networkx": "3.7",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1"
+     },
+     "platform": {
+      "machine": "x86_64",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43"
+     },
+     "python": {
+      "implementation": "CPython",
+      "version": "3.13.13"
+     },
+     "script": {
+      "name": "scripts/homologues.py",
+      "sha256": "61e02d7fc4adfff81058b1975974aa1f447a37029f358bb9e66a9c6c2ca7555f"
+     }
+    },
+    "tm_score": 0.7233,
     "usalign": {
      "agreement": {
-      "close_within_1": 0.9633,
-      "exact": 0.8218,
-      "foldmap_pairs_in_usalign": 0.9446,
-      "within_1": 0.9521
+      "close_within_1": 0.9933,
+      "exact": 0.9335,
+      "foldmap_pairs_in_usalign": 0.9946,
+      "within_1": 0.9867
      },
      "auto": {
       "method": "structure",
-      "tm_score": 0.7105,
-      "within_1": 0.9521
+      "tm_score": 0.7233,
+      "within_1": 0.9867
      },
      "disagreements": [
-      "A 188-188 (1): not paired",
-      "A 302-302 (1): not paired",
-      "A 303-303 (1): B shifted +4",
-      "A 304-308 (5): not paired",
-      "A 379-387 (9): B shifted -2",
-      "A 556-556 (1): B shifted -2"
+      "A 305-305 (1): not paired",
+      "A 468-468 (1): not paired",
+      "A 473-473 (1): B shifted -2",
+      "A 556-556 (1): B shifted -2",
+      "A 567-567 (1): not paired"
      ],
      "limits": {
       "applies": true,
@@ -3671,8 +5305,8 @@
      },
      "rows": {
       "foldmap": [
-       "NI---------------CLQKTSNQILKPKLIS--TLPVVGQSGTCITDPLLAMDEGYFAYSHLERIGSC-GVSKQRIIGVGEVLDRGDEVPSLFMTNVWTPPNPNTVYHCSAVYNNEFYYVLCAVSTVGD-PILNST-----YWSGSLMMTRLAVKPKSNGGGYNQHQLALRSIEKGRYDKVMPYGPSGIKQGDTLYFPAVGFLVRTEFKYNDSNCPITKCQYSKPENCRLSMGIRPNSHYILRSGLLKYNLSDGENPKVVFIEISDQRLSIGSPSKIYDSLG--QPVFYQASFSWDTMIKFGDVLTV-NPLVVNWRNNTVISRPGQSQCPR------------FNTCPEICW---EGVYNDAFLIDRINWISAGVFLDSNQTA-ENPVFTVFKDNEILYRAQLASEDT--NAQKTITNCFLLKNKIWCISLVEIYDTGDNVIRPKLFAVKIPEQCT",
-       "--CADVAAEELMNALVNNCSGPTTIRGQFSNMSLSLLDLYLGRGYNVSSIVTMTSQGMYGGTYLVEKP--NQLSMYRVFEVGVIRNPGLGAPVFHMTNYLEQPVSNDLSNCMVALGELKLAALCHGEDSI-TI-----PYQGSGKGVSFQLVKLGVWKS----PTDMQSWVPLSTDDPVIDRLYLSSHRGVIADNQAKWAVPTTRTDDKLRMETCFQQACKGKIQA--LCENPEWAPLKDNRIPSYGVLSVDLSLTVELKIKIASGFGPLITHGSGMDLYKSNHNNVYWLTIPPMKNLALGVINTLEWIPRFKVSPYLFTV------------PIKEAGGDCHAPTYLP-----DGDVKLSSNLVILPGQDLQYVLATYDTSRV-EHAVVYYVYSPSRSFSYFYPFRLPIKGVPIELQVECFTWDQKLWCRHFCVLADSESGGHITHSGMVGMGVSCT"
+       "N---------------ICLQKTSNQILKPKLIS-TL--PVVGQSGTCITDPLLAMDEGYFAYSHLERIGSC-GVSKQRIIGVGEVLDRGDEVPSLFMTNVWTPPNPNTVYHCSAVYNNEFYYVLCAVSTVGDPILNST-----YWSGSLMMTRLAVKPKSNGGGYNQHQLALRSIEKGRYDKVMPYGPSGIKQGDTLYFPAVGFLVRTEF-KYN-DSNCPITKCQYSKPENCRLSMGIRPNSHYILRSGLLKYNLSDGENPKVVFIEISDQRLSIGSPSKIYDSLG--QPVFYQASFSWDTMIKFGDVLTVN--PLVVNWRNNTVISRPGQSQCPR------------FNTCPEICW---EGVYNDAFLIDRINWISAGVFLDSNQTA-ENPVFTVFKDNEILYRAQLASEDT-N-A-QKTITNCFLLKNKIWCISLVEIYDTGD--NVIRPKLFAVKIPEQCT",
+       "-CADVAAEELMNALVNNCSGPT-TIRGQFSNMSLSLLDLYLGRG-YNVSSIVTMTSQGMYGGTYLVEKP--NQLSMYRVFEVGVIRNPGLGAPVFHMTNYLEQPVSNDLSNCMVALGELKLAALCH-G---EDS-ITIPYQGSGKGVSFQLVKLGVWKS----PTDMQSWVPLSTDDPVIDRLYLSSHRGVIADNQAKWAVPTTRTDDKLRMETCFQQACKGKI--QA--LCENPEWAPLKDNRIPSYGVLSVDLSLTVELKIKIASGFGPLITHGSGMDLYKSNHNNVYWLTIPPMKNLALGVIN-TLEWIPRFKVSPYLFTV------------PIKEAGGDCHAPTYLP-----DGDVKLSSNLVILPGQDLQYVLATYDTSRV-EHAVVYYVYSPSRSFSYFYPFRLPIKGVPIELQVECFT-WD-QKLWCRHFCVLADSESGGHITHSGMVGMGV-SCT"
       ],
       "usalign": [
        "N---------------ICLQKTSNQILKPKLIS-TL--PVVGQSGTCITDPLLAMDEGYFAYSHLERIGSC-GVSKQRIIGVGEVLDRGDEVPSLFMTNVWTPPNPNTVYHCSAVYNNEFYYVLCAVSTVGDPILNST----YWSGSLMMTRLAVKPKSNGGGYNQHQLALRSIEKGRYDKVMPYGPSGIKQGDTLYFPAVGFLVRTEF-KYN-DSNCPITKCQYSKPENCRLSMGIRPNSHYILRSGLLKYNLSDGENPKVVFIEISDQRLSIGSPSKIYDSLG--QPVFYQASFSWDTMIKFGDVLTV-NPLVVNWRNNTVISRPGQSQCPR------------FNTCPEICW---EGVYNDAFLIDRINWISAGVFLDSNQTA-ENPVFTVFKDNEILYRAQL-ASED-TNAQKTITNCFLLKNKIWCISLVEIYDTGD--NVIRPKLFAVKIPEQCT",
@@ -3680,11 +5314,11 @@
       ]
      },
      "structure": {
-      "aligned": 379,
-      "rmsd": 4.6663,
-      "tm_score": 0.7105
+      "aligned": 373,
+      "rmsd": 4.2769,
+      "tm_score": 0.7233
      },
-     "tm_difference": -0.0124,
+     "tm_difference": 0.0005,
      "usalign": {
       "aligned": 376,
       "aligned_reported": 376,
@@ -3698,9 +5332,9 @@
     }
    },
    {
-    "aligned": 379,
+    "aligned": 378,
     "extras": 7,
-    "identity": 0.0923,
+    "identity": 0.1032,
     "kind": "positive",
     "length_a": 424,
     "length_b": 446,
@@ -3709,36 +5343,55 @@
     "only_a": 5,
     "pair": "2ZB5_A-1E8T_A",
     "pieces": 0,
-    "rmsd": 4.8452,
+    "rmsd": 4.6917,
     "same_fold": true,
-    "tm_score": 0.6909,
+    "source_stamp": {
+     "checkout_fingerprint": "7879eea05bd9301c",
+     "code_fingerprint": "7879eea05bd9301c",
+     "foldmap": "0.2.0",
+     "git": {
+      "commit": "55e1a78e9d594601040decb04af43f321622d3d9",
+      "dirty": false,
+      "source": "asserted by runner"
+     },
+     "installed_matches_checkout": true,
+     "package": "checkout",
+     "packages": {
+      "PyYAML": "6.0.3",
+      "gemmi": "0.7.5",
+      "matplotlib": "3.11.2",
+      "networkx": "3.7",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1"
+     },
+     "platform": {
+      "machine": "x86_64",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43"
+     },
+     "python": {
+      "implementation": "CPython",
+      "version": "3.13.13"
+     },
+     "script": {
+      "name": "scripts/homologues.py",
+      "sha256": "61e02d7fc4adfff81058b1975974aa1f447a37029f358bb9e66a9c6c2ca7555f"
+     }
+    },
+    "tm_score": 0.6977,
     "usalign": {
      "agreement": {
       "close_within_1": 1.0,
-      "exact": 0.7731,
-      "foldmap_pairs_in_usalign": 0.9604,
-      "within_1": 0.9604
+      "exact": 0.9789,
+      "foldmap_pairs_in_usalign": 1.0,
+      "within_1": 0.9974
      },
      "auto": {
       "method": "structure",
-      "tm_score": 0.6909,
-      "within_1": 0.9604
+      "tm_score": 0.6977,
+      "within_1": 0.9974
      },
      "disagreements": [
-      "A 187-187 (1): B shifted +4",
-      "A 188-188 (1): B shifted +3",
-      "A 189-189 (1): B shifted +2",
-      "A 190-190 (1): not paired",
-      "A 191-191 (1): B shifted +2",
-      "A 304-305 (2): B shifted -2",
-      "A 306-306 (1): B shifted -4",
-      "A 307-307 (1): not paired",
-      "A 309-309 (1): not paired",
-      "A 313-313 (1): not paired",
-      "A 329-329 (1): not paired",
-      "A 385-385 (1): B shifted -11",
-      "A 421-421 (1): not paired",
-      "A 561-561 (1): not paired"
+      "A 401-401 (1): not paired"
      ],
      "limits": {
       "applies": true,
@@ -3748,8 +5401,8 @@
      },
      "rows": {
       "foldmap": [
-       "CADVAAEELMN-ALVN-----------NCSG-PTTIRGQFSNMSLSLLDLYLGRGYNVSSIVTMTSQGMYGGTYLVEKPNQ-----LSMYRVFEVGVIRNPGLGAPVFHMTNYLEQPVSNDLSNCMVALGELKLAALCHGEDSITIPYQGS-------GKGVSFQLVKLGVWKSPTDMQSWVPLSTDDPVIDRLYL-SSHRGVIADNQAKWAVPTTR---TDDKLRMETCFQQA----------CKGKIQALCENPEWAPLKDNRIPSYGVLSVDLSLTVELKIKIASGFGPLITHGSGMDLYKSNHNNVYWLTIPPMKNLALGVINTLEWIPRFKVSPYLFTVPIKEAGGDCHAP-------------TYLPDGD------VKLSSNLVILPG---QDL-QYVLATYDTSRVE-HAVVYYVYSPSRSFSYFYPFRLPIKGVPIELQVECFTWD----QKLWCRHFCVLADSESGGHITHSGMVGMGVSCT",
-       "-----GAPIH-DPDFIGGIGKELIVDNASD-VTSFYPSAFQEHLNF-IPAPTTGSGCTRIPSFDMSATHYCYTHNVILS--GCRDHSHSHQYLALGVLRTTATGRIFFSTLRSISLDDTQNRKSCSVSATPLGCDMLCSKVTET-------EEEDYNSAVPTLMAHGRLGFDG---QYHEKDLDVTTLFEDWVANYPGVGGGSFIDGRVWFSVYGGLKPNSPSDTVQEGKYVIYKRYNDTCPDEQDYQIRMAKSSYKPGRFGGKRIQQAILSIKVSTSL-GEDPVLTVPPNTVTLMGAEGRILTVGT--SHFLYQRGSSYFSPALLYPMTVSNKTATLHSPYT-------------FNAFTRPGSIPCQASAR---CPNSCVTGVYTDPYPLIFYRNHTLRGVFGTMLDSEQA-RLNPASAVFDS-TSRSRITRVSSSST--KAAYTTSTCFKVVKTNKTYCLSIAEISNTLF--GEFRIVPLLVEILKND"
+       "CADVAAEELMN-AL--VN------N-C-SGP--TTIRGQFSNMSLSLLDLYLGRGYNVSSIVTMTSQG-MYGGTYLVEKPNQ-----LSMYRVFEVGVIRNPGLGAPVFHMTNYLEQPVSNDLSNCMVALGELKLAALCHGE---DS-ITI-PYQGSGKGVSFQLVKLGVWKSPTDMQSWVPLSTDDPVIDRLYL-SSHRGVIADNQAKWAVPT-TR--TDDKLRMETCFQQ-----------ACKGKIQALCE-NPEWAPLKDNRIPSYGVLSVDLSLTVELKIKIASGFGPLITHGSGMDLYKSNHNNVYWLTIPPMKNLALGVINTLEWIP-RFKVSPYLFTVPIKEAGGDCHAP-------------TYLPDGD-----VKLSSNLVILPG---QDL-QYVLATYDTSRVE-HAVVYYVYSPSRSFSYFYPFRLPIKGVPIELQVECFTWD----QKLWCRHFCVLADSESGGHITHSGMVGMGVSCT",
+       "-----GA-PI-HDPDFIGGIGKELIVDNASDVTSFYPSAFQEHLNF-I-PAPTTGSGCTRIPSFDMSATHYCYTHNVILS--GCRDHSHSHQYLALGVLRTTATGRIFFSTLRSISLDDTQNRKSCSVSATPLGCDMLCSKVTETEEEDY-NS---AV-PTLMAHGRLG-FDG--QYHEKDLDVTTLFEDWVANYPGVGGGSFIDGRVWFSVYGGLKPNSPSDTVQEGKYVIYKRYNDTCPDEQDYQIRMAKSSYKPGRF--GGKRIQ-QAILSIKVSTSLGEDPVLTVPPNTVTLMGAEGRILTVGT--SHFLYQRGSSYFSPALLYPMTVSNKTATLHSPYTF-------------NAFTRPGSIPCQASARC---PNSCVTGVYTDPYPLIFYRNHTLRGVFGTMLDSEQA-RLNPASAVFDS-TSRSRITRVSSSS-T-KAAYTTSTCFKVVKTNKTYCLSIAEISNTLF--GEFRIVPLLVEILKND"
       ],
       "usalign": [
        "CADVAAEELMN-AL--VN------N-C-SGP--TTIRGQFSNMSLSLLDLYLGRGYNVSSIVTMTSQG-MYGGTYLVEKPNQ-----LSMYRVFEVGVIRNPGLGAPVFHMTNYLEQPVSNDLSNCMVALGELKLAALCHGE--DS--ITI-PYQGSGKGVSFQLVKLGVWKSPTDMQSWVPLSTDDPVIDRLYL-SSHRGVIADNQAKWAVPT-TR--TDDKLRMETCFQQ-----------ACKGKIQALCENPEWAPLKDNRIPSYGVLSVDLSLTVELKIKIASGFGPLITHGSGMDLYKSNHNNVYWLTIPPMKNLALGVINTLEWIP-RFKVSPYLFTVPIKEAGGDCHAP-------------TYLPDGD-----VKLSSNLVILPG---QDL-QYVLATYDTSRVE-HAVVYYVYSPSRSFSYFYPFRLPIKGVPIELQVECFTWD----QKLWCRHFCVLADSESGGHITHSGMVGMGVSCT",
@@ -3757,11 +5410,11 @@
       ]
      },
      "structure": {
-      "aligned": 379,
-      "rmsd": 4.8452,
-      "tm_score": 0.6909
+      "aligned": 378,
+      "rmsd": 4.6917,
+      "tm_score": 0.6977
      },
-     "tm_difference": -0.0067,
+     "tm_difference": 0.0001,
      "usalign": {
       "aligned": 379,
       "aligned_reported": 379,
@@ -3777,7 +5430,7 @@
    {
     "aligned": 260,
     "extras": 10,
-    "identity": 0.1038,
+    "identity": 0.0769,
     "kind": "positive",
     "length_a": 286,
     "length_b": 413,
@@ -3786,9 +5439,41 @@
     "only_a": 6,
     "pair": "4CH9_A-2VWD_A",
     "pieces": 0,
-    "rmsd": 4.031,
+    "rmsd": 3.9306,
     "same_fold": true,
-    "tm_score": 0.6814,
+    "source_stamp": {
+     "checkout_fingerprint": "7879eea05bd9301c",
+     "code_fingerprint": "7879eea05bd9301c",
+     "foldmap": "0.2.0",
+     "git": {
+      "commit": "55e1a78e9d594601040decb04af43f321622d3d9",
+      "dirty": false,
+      "source": "asserted by runner"
+     },
+     "installed_matches_checkout": true,
+     "package": "checkout",
+     "packages": {
+      "PyYAML": "6.0.3",
+      "gemmi": "0.7.5",
+      "matplotlib": "3.11.2",
+      "networkx": "3.7",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1"
+     },
+     "platform": {
+      "machine": "x86_64",
+      "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43"
+     },
+     "python": {
+      "implementation": "CPython",
+      "version": "3.13.13"
+     },
+     "script": {
+      "name": "scripts/homologues.py",
+      "sha256": "61e02d7fc4adfff81058b1975974aa1f447a37029f358bb9e66a9c6c2ca7555f"
+     }
+    },
+    "tm_score": 0.6937,
     "usalign": {
      "agreement": {
       "close_within_1": 0.0,
@@ -3798,29 +5483,35 @@
      },
      "auto": {
       "method": "structure",
-      "tm_score": 0.6814,
+      "tm_score": 0.6937,
       "within_1": 0.0
      },
      "disagreements": [
-      "A 300-322 (23): not paired",
+      "A 300-301 (2): B shifted -38",
+      "A 302-322 (21): not paired",
       "A 323-324 (2): B shifted -59",
       "A 325-335 (11): B shifted -63",
       "A 336-336 (1): B shifted -64",
       "A 337-356 (20): B shifted -60",
-      "A 357-360 (4): B shifted -57",
-      "A 361-371 (11): B shifted -66",
-      "A 372-372 (1): B shifted -73",
-      "A 373-378 (6): B shifted -66",
-      "A 379-380 (2): B shifted -67",
-      "A 381-381 (1): B shifted -68",
-      "A 382-383 (2): B shifted -72",
+      "A 357-358 (2): B shifted -58",
+      "A 359-359 (1): B shifted -57",
+      "A 360-360 (1): B shifted -56",
+      "A 361-371 (11): B shifted -65",
+      "A 372-378 (7): B shifted -67",
+      "A 379-380 (2): B shifted -68",
+      "A 381-381 (1): B shifted -69",
+      "A 382-382 (1): B shifted -73",
+      "A 383-383 (1): B shifted -72",
       "A 384-394 (11): B shifted -70",
       "A 395-403 (9): B shifted -71",
-      "A 404-404 (1): B shifted -102",
-      "A 405-407 (3): B shifted -107",
-      "A 408-417 (10): B shifted -98",
+      "A 404-404 (1): B shifted -101",
+      "A 405-407 (3): B shifted -106",
+      "A 408-416 (9): B shifted -97",
+      "A 417-417 (1): B shifted -96",
       "A 418-418 (1): B shifted -90",
-      "A 419-428 (10): B shifted -93",
+      "A 419-425 (7): B shifted -93",
+      "A 426-427 (2): B shifted -92",
+      "A 428-428 (1): B shifted -91",
       "A 429-429 (1): B shifted -89",
       "A 430-439 (10): B shifted -90",
       "A 440-441 (2): B shifted -91",
@@ -3829,14 +5520,20 @@
       "A 455-467 (13): B shifted -53",
       "A 468-468 (1): B shifted -50",
       "A 469-477 (9): B shifted -51",
-      "A 478-480 (3): B shifted -48",
-      "A 481-490 (10): B shifted -67",
-      "A 491-497 (7): B shifted -70",
-      "A 498-511 (14): B shifted -71",
+      "A 478-478 (1): B shifted -49",
+      "A 479-480 (2): B shifted -48",
+      "A 481-488 (8): B shifted -67",
+      "A 489-490 (2): B shifted -66",
+      "A 491-497 (7): B shifted -69",
+      "A 498-499 (2): B shifted -70",
+      "A 500-501 (2): not paired",
+      "A 502-509 (8): B shifted -72",
+      "A 510-511 (2): B shifted -71",
       "A 515-515 (1): B shifted -68",
-      "A 516-525 (10): B shifted -67",
-      "A 526-527 (2): B shifted -71",
-      "A 528-535 (8): B shifted -52",
+      "A 516-522 (7): B shifted -67",
+      "A 523-525 (3): B shifted -66",
+      "A 526-526 (1): B shifted -70",
+      "A 527-535 (9): B shifted -52",
       "A 536-536 (1): B shifted -53",
       "A 537-537 (1): B shifted -56",
       "A 538-544 (7): B shifted -53",
@@ -3853,8 +5550,8 @@
      },
      "rows": {
       "foldmap": [
-       "PKVMIVVGGQAPKAIRSVECYDF---------EEDRWDQIAELPSR------RCRAGVVFMAGHVYAVGGFN----GSLRVRTVDVYDGVKD-------QWTSIASMQER--RSTLGAAVLNDLLYAVGGFDGSTG---------LASVEAYSYK--------TNEWFFVAPMN------TRRSSVGVGVVEG-KLYAVGGYDGA----------------------------------SRQCLSTVEQYNPAT---NEWIYVADMS---TRRSGAGVGVLSGQLYATGGHDGPLVRKSVEVYDPGTN-TWKQVADMNMCR-------------------RNAGVCAVNG---LLYVVGG-DDGSCNLASVEYYNPVTDKWTLLPTNMS---TGRSYAGVAVIHK----------------------------------",
-       "-----------------------NICLQKTSNQILKPKLISTLPVVGQSGTCITDPLLAMDEGYFAYSHLERIGSCGVSKQRIIGVGEVLDRGDEVPSLFMTNVWTPPNPNTVYHCSAVYNNEFYYVLCAVSTVGDPILNSTYWSGSLMMTRLAVKPKSNGGGYNQHQLALRSIEKGRYDKVMPYGPSGIKQGDTLYFPAVGFLVRTEFKYNDSNCPITKCQYSKPENCRLSMGIRPNSHYILRSGLLKYNLSDGENPKVVFIEISDQRLSIGSPSKIYDSLGQPVFYQASFSWDTMIKFGDVLTVNPLVVNWRNNTVISRPGQSQCPRFNTCPEICWEGVYNDAFLIDRINWISAGVFLDSNQTAENPVFTVFK---DNEILYRAQLASEDTNAQKTITNCFLLKNKIWCISLVEIYDTGDNVIRPKLFAVKIPEQCT"
+       "PKVMIVVGGQAPKAIRSVECYDF-------EEDRWDQIAELPSR------RCRAGVVFMAGHVYAVGGFN---GS-L-RVRTVDVYDGVK-----DQWTSIASMQE-R--RSTLGAAVLNDLLYAVGGFD-GSTG---------LASVEAYSY-K------TNEWFFVA-PM-N----TRRSSVGVGVVEG-KLYAVGGYDGA----------------------------------SRQCLSTVEQYNPAT---NEWIYVADMS--T-RRSGAGVGVL-SGQLYATGGHDGPLVRKSVEV-YDPGTN-TWKQVAD-MNMC------------------RRNAGVCAVNG---LLYVVGG-DDGSCNLASVEYYNPVTDKWTLLPTNMS---TGRSYAGVAVI-H----K-----------------------------",
+       "NI---------------------CLQKTSNQILKPKLISTLPVVGQSGTCITDPLLAMDEGYFAYSHLERIGSCGVSKQRIIGVGEVLDRGDEVPSLFMTNVWTPPNPNTVYHCSAVYNNEFYYVLCAVSTVGDPILNSTYWSGSLMMTRLAVKPKSNGGGYNQHQLALRSIEKGRYDKVMPYGPSGIKQGDTLYFPAVGFLVRTEFKYNDSNCPITKCQYSKPENCRLSMGIRPNSHYILRSGLLKYNLSDGENPKVVFIEISDQRLSIGSPSKIYDSLGQPVFYQASFS--WDTMIKFGDVLTVNPLVVNWRNNTVISRPGQSQCPRFNTCPEICWEGVYNDAFLIDRINWISAGVFLDSNQTAENPVFTVFK---DNEILYRAQLASEDTNAQKTITNCFLLKNKIWCISLVEIYDTGDNVIRPKLFAVKIPEQCT"
       ],
       "usalign": [
        "--------------------------------------PKVMIVVGGQA---P-KA-IRSVECYD-F-EE----DRWDQIAELPS-R--RCRAGVVFMAGHVYAVGGFN-GSLR---------VRTVDVYDGVK-------DQWTSIA-SM-Q----ERRSTLGAAVLND-LLYAVGGFD-------------------------------G-----STGLASVEAYSYKT---NEWFFVAPMN--T-RRSSVGVGVV-EGKLYAVGGYDGASRQCLSTVEQYNPATN-EWIYVADMSTRR-------------------SGAGVGVLSG---QLYATGG-HDGPLVRKSVEVYDPGTNTWKQVADMNM----CRRNAGVCAV-N---GLLYVVGGDDG---SCNLASVEYYNPVTDKWTLLPTNMSTGRSYAGVAVIHK-",
@@ -3863,10 +5560,10 @@
      },
      "structure": {
       "aligned": 260,
-      "rmsd": 4.031,
-      "tm_score": 0.6814
+      "rmsd": 3.9306,
+      "tm_score": 0.6937
      },
-     "tm_difference": 0.0031,
+     "tm_difference": 0.0154,
      "usalign": {
       "aligned": 258,
       "aligned_reported": 258,
@@ -3880,6 +5577,38 @@
     }
    }
   ]
+ },
+ "source_stamp": {
+  "checkout_fingerprint": "7879eea05bd9301c",
+  "code_fingerprint": "7879eea05bd9301c",
+  "foldmap": "0.2.0",
+  "git": {
+   "commit": "55e1a78e9d594601040decb04af43f321622d3d9",
+   "dirty": false,
+   "source": "asserted by runner"
+  },
+  "installed_matches_checkout": true,
+  "package": "checkout",
+  "packages": {
+   "PyYAML": "6.0.3",
+   "gemmi": "0.7.5",
+   "matplotlib": "3.11.2",
+   "networkx": "3.7",
+   "numpy": "2.5.4",
+   "scipy": "1.18.1"
+  },
+  "platform": {
+   "machine": "x86_64",
+   "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43"
+  },
+  "python": {
+   "implementation": "CPython",
+   "version": "3.13.13"
+  },
+  "script": {
+   "name": "scripts/homologues.py",
+   "sha256": "61e02d7fc4adfff81058b1975974aa1f447a37029f358bb9e66a9c6c2ca7555f"
+  }
  },
  "usalign_version": "20241108"
 }

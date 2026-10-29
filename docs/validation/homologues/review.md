@@ -1,5 +1,10 @@
 # Homologue held-out set: review (plan 13a, Task 13a-11)
 
+Since the freeze, `usalign.json`, `usalign-report.md` and the summary's `usalign` entry are the US-align comparison
+measured again at v0.2.0 (33 of 34 meet both limits, the same pairs and TM-scores as `aligner-seeds/`); plan 23's,
+which this review's US-align sections read as "`usalign.json`" and "`usalign-report.md`", are kept as
+`usalign-plan23.json` and `usalign-plan23-report.md`.
+
 One run at c099787 with the limits frozen at 76fd936; the table is `heldout-report.md`, the numbers
 `heldout-summary.json`. Nothing was changed after the run. Every failure below is reported as measured, with what
 the run's own output and pages show; none is fixed here.

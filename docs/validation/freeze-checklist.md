@@ -20,6 +20,7 @@ record. A record whose number the paper quotes is regenerated before the paper q
 | `na-fixes/` | 6ca884c | stamped at a pre-release commit; `na_runs:_JOINT_NEAR` was pruned after it (the prune measured the NA set identical) | `scripts/na_fixes_record.py` |
 | `domain-uncertainty/` | 42e3fe8 | stamped at a pre-release commit | `scripts/domain_uncertainty.py` |
 | `homologues/topology-transfer/` | cdd29dd | H1-H5 not remeasured since; low risk (domain-name placement and NA joints only changed) | `scripts/topology_transfer.py`, with the other homologue campaigns |
+| `homologues/` US-align comparison (`usalign.*`, the summary's `usalign` entry) | c22ba5f | the paper quotes its agreement (claim H2); the aligner changed in plan 24 | `homologues.py align --usalign` on both sets, then `usalign-report`; rerun at v0.2.0 (33 of 34; plan 23's kept as `usalign-plan23.*`) |
 | `random100/`, `random100-heldout/` | 7696947; rerun at v0.2.0 (91 and 94 of 100) | "on this release" in the paper is false until they are rerun (claims R8, R9) | `random100.py run` at the tag, not for the headline |
 | `random100-third/` | 7696947 | kept as it is: a historical prospective evaluation at 7696947 | none |
 | `na/` (and the M2 NA rerun) | older code; rerun at v0.2.0 (34 of 39, as before) | the NA campaign the paper quotes | `M2_RERUN=1 scripts/paper/run_all.sh TAG HARNESS` |
