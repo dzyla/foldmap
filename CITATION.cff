@@ -7,8 +7,8 @@ url: "https://github.com/dzyla/foldmap"
 authors:
   - family-names: Zyla
     given-names: Dawid
-version: 0.1.0
-date-released: 2026-10-12
+version: 0.2.0
+date-released: 2026-10-28
 license: AGPL-3.0-or-later
 keywords:
   - protein topology

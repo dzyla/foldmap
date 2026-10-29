@@ -2,7 +2,7 @@
 # Copyright (C) 2026 Dawid Zyla. Additional terms (AGPL-3.0 section 7(b)): see NOTICE.
 """foldmap: publication-grade protein topology diagrams."""
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 ATTRIBUTION = "foldmap, by Dawid Zyla"
 
