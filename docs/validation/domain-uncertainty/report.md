@@ -1,6 +1,6 @@
 # The automatic domains with their uncertainty
 
-Plan 28 Task 5 (the review's 3.4, rulings Q42, Q43). Written by: foldmap 0.1.0, git 42e3fe80e84b (asserted by runner, dirty False), code fingerprint 4eb4cad74365b1ed, scripts/domain_uncertainty.py sha256 7bf6bc844b98; Python 3.13.13 on Linux-7.0.0-38-generic-x86_64-with-glibc2.43; gemmi 0.7.5, numpy 2.5.4, scipy 1.18.1, networkx 3.7, matplotlib 3.11.2, PyYAML 6.0.3
+Plan 28 Task 5 (the review's 3.4, rulings Q42, Q43). Written by: foldmap 0.2.0, git 3990050bc734 (asserted by runner, dirty False), code fingerprint 7879eea05bd9301c, scripts/domain_uncertainty.py sha256 7bf6bc844b98; Python 3.13.13 on Linux-6.8.0-138-generic-x86_64-with-glibc2.35; gemmi 0.7.5, numpy 2.5.4, scipy 1.18.1, networkx 3.7, matplotlib 3.11.2, PyYAML 6.0.3
 
 Sets, tagged as scripts/paper/sets.json tags them: dom_cal, 22 chains (tuning); dom_held, 11 chains (regression); dom_fresh, 11 chains (regression); r100_third, 109 chains (unseen at 7696947, historical; looked at again here). dom_cal and dom_held are the reference chains split chain by chain (seed 20261016:domains), as the parameters were chosen. A chain meets the targets (S5) when its overlap, boundary F1 and recall are each at least 0.8, 0.7 and 0.85 against CATH (domain_score, boundaries within 20 residues). DOMAIN_NCUT is 0.37. report-chains.json holds each chain's cuts, trace and scores at every t.
 

@@ -1,12 +1,12 @@
 {
  "source_stamp": {
-  "foldmap": "0.1.0",
-  "code_fingerprint": "d3481a10e388ea51",
+  "foldmap": "0.2.0",
+  "code_fingerprint": "7879eea05bd9301c",
   "package": "checkout",
-  "checkout_fingerprint": "d3481a10e388ea51",
+  "checkout_fingerprint": "7879eea05bd9301c",
   "installed_matches_checkout": true,
   "git": {
-   "commit": "aaee6de35d8ff08e260a777025804e12077e4c59",
+   "commit": "e1392f79daf7af623eb262bf476857cbb3dffc5e",
    "dirty": false,
    "source": "asserted by runner"
   },
@@ -19,7 +19,7 @@
    "implementation": "CPython"
   },
   "platform": {
-   "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+   "platform": "Linux-6.8.0-138-generic-x86_64-with-glibc2.35",
    "machine": "x86_64"
   },
   "packages": {

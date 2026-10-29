@@ -1,6 +1,6 @@
 # The topology carried by --like
 
-Plan 28 Task 6 (the review's 3.5, ruling Q44). Written by: foldmap 0.1.0, git cdd29dd49035 (asserted by runner, dirty False), code fingerprint 4eb4cad74365b1ed, scripts/topology_transfer.py sha256 731bc36e96e0; Python 3.13.13 on Linux-7.0.0-38-generic-x86_64-with-glibc2.43; gemmi 0.7.5, numpy 2.5.4, scipy 1.18.1, networkx 3.7, matplotlib 3.11.2, PyYAML 6.0.3
+Plan 28 Task 6 (the review's 3.5, ruling Q44). Written by: foldmap 0.2.0, git e1392f79daf7 (asserted by runner, dirty False), code fingerprint 7879eea05bd9301c, scripts/topology_transfer.py sha256 731bc36e96e0; Python 3.13.13 on Linux-6.8.0-138-generic-x86_64-with-glibc2.35; gemmi 0.7.5, numpy 2.5.4, scipy 1.18.1, networkx 3.7, matplotlib 3.11.2, PyYAML 6.0.3
 
 Whether a sheet drawn like a reference keeps the reference's strand order and direction. Each pair is drawn like A twice: **carried**, as foldmap draws it (each of B's sheets reads left to right as A reads its mates, Like.order, where like._order says), and **withheld**, the same with like._order answering None, so each sheet's order is its own (layout._sheet_order's default). Both are judged by H1-H5 as the homologue campaign judges them (scripts/homologues.py; limits criteria.LIMITS, frozen at 76fd936). The record is made by scripts/topology_transfer.py; report.json holds every pair and sheet.
 
