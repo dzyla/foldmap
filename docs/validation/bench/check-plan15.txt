@@ -1,0 +1,23 @@
+1BL8         12 el    0.06 s    20.0 x  15.3  _attract=0.02 _separate=0.01  identical
+1C3W         30 el    0.14 s    54.3 x  16.0  read_model=0.01 _ligands=0.01 _attract=0.06 _separate=0.04  identical
+1EMA         16 el    0.03 s    13.2 x  16.8  _attract=0.02  identical
+1LMB         12 el    0.05 s    18.2 x  15.4  _attract=0.02  identical
+1TIM         41 el    0.26 s    56.1 x  13.2  read_model=0.01 _attract=0.02  identical
+1UBQ          8 el    0.02 s    11.9 x   6.5  _attract=0.01  identical
+1ZAA          9 el    0.05 s    14.5 x  11.7  _attract=0.03  identical
+25IN         78 el    0.24 s    39.4 x  32.8  read_model=0.01 _attract=0.13 _separate=0.06  identical
+2HHB         34 el    0.10 s    39.8 x  17.6  read_model=0.01 _attract=0.05 _separate=0.02  identical
+2JTY         11 el    0.14 s    11.4 x  16.8  read_model=0.04 _attract=0.08  identical
+2LZM         13 el    0.05 s    17.3 x  11.0  _attract=0.03  identical
+4CH9         29 el    0.06 s    12.4 x  19.1  read_model=0.01 _attract=0.03  identical
+5NKT         12 el    0.02 s    13.7 x  12.9  _attract=0.01  identical
+6R74         12 el    0.02 s    13.7 x  13.3  _attract=0.01  identical
+6Y7S         13 el    0.05 s    14.8 x  16.1  read_model=0.01 _attract=0.01  identical
+6ZS5         19 el    0.08 s    14.8 x  17.9  _attract=0.07  identical
+6ZYA         29 el    0.50 s    15.5 x  37.1  read_model=0.02 _attract=0.44  identical
+8UTF         91 el    1.26 s    53.8 x  51.2  read_model=0.01 _attract=1.16 _separate=0.04  identical
+8UUP        121 el    0.66 s    83.7 x  32.5  read_model=0.01 _attract=0.55 _separate=0.04  identical
+9TX7         48 el    0.19 s    56.8 x  13.6  read_model=0.01 _attract=0.10 _separate=0.05  identical
+AF-P04637    16 el    0.05 s    12.6 x  15.3  _attract=0.04  identical
+big32       272 el    1.14 s    77.7 x 107.2  read_model=0.04 _ligands=0.01 _attract=0.48 _separate=0.32  identical
+check exit 0
