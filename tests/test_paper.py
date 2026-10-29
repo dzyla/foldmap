@@ -552,3 +552,16 @@ def test_na_measures_tag_the_guards_and_give_stems_nearer_its_distribution():
     assert got["fidelity"]["mirrored"] == {"measured": 3, "stems": 2, "entries_with_mirrored": ["B"]}
     assert got["fidelity"]["spearman"]["n"] == 2 and got["fidelity"]["procrustes"] == {"n": 0}
     assert common.nearer_applies(rows[2]) is False and common.nearer_applies(rows[3]) is None
+
+
+def test_m2_compares_the_na_rerun_with_a_committed_report_that_holds_pk_measures():
+    """The freeze: the committed NA record rerun at v0.2.0 holds the pk_* measures the rerun holds; they are left out
+    on both sides, so the rerun equals it (before, only the rerun's were, and no such record could ever equal it)."""
+    m2 = _load("m2")
+    row = {"entry": "1EHZ", "failed": [], "procrustes": 0.2, "seconds": 3.0}
+    pk = {"pk_found": 1, "pk_reference": 1, "deposited_pk_found": 1}
+    assert m2.na_same([row | pk], [row | pk | {"seconds": 9.0}])
+    assert m2.na_same([row | pk], [row])  # a committed report from before the pk_* measures
+    assert not m2.na_same([row | {"procrustes": 0.3}], [row])
+    assert not m2.na_same([row | {"failed": ["spearman"]}], [row])
+    assert not m2.na_same([row | {"entry": "1FFK"}], [row])  # an entry the committed report lacks

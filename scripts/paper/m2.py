@@ -493,6 +493,24 @@ def _na_code(raw) -> str:
     return f"{stamped_commit(raw)}, verified"
 
 
+def na_same(rerun: list[dict], committed: list[dict]) -> bool:
+    """Whether the NA rerun's rows equal the committed report's but for seconds, the stamp and the pk_* measures,
+    dropped from both sides (a committed report written since the pk_* measures were added holds them too: the
+    freeze's NA record, rerun at v0.2.0)."""
+
+    def bare(e: dict) -> dict:
+        return {
+            k: v
+            for k, v in e.items()
+            if k not in ("seconds", "source_stamp") and not k.startswith(("pk_", "deposited_pk_"))
+        }
+
+    old = {e["entry"]: e for e in committed}
+    return all(e["entry"] in old and bare(e) == bare(old[e["entry"]]) for e in rerun) and sum(
+        not e["failed"] for e in rerun
+    ) == sum(not e["failed"] for e in committed)
+
+
 def build_pk(nb, committed_na: list[dict]) -> None:
     path = M2 / "na" / "report.json"
     if not path.exists():
@@ -500,15 +518,7 @@ def build_pk(nb, committed_na: list[dict]) -> None:
     raw = json.loads(path.read_text(encoding="utf-8"))
     quotable("data/m2/na/report.json", raw)
     rep = na_rows(raw)
-    passed = sum(not e["failed"] for e in rep)
-    old = {e["entry"]: e for e in committed_na}
-    skip = ("seconds", "source_stamp")
-    same = all(
-        {k: v for k, v in e.items() if k not in skip and not k.startswith(("pk_", "deposited_pk_"))}
-        == {k: v for k, v in old[e["entry"]].items() if k not in skip}
-        for e in rep
-    )
-    if not same or passed != sum(not e["failed"] for e in committed_na):
+    if not na_same(rep, committed_na):
         raise SystemExit("NA rerun differs from the committed report beyond pk_* and seconds")
     commit = _na_code(raw)  # from the report's own stamp, verified (rulings Q11, Q18; no COMMIT file)
     src = [
